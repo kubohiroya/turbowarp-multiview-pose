@@ -13,10 +13,13 @@ as a temporary sprite skin.
 - Generates lossless QR SVGs through Version 40 and displays them on a sprite.
 - Restores the sprite's original skin and discards sensitive temporary data on cleanup.
 - Runs MoveNet MultiPose Lightning for up to six tracked people through TensorFlow.js WebGPU only.
-- Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
-- Validates and round-trips all five pinned multiview-pose v1 application contracts.
+- Reports COCO-17 observations as `twmp/pose-frame-2d` version 1, or version 2 with glow stick markers.
+- Owns and validates the multiview-pose application contracts, including PoseFrame2D v1 and v2.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
 - Retargets external PoseFrame3D v1 data onto up to six declarative A-Frame avatar rigs.
+- Buffers jittered PoseFrame2D streams per camera and resamples every camera at one past instant.
+- Triangulates the synchronized 2D sets into `twmp/pose-frame-3d` version 1 poses.
+- Reads a uniquely colored glow stick per performer to name and track them and to fix back views.
 
 - Shows a time coded pattern and decodes it per camera to measure frame recording latency.
 
@@ -63,6 +66,16 @@ Enable avatar retargeting independently:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {avatarRetargetV1: true};
+Enable multi-camera 3D pose fusion independently:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
+```
+
+Enable glow stick markers independently:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {glowStickMarkers: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -80,7 +93,7 @@ extension neither uploads nor stores the QR image as a project costume.
 Load `dist/turbowarp-multiview-pose.js` as an unsandboxed custom extension. A version-pinned package URL is:
 
 ```text
-https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.1.0/dist/turbowarp-multiview-pose.js
+https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.2.0/dist/turbowarp-multiview-pose.js
 ```
 
 ## Quick start
@@ -161,6 +174,83 @@ PoseFrame3D is boundary data produced by a separate 3D service. This extension c
 triangulate observations, or solve 3D coordinates. Kalidokit is deprecated upstream and was designed
 for BlazePose landmarks, so release validation must include the intended GLTF rigs and real browser
 motion; no custom solver fallback is provided.
+The fusion app pipeline consumes PoseFrame2D JSON that WebRTC data channels deliver from every
+camera peer, and needs one CameraCalibration v1 profile per camera:
+
+```text
+load fusion camera calibration [(camera-1 profile JSON)]
+load fusion camera calibration [(camera-2 profile JSON)]
+start pose fusion delay [120] ms jitter [80] ms min keypoint score [0.3]
+forever:
+  buffer PoseFrame2D JSON [(received data channel message)]
+  fuse PoseFrame3D at buffered delay
+  set [poseJson] to (latest PoseFrame3D JSON)
+stop pose fusion
+```
+
+Each camera keeps its own timestamp-ordered ring buffer. A frame that arrives out of order inside
+the jitter window is inserted at its timestamp position. A frame is counted by
+`dropped pose frame count` instead of being buffered when its camera has no loaded profile
+(`unknown-camera`), when its `calibrationId` or frame size does not match that profile
+(`calibration-mismatch`), when its timestamp is already buffered, when it is older than the jitter
+window, and when it is older than the retained window of a full ring. Load every camera profile
+before the frames of that camera start arriving.
+
+`fuse PoseFrame3D at buffered delay` fuses the instant one configured delay behind the newest
+buffered timestamp, which is why the delay must cover the slowest camera's jitter. Every camera is
+resampled at that shared instant: a bracketed keypoint is interpolated linearly, a keypoint that is
+occluded on one side of the bracket keeps the visible observation, and a camera without a bracket
+holds its nearest frame for at most one jitter window. Use `fuse PoseFrame3D at timestamp [] us` to
+fuse an explicit past instant instead.
+
+The synchronized 2D sets are associated across cameras by two-view reprojection error, so one person
+never takes two views from the same camera. Each cluster seen by at least two cameras is triangulated
+per keypoint with score weighting and a cheirality check, and keeps a stable `person-N` identifier.
+When the views of a keypoint disagree, the largest set of views that agree on one point within the
+reprojection threshold wins, so a minority of wrong detections is discarded rather than pulling the
+keypoint away from the truth. A keypoint left with fewer than two confident views holds its last
+triangulated position and reports score `0`.
+
+Transient shortages do not throw and do not replace the last fused frame: `fuse` reports `false`,
+`pose fusion state` returns `buffering`, and `pose fusion error code` returns `empty-buffer`,
+`insufficient-cameras`, or `no-fused-person`. Frames that cannot be buffered report
+`unknown-camera`, `calibration-mismatch`, or `frame-dropped` without throwing, so one misconfigured
+peer cannot break a running project script. Invalid JSON, a foreign schema, and an invalid
+calibration profile throw.
+
+Performers may also carry a uniquely colored glow stick, which the camera app samples on the same
+video frame as the keypoints:
+
+```text
+start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
+sample glow stick colors at [right_wrist,left_wrist]
+forever:
+  infer latest pose frame timestamp [(synchronized timestamp us)] us
+  set [poseJson] to (latest PoseFrame2D JSON)
+```
+
+While sampling is on, `latest PoseFrame2D JSON` reports `twmp/pose-frame-2d` version 2: every person
+carries up to four markers naming the COCO-17 keypoint where a saturated color was found, its
+`#RRGGBB` value, and the patch coverage behind it. Turning sampling off returns the reporter to
+version 1. The color travels inside the pose frame, so the fusion app never has to time-align a
+second message.
+
+The fusion app maps colors to performers with the Performance DSL, which already owns
+`glowStickColor`, and chooses which keypoint each performer carries the light at:
+
+```text
+load glow stick palette from PerformanceDSL [(performance DSL JSON)]
+set performer [actor-1] glow stick at [right_wrist]
+set performer [actor-2] glow stick at [right_wrist]
+```
+
+The palette does two things for accuracy. A fused person identified by color takes its `personId`
+from the performer, so identity survives occlusion, re-entry, and tracking-ID churn, and two views of
+different performers are never merged. When the color instead appears on the mirror of the
+performer's keypoint, that camera read a back view as a front view: the fusion swaps the left and
+right labels of that view before triangulating, which removes the front/back confusion that
+otherwise drags a wrist across the body. `identified performer count` and
+`mirror-corrected view count` report both effects.
 
 The frame sync vertical slice measures how long after the projected pattern each camera computer
 finishes recording a frame:
@@ -829,6 +919,259 @@ Returns the display time decoded out of the taken frame, within the current patt
 | Type | Reporter |
 | Opcode | `frameSyncPatternTimestampUs` |
 
+### `start pose fusion delay [DELAY_MS] ms jitter [JITTER_MS] ms min keypoint score [MIN_SCORE]`
+
+Starts the multi-camera jitter buffer that fuses one past instant behind the newest frame.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `startPoseFusion` |
+| `DELAY_MS` | Number, default: `120` |
+| `JITTER_MS` | Number, default: `80` |
+| `MIN_SCORE` | Number, default: `0.3` |
+
+### `stop pose fusion`
+
+Clears every buffered frame and fused result while keeping loaded calibration profiles.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `stopPoseFusion` |
+
+### `cleanup pose fusion`
+
+Clears buffered frames, fused results, and every loaded fusion calibration profile.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `cleanupPoseFusion` |
+
+### `load fusion camera calibration [JSON]`
+
+Loads one CameraCalibration v1 profile and derives its world-to-camera projection.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `loadFusionCameraCalibration` |
+| `JSON` | String, default: `{}` |
+
+### `buffer PoseFrame2D JSON [JSON]`
+
+Validates one PoseFrame2D v1 and inserts it into its camera ring buffer in timestamp order.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `bufferPoseFrame2D` |
+| `JSON` | String, default: `{}` |
+
+### `fuse PoseFrame3D at buffered delay`
+
+Fuses the instant one configured delay behind the newest buffered timestamp.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `fuseBufferedPoseFrame3D` |
+
+### `fuse PoseFrame3D at timestamp [TIMESTAMP_US] us`
+
+Fuses one explicit past instant expressed in the synchronized microsecond time base.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `fusePoseFrame3DAt` |
+| `TIMESTAMP_US` | Number, default: `0` |
+
+### `latest PoseFrame3D JSON`
+
+Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `latestPoseFrame3D` |
+
+### `synchronized 2D pose set JSON`
+
+Returns the last resampled per-camera 2D keypoint set used for triangulation.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `synchronizedPoseSet2D` |
+
+### `pose fusion state`
+
+Returns idle, buffering, fusing, ready, or error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionState` |
+
+### `pose fusion ready?`
+
+Returns true when fusion is started and at least two cameras are calibrated.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `poseFusionReady` |
+
+### `fusion calibrated camera count`
+
+Returns how many camera calibration profiles are loaded for fusion.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionCameraCount` |
+
+### `buffered pose frame count`
+
+Returns how many PoseFrame2D frames are currently retained across all ring buffers.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionBufferedFrameCount` |
+
+### `dropped pose frame count`
+
+Returns how many frames were rejected as duplicates or as arrivals past the jitter window.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionDroppedFrameCount` |
+
+### `fused person count`
+
+Returns how many people the last successful fusion produced.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionPersonCount` |
+
+### `fused timestamp us`
+
+Returns the synchronized timestamp of the last successful fusion in microseconds.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionTimestampUs` |
+
+### `fused mean reprojection error px`
+
+Returns the mean reprojection error of the last successful fusion in pixels.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionReprojectionErrorPx` |
+
+### `pose fusion error code`
+
+Returns the latest fusion error code, or an empty string.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionErrorCode` |
+
+### `pose fusion error`
+
+Returns the latest fusion error message.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseFusionError` |
+
+### `sample glow stick colors at [KEYPOINTS]`
+
+Samples the named COCO-17 keypoints for a uniquely colored glow stick and reports PoseFrame2D v2.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `enableGlowStickMarkers` |
+| `KEYPOINTS` | String, default: `right_wrist,left_wrist` |
+
+### `stop sampling glow stick colors`
+
+Returns pose reporting to PoseFrame2D v1 without glow stick markers.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `disableGlowStickMarkers` |
+
+### `glow stick marker count`
+
+Returns how many glow stick markers the latest pose frame carries.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `glowStickMarkerCount` |
+
+### `load glow stick palette from PerformanceDSL [JSON]`
+
+Loads the performer colors from a Performance DSL v1 payload for fusion identity.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `loadGlowStickPalette` |
+| `JSON` | String, default: `{}` |
+
+### `set performer [PERFORMER_ID] glow stick at [KEYPOINT]`
+
+Chooses which COCO-17 keypoint one performer carries the glow stick at.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `setPerformerGlowStick` |
+| `PERFORMER_ID` | String, default: `actor-1` |
+| `KEYPOINT` | String, default: `right_wrist` |
+
+### `glow stick palette size`
+
+Returns how many performers the loaded palette describes.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `glowStickPaletteSize` |
+
+### `identified performer count`
+
+Returns how many fused people the last fusion identified by glow stick color.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `identifiedPerformerCount` |
+
+### `mirror-corrected view count`
+
+Returns how many camera views the last fusion corrected for swapped left and right labels.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `mirrorCorrectedViewCount` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -851,6 +1194,16 @@ Returns the display time decoded out of the taken frame, within the current patt
 | Resolution changes mid-session | The sample is rejected with `resolution-mismatch`. |
 | Weak or duplicate board view | The sample is rejected without entering the solve set. |
 | Cancel/reload/disposal | Camera lease and temporary samples are released; the last valid profile remains. |
+| Fusion flag OFF | Fusion blocks are hidden; the other vertical slices remain independent. |
+| Late or duplicate 2D frame | The frame is counted by `dropped pose frame count` and never enters a ring buffer. |
+| Instant without two cameras | Fusion reports `insufficient-cameras`, keeps the last fused frame, and does not throw. |
+| Keypoint with fewer than two views | Its last triangulated position is held and its score is reported as `0`. |
+| Frame without a matching profile | The frame is dropped with `unknown-camera` or `calibration-mismatch`; it never reaches a ring buffer. |
+| Scripts finish running | Buffered frames survive; only the stop button, project reload, and disposal clear them. |
+| Fusion stop/reload/disposal | Buffers and fused results are cleared; loaded calibration profiles survive until cleanup. |
+| Glow stick flag OFF | Marker blocks are hidden, pose frames stay version 1, and fusion behaves exactly as before. |
+| Unmatched glow stick color | The person keeps a `person-N` identity; no performer is claimed twice in one camera. |
+| Color on the mirrored keypoint | That view's left and right labels are swapped before triangulation. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.
@@ -882,11 +1235,11 @@ tracking IDs, non-overlap behavior, fail-closed backend checks, and cleanup. The
 real WebGPU adapter or download the production model; browser/GPU compatibility and throughput
 must be verified separately on deployment hardware.
 
-`schemas/protocol-v1-integrity.json` pins the source repository commit and canonical SHA-256 for all
-five schemas. Repository checks always compare the runtime TypeBox definitions to those digests and,
-when a sibling multiview-pose checkout (or `MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`) is available, also
-fail on upstream working-copy drift. Contract fixtures are copied from that pinned package and
-cross-checked against both the schema and block-facing codec.
+This package owns the application contracts. `src/protocol/schemas.ts` is their source of truth, and
+`pnpm run schemas` regenerates the published JSON Schemas in `schemas/`, which the repository check
+compares against the TypeBox definitions. Applications depend on this package; this package never
+reads contract definitions from an application repository. Contract fixtures are validated against
+both the schema and the block-facing codec.
 
 Calibration uses one production backend: exact-pinned `@techstark/opencv-js` 4.12.0-release.1. A
 requested sample lazily initializes the bundled backend and copies one video frame to a temporary

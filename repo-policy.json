@@ -12,7 +12,12 @@
     "minimum": "22.18.0"
   },
   "packageManager": "pnpm",
-  "requiredFiles": ["README.md", "README.ja.md", "THIRD_PARTY_NOTICES.md", "LICENSE"],
+  "requiredFiles": [
+    "README.md",
+    "README.ja.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
+  ],
   "exceptions": {
     "upstreamFork": false,
     "mixedContentLicenses": false,
@@ -32,6 +37,15 @@
     "Treat pose and frame sync timestamps as opaque values from an external synchronized time service; do not add clock probe, offset, ping, or pong logic.",
     "Treat PoseFrame3D as external boundary data; do not add frame alignment, history queries, triangulation, or 3D solving.",
     "Keep the frame sync pattern behind its independent startup-fixed default-OFF flag and report calibration failures instead of untrusted latencies.",
+    "Keep multi-camera 3D pose fusion behind its independent startup-fixed default-OFF flag.",
+    "Keep fusion limited to buffering, reordering, and resampling supplied timestamps; do not estimate per-camera clock offsets.",
+    "Validate every fused frame against the pinned PoseFrame3D v1 schema before retaining it.",
+    "Keep glow stick markers behind their independent startup-fixed default-OFF flag and sample colors only from the leased camera frame.",
+    "Own the application contracts here: src/protocol/schemas.ts is the source of truth and schemas/ holds its generated JSON Schemas.",
+    "Never take contract definitions from the application repository; applications depend on this package, never the reverse.",
+    "Reject unknown versions and pairing credentials in persistent contracts, and add a new contract version instead of editing a published one.",
+    "Treat pose timestamps as opaque values from an external synchronized time service; do not add clock probe, offset, ping, or pong logic.",
+    "Keep avatar retargeting free of frame alignment, history query, triangulation, and 3D solving; that work belongs to the fusion module behind its own flag.",
     "Do not add CPU, WASM, or WebGL inference fallback or direct getUserMedia calls.",
     "Run pnpm run check before publishing generated artifacts."
   ]

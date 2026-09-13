@@ -57,10 +57,18 @@ QR skinへ切り替えます。明示終了、project停止、extension dispose�
 version推測やfallbackは行いません。decode成功時はcompact JSONを1件保持し、失敗時は保持値を
 消去して、最初の診断をJSON Pointer pathとmessageとして公開します。
 
-schema定義は`schemas/protocol-v1-integrity.json`に記録したcommit時点の
-`@multiview-pose/protocol`を反映します。5 runtime定義すべてをcanonical JSON SHA-256で固定し、
-利用可能な上流working checkoutともrepository checkで比較します。schema変更時はpin、実装、
-fixture、compatibility判断を同時に更新しない限りcheckが失敗します。
+契約は本packageが所有します。正本は`src/protocol/schemas.ts`、`pnpm run schemas`が`schemas/`配下の
+配布用JSON Schemaを生成し、repository checkは、生成物が定義からdriftした場合、file名が宣言した
+`version` literalや`$id`と食い違う場合、dispatch対象のversionに対応するfileが無い場合に失敗します。
+applicationは本packageと配布された`schemas/`を通して契約を利用します。本packageがapplication
+repositoryから契約定義を読むことはなく、依存方向はapplication → extensionの一方向に保たれます。
+
+契約はversionを切って追加し、公開済みversionを書き換えません。`protocolSchemas`はschema識別子と
+versionの2段でdispatchするため、`twmp/pose-frame-2d`はv1とv2を受理し、v1利用者はv2 payloadを
+拒否し続けます。PoseFrame2D v2は人物ごとに最大4件のサイリウムmarkerを追加します。各markerは、
+一意な色の発光体を観測したCOCO-17 keypoint、`#RRGGBB`の色、patch内で色が占めた割合を持ちます。
+色はkeypointと同一の映像frame・同一のcapture timestampの観測なので、別messageではなくpose frame
+内で運び、受信側での時刻対応付けを不要にします。
 
 TypeBoxのtuple／array制約でCOCO-17順序、6人上限、matrix size、各数値境界を保証します。
 別の再帰key guardにより、WebRTC offer／answer、SDP、ICE／DTLS material、credential fieldを
@@ -170,3 +178,74 @@ animation frameで描いた内容は次のリフレッシュで画面に出る�
 必要な呼び出し側のために、browserが報告するframe ageは別に公開します。clock probe、latency
 サンプル、カメラ別の集計レポートはWebRTC機能拡張側の責務なので、clock・offset・ping・pongの
 ロジックはここには置きません。
+## 多視点3D pose fusion
+
+`poseFusion3D`は独立した起動時固定・既定OFF flagです。bufferへ入力するPoseFrame2D JSONは
+fusion appがWebRTC data channelで受信したものであり、本機能拡張はtransportもclockも所有しません。
+
+cameraごとにtimestamp順のring bufferを持ちます。slot数は設定delayとjitter windowから算出し、
+16〜600 frameに制限します。buffer対象cameraは最大16台です。jitter window内で順序が入れ替わった
+frameは、ringの短い側をずらしてtimestamp位置へ挿入するため、通常の順序どおりの追加はO(1)の
+ままです。timestampの重複、最新frameからjitter windowより古い到着、満杯ringの最古frameより
+古い到着はdropとして計上し、bufferしません。ここではcameraごとのclock offsetを推定しません。
+capture timestampは別実装の同期済みlocal time serviceが与える不透明値のまま扱います。
+
+frameをbufferするのは、その`cameraId`のcalibration profileが読み込み済みで、かつそのprofileが
+frameを説明できる場合だけです。`calibrationId`や解像度が一致しないframeは、誤ったintrinsicで
+そのまま三角測量されてしまうため拒否します。これらは重複や遅延到着と同様にdropとして計上し、
+throwしません。ingestはdata channelのhot pathであり、設定を誤ったpeer 1台で実行中のscriptを
+止めるべきではないからです。calibration済みcameraしかbufferしないので、未知のcamera IDが
+ring bufferを占有することもありません。
+
+`fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayを引いた1つの過去の
+瞬間を解決し、全cameraをその瞬間で再sampleします。前後のframeで挟めたkeypointは線形補間し、
+片側がocclusionのkeypointは低信頼値を混ぜず見えている側の観測を採用します。挟めないcamera、
+またはjitter windowの2倍より広い間隔しかないcameraは、最大1 jitter windowだけ直近frameを保持し、
+それを超える場合は寄与しません。
+
+camera間の対応付けは、異なるcameraの追跡人物のすべての組について、共有する確信のあるkeypoint
+での2視点reprojection誤差の平均をcostとし、共有keypointは4点以上・最大12点で打ち切ります。costの
+小さい組から貪欲にmergeし、同一cameraの2視点が1人になるmergeは拒否します。2視点の三角測量は
+2本の視線の最短距離の中点を閉形式で求め、この二乗オーダーの段を反復解法から外します。3視点
+以上はscore重み付き線形解法（Jacobiは相対収束判定）を使います。16 camera×6人の上限で1回の統合
+は約80 ms、4 camera×2人では約1 msです。
+
+2台以上のcameraが覆うclusterは、keypointごとにcheirality判定とreprojection判定付きで三角測量
+します。全視点が一致しない場合は、2視点ごとの仮解に対してreprojection閾値内に収まる視点数を
+数え、最大の一致集合で三角測量し直します。これにより少数の誤検出はkeypointを引きずらずに
+捨てられます（視点が2つの解に均等に割れる場合は原理的に区別できません）。pixel観測はprofileの
+OpenCV rational modelで歪み補正するため、係数0／4／5／8個に対応し、それ以外はprofile読み込み時
+に拒否します。
+
+registryはcameraとtracking IDの重なりから`person-N`のidentityを維持し、keypointごとに最後に
+三角測量できた位置を保持します。確信のある視点が2つ未満のkeypointはその位置を保持してscore `0`
+を返し、実測値と保持値を利用側が区別できるようにします。組み立てたframeは保持する前に、
+pinnedのPoseFrame3D v1 schemaで検証します。
+
+bufferが空、覆うcameraが2台未満、多視点で見えた人物がいない場合は想定内の一時状態として
+`false`を返し、直前の統合結果を保持したままerror codeを公開します。不正なJSON、他contractの
+schema、不正なcalibration profileはerrorになります。停止ボタン、project reload、extension dispose
+ではbufferと統合結果を解放し、明示cleanupでは読み込み済みcalibration profileも解放します。
+`PROJECT_RUN_STOP`では解放しません。runtimeはthread queueが空になるたびにこのeventを出すため、
+hat scriptでframeをbufferするevent駆動のprojectがmessageの合間にjitter bufferを失ってしまいます。
+camera leaseと一時skinはこのeventでも解放します。
+
+## サイリウムによる識別と向きの補正
+
+`glowStickMarkers`は独立した起動時固定・既定OFF flagです。camera側では推論のたびに、追跡中の各
+人物について設定したkeypointごとに1つのpatchを、keypointと同一の映像frameから、直後に破棄する
+一時canvas経由でsampleします。patchはhueで評価します。彩度または明度が閾値未満のpixelは無視し、
+残りのhueを円環平均するため、0度をまたぐ赤は赤のまま扱えます。色が占める割合が閾値を超えた場合
+だけmarkerとして採用し、keypointごとに最も強い観測をPoseFrame2D v2のmarkerにします。sampleを
+止めている間、frameはv1のままです。
+
+fusion側では、performance DSLが演者の色を与え、演者がサイリウムを持つkeypointはfusion側の設定と
+します（その契約は持ち手を記述しないため）。cameraのsampleごとに、観測の強い順で貪欲に割り当て、
+1人の演者が同じcameraで2人を占めることはありません。
+
+割り当ては2つの効果を持ちます。1つは識別です。統合された人物は演者IDを`personId`とするため、
+occlusion、再入場、tracking ID変化をまたいで同一性が保たれ、対応付けでは別演者の視点の統合を拒否し、
+同一演者の視点はreprojection costより先に統合します。もう1つは向きの補正です。指定keypointの
+左右反転側で色が見つかった場合、そのcameraは背面を腹面として読んでいるため、三角測量の前に
+その視点の左右keypointを入れ替えます。補正しなければ、その視点は手足を体の反対側へ引きずるか、
+reprojection判定で落ちてしまいます。

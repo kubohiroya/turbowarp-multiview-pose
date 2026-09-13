@@ -1,9 +1,10 @@
 import { access, readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { resolve } from "node:path";
 import { promisify } from "node:util";
-import { protocolSchemas } from "../src/protocol/schemas.ts";
+import {
+  protocolSchemaFiles,
+  protocolSchemas,
+} from "../src/protocol/schemas.ts";
 
 interface PackageMetadata {
   name: string;
@@ -52,16 +53,6 @@ interface PackResult {
   files: { path: string }[];
 }
 
-interface ProtocolIntegrityManifest {
-  formatVersion: number;
-  sourceRepository: string;
-  sourceCommit: string;
-  sourcePackage: string;
-  canonicalization: string;
-  digest: string;
-  schemas: Record<string, string>;
-}
-
 const execFileAsync = promisify(execFile);
 const errors: string[] = [];
 
@@ -91,10 +82,11 @@ const kalidokitAdapter = await readFile(
   "src/avatar/kalidokit-adapter.ts",
   "utf8",
 );
+const fusionController = await readFile("src/fusion/controller.ts", "utf8");
+const markerSampler = await readFile("src/markers/canvas-sampler.ts", "utf8");
+const fusionBuffer = await readFile("src/fusion/jitter-buffer.ts", "utf8");
 const featureFlagSource = await readFile("config/feature-flags.ts", "utf8");
-const protocolIntegrity = JSON.parse(
-  await readFile("schemas/protocol-v1-integrity.json", "utf8"),
-) as ProtocolIntegrityManifest;
+const protocolCodec = await readFile("src/protocol/codec.ts", "utf8");
 
 checkPolicy();
 checkPackageMetadata();
@@ -104,7 +96,9 @@ checkGeneratedArtifacts();
 checkPosePolicy();
 checkCalibrationPolicy();
 checkAvatarPolicy();
-await checkProtocolSchemaIntegrity();
+checkFusionPolicy();
+checkGlowStickPolicy();
+await checkProtocolOwnership();
 await checkPackContents();
 
 if (errors.length > 0) {
@@ -371,7 +365,47 @@ function checkAvatarPolicy() {
   }
 }
 
-async function checkProtocolSchemaIntegrity() {
+function checkFusionPolicy() {
+  if (!featureFlagSource.includes("poseFusion3D")) {
+    errors.push("Pose fusion must have a startup-fixed feature flag");
+  }
+  if (!fusionController.includes("PoseFrame3DSchema")) {
+    errors.push(
+      "Fusion must validate every fused frame against the pinned PoseFrame3D v1 schema",
+    );
+  }
+  for (const [name, source] of [
+    ["src/fusion/controller.ts", fusionController],
+    ["src/fusion/jitter-buffer.ts", fusionBuffer],
+  ] as const) {
+    if (/performance\.(?:timeOrigin|now)|clockId|clock-probe/u.test(source)) {
+      errors.push(
+        `${name} must carry external timestamps without implementing a clock`,
+      );
+    }
+    if (source.includes("getUserMedia(")) {
+      errors.push(`${name} must not capture media directly`);
+    }
+  }
+}
+
+function checkGlowStickPolicy() {
+  if (!featureFlagSource.includes("glowStickMarkers")) {
+    errors.push("Glow stick markers must have a startup-fixed feature flag");
+  }
+  if (markerSampler.includes("getUserMedia(")) {
+    errors.push("Glow stick sampling must read the leased camera frame only");
+  }
+  if (
+    !JSON.stringify(protocolSchemas["twmp/pose-frame-2d"][2]).includes(
+      "markers",
+    )
+  ) {
+    errors.push("PoseFrame2D v2 must carry glow stick markers");
+  }
+}
+
+async function checkProtocolOwnership() {
   if (packageMetadata.dependencies?.["@sinclair/typebox"] !== "0.34.52") {
     errors.push("package.json must pin @sinclair/typebox exactly to 0.34.52");
   }
@@ -390,69 +424,72 @@ async function checkProtocolSchemaIntegrity() {
       "Pose inference must carry external timestamps without implementing a clock",
     );
   }
-  if (
-    protocolIntegrity.formatVersion !== 1 ||
-    protocolIntegrity.sourceRepository !==
-      "https://github.com/kubohiroya/multiview-pose.git" ||
-    protocolIntegrity.sourcePackage !== "packages/protocol" ||
-    !/^[0-9a-f]{40}$/u.test(protocolIntegrity.sourceCommit) ||
-    protocolIntegrity.digest !== "sha256" ||
-    protocolIntegrity.canonicalization !== "JSON.stringify(JSON.parse(source))"
-  ) {
-    errors.push("protocol-v1-integrity.json metadata is invalid");
+
+  // This package owns the application contracts. Nothing here may treat the
+  // application repository as their source of truth. The needle is assembled at
+  // runtime so this guard does not match its own source.
+  const applicationProtocolPath = [
+    "multiview-pose",
+    "packages",
+    "protocol",
+  ].join("/");
+  for (const [name, source] of [
+    ["scripts/check-repo.ts", await readFile("scripts/check-repo.ts", "utf8")],
+    [
+      "src/protocol/schemas.ts",
+      await readFile("src/protocol/schemas.ts", "utf8"),
+    ],
+    ["src/protocol/codec.ts", protocolCodec],
+    ["repo-policy.json", await readFile("repo-policy.json", "utf8")],
+  ] as const) {
+    if (source.includes(applicationProtocolPath)) {
+      errors.push(
+        `${name} must not depend on the application repository for schema definitions`,
+      );
+    }
+  }
+  if (packageMetadata.files?.includes("schemas/") !== true) {
+    errors.push("package.json files must publish schemas/ for consumers");
   }
 
-  const schemaIdsByFile = {
-    "camera-calibration-v1.json": "twmp/camera-calibration",
-    "performance-dsl-v1.json": "twmp/performance-dsl",
-    "pose-frame-2d-v1.json": "twmp/pose-frame-2d",
-    "pose-frame-3d-v1.json": "twmp/pose-frame-3d",
-    "session-policy-v1.json": "twmp/session-policy",
-  } as const;
-  if (
-    Object.keys(protocolIntegrity.schemas).sort().join("\n") !==
-    Object.keys(schemaIdsByFile).sort().join("\n")
-  ) {
+  for (const [filename, schema] of Object.entries(protocolSchemaFiles)) {
+    let generated: string;
+    try {
+      generated = await readFile(`schemas/${filename}`, "utf8");
+    } catch {
+      errors.push(`schemas/${filename} is missing; run pnpm run schemas`);
+      continue;
+    }
+    if (generated !== `${JSON.stringify(schema, null, 2)}\n`) {
+      errors.push(
+        `schemas/${filename} does not match its definition; run pnpm run schemas`,
+      );
+    }
+    const identifier = (schema as { $id?: string }).$id ?? "";
+    if (!identifier.endsWith(`/${filename}`)) {
+      errors.push(`schemas/${filename} does not match its $id ${identifier}`);
+    }
+    const version = Number(/-v(\d+)\.json$/u.exec(filename)?.[1] ?? "0");
+    const declared = (
+      schema as { properties?: { version?: { const?: number } } }
+    ).properties?.version?.const;
+    if (version < 1 || declared !== version) {
+      errors.push(
+        `schemas/${filename} declares version ${String(declared)} but its filename says ${version}`,
+      );
+    }
+  }
+
+  const fileCount = Object.keys(protocolSchemaFiles).length;
+  const versionCount = Object.values(protocolSchemas).reduce(
+    (total, versions) => total + Object.keys(versions).length,
+    0,
+  );
+  if (fileCount !== versionCount) {
     errors.push(
-      "protocol integrity manifest must list exactly five v1 schemas",
+      `every dispatched contract version needs one published schema file (${versionCount} versions, ${fileCount} files)`,
     );
-    return;
   }
-  for (const [filename, schemaId] of Object.entries(schemaIdsByFile)) {
-    const expected = protocolIntegrity.schemas[filename];
-    const actual = canonicalJsonHash(protocolSchemas[schemaId]);
-    if (actual !== expected) {
-      errors.push(
-        `runtime schema ${filename} hash ${actual} does not match pinned ${expected}`,
-      );
-    }
-  }
-
-  const sourceDirectory =
-    process.env.MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR ??
-    resolve(process.cwd(), "../multiview-pose/packages/protocol/schemas");
-  try {
-    await access(sourceDirectory);
-  } catch {
-    return;
-  }
-  for (const [filename, expected] of Object.entries(
-    protocolIntegrity.schemas,
-  )) {
-    const source = JSON.parse(
-      await readFile(resolve(sourceDirectory, filename), "utf8"),
-    ) as unknown;
-    const actual = canonicalJsonHash(source);
-    if (actual !== expected) {
-      errors.push(
-        `upstream protocol schema drift for ${filename}: ${actual} != ${expected}`,
-      );
-    }
-  }
-}
-
-function canonicalJsonHash(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
 async function checkPackContents() {

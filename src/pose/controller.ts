@@ -1,11 +1,23 @@
 import { createPoseFrame2D } from "./pose-frame.js";
 import type {
+  CameraFrameSourcePort,
   CameraLeasePort,
   CameraSourcePort,
+  Coco17KeypointId,
+  ModelPose,
   PoseDetectorPort,
-  PoseFrame2DV1,
+  PoseFrame2D,
   PoseModelPort,
+  PoseMarkerV2,
 } from "./types.js";
+import { markerPatchesFor, toMarkers } from "../markers/sampler.js";
+import {
+  DEFAULT_MARKER_SAMPLING_OPTIONS,
+  type MarkerImageSamplerPort,
+  type MarkerPatch,
+  type MarkerSamplingOptions,
+  type SampledColor,
+} from "../markers/types.js";
 
 export type PosePipelineState =
   | "idle"
@@ -24,6 +36,7 @@ export type PosePipelineErrorCode =
   | "camera-unavailable"
   | "camera-ended"
   | "inference-failed"
+  | "marker-sampling-failed"
   | "invalid-output";
 
 export interface PoseStartOptions {
@@ -35,6 +48,7 @@ export interface PoseStartOptions {
 export interface PosePipelineControllerOptions {
   runtime: TurboWarpRuntime;
   model: PoseModelPort;
+  markerSampler?: MarkerImageSamplerPort;
 }
 
 export class PosePipelineController {
@@ -47,7 +61,9 @@ export class PosePipelineController {
   private inference: Promise<void> | undefined;
   private operation = 0;
   private sequence = 0;
-  private latestFrame: PoseFrame2DV1 | undefined;
+  private latestFrame: PoseFrame2D | undefined;
+  private readonly markerSampler: MarkerImageSamplerPort | undefined;
+  private markerOptions: MarkerSamplingOptions | undefined;
   private pipelineState: PosePipelineState = "idle";
   private pipelineErrorCode: PosePipelineErrorCode = "";
   private pipelineErrorMessage = "";
@@ -55,6 +71,36 @@ export class PosePipelineController {
   public constructor(options: PosePipelineControllerOptions) {
     this.runtime = options.runtime;
     this.model = options.model;
+    this.markerSampler = options.markerSampler;
+  }
+
+  /**
+   * Turns PoseFrame2D v2 output on: every inference also samples the named
+   * keypoints for a uniquely colored glow stick.
+   */
+  public enableMarkers(keypointIds: Coco17KeypointId[]): void {
+    if (!this.markerSampler) {
+      throw new Error("No glow stick image sampler is available.");
+    }
+    this.markerOptions = { ...DEFAULT_MARKER_SAMPLING_OPTIONS, keypointIds };
+  }
+
+  public disableMarkers(): void {
+    this.markerOptions = undefined;
+  }
+
+  public markersEnabled(): boolean {
+    return this.markerOptions !== undefined;
+  }
+
+  /** Glow stick markers carried by the latest frame. */
+  public markerCount(): number {
+    const frame = this.latestFrame;
+    if (!frame || frame.version !== 2) return 0;
+    return frame.persons.reduce(
+      (total, person) => total + person.markers.length,
+      0,
+    );
   }
 
   public async start(options: PoseStartOptions): Promise<void> {
@@ -225,22 +271,71 @@ export class PosePipelineController {
       this.fail("inference-failed", error);
     }
     if (operation !== this.operation) return;
+    let markersByPose: Map<number, PoseMarkerV2[]> | undefined;
     try {
-      this.latestFrame = createPoseFrame2D(poses, {
-        cameraId: options.cameraId,
-        peerId: options.peerId,
-        calibrationId: options.calibrationId,
-        sequence: this.sequence,
-        captureTimestampUs,
-        frameWidth: frame.width,
-        frameHeight: frame.height,
-      });
+      markersByPose = this.sampleMarkers(poses, frame);
+    } catch (error) {
+      this.fail("marker-sampling-failed", error);
+    }
+    try {
+      this.latestFrame = createPoseFrame2D(
+        poses,
+        {
+          cameraId: options.cameraId,
+          peerId: options.peerId,
+          calibrationId: options.calibrationId,
+          sequence: this.sequence,
+          captureTimestampUs,
+          frameWidth: frame.width,
+          frameHeight: frame.height,
+        },
+        markersByPose,
+      );
       this.sequence += 1;
       this.pipelineState = "ready";
       this.clearError();
     } catch (error) {
       this.fail("invalid-output", error);
     }
+  }
+
+  /** Samples one patch per configured keypoint of every tracked person. */
+  private sampleMarkers(
+    poses: readonly ModelPose[],
+    frame: CameraFrameSourcePort,
+  ): Map<number, PoseMarkerV2[]> | undefined {
+    const options = this.markerOptions;
+    const sampler = this.markerSampler;
+    if (!options || !sampler) return undefined;
+    const patches: MarkerPatch[] = [];
+    const owners: Array<{ pose: number; keypointId: Coco17KeypointId }> = [];
+    poses.slice(0, 6).forEach((pose, index) => {
+      for (const { keypointId, patch } of markerPatchesFor(pose, options)) {
+        owners.push({ pose: index, keypointId });
+        patches.push(patch);
+      }
+    });
+    const colors = sampler.sample(
+      { element: frame.element, width: frame.width, height: frame.height },
+      patches,
+    );
+    const byPose = new Map<
+      number,
+      Array<{
+        keypointId: Coco17KeypointId;
+        color: SampledColor | undefined;
+      }>
+    >();
+    owners.forEach((owner, index) => {
+      const entries = byPose.get(owner.pose) ?? [];
+      entries.push({ keypointId: owner.keypointId, color: colors[index] });
+      byPose.set(owner.pose, entries);
+    });
+    const markers = new Map<number, PoseMarkerV2[]>();
+    poses.slice(0, 6).forEach((_, index) => {
+      markers.set(index, toMarkers(byPose.get(index) ?? []));
+    });
+    return markers;
   }
 
   private fail(

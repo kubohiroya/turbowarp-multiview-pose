@@ -713,6 +713,259 @@
   			"text": "frame sync pattern timestamp us",
   			"description": "Returns the display time decoded out of the taken frame, within the current pattern wrap window.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "startPoseFusion",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "start pose fusion delay [DELAY_MS] ms jitter [JITTER_MS] ms min keypoint score [MIN_SCORE]",
+  			"description": "Starts the multi-camera jitter buffer that fuses one past instant behind the newest frame.",
+  			"arguments": {
+  				"DELAY_MS": {
+  					"type": "NUMBER",
+  					"defaultValue": 120
+  				},
+  				"JITTER_MS": {
+  					"type": "NUMBER",
+  					"defaultValue": 80
+  				},
+  				"MIN_SCORE": {
+  					"type": "NUMBER",
+  					"defaultValue": .3
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "stopPoseFusion",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "stop pose fusion",
+  			"description": "Clears every buffered frame and fused result while keeping loaded calibration profiles.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "cleanupPoseFusion",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "cleanup pose fusion",
+  			"description": "Clears buffered frames, fused results, and every loaded fusion calibration profile.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "loadFusionCameraCalibration",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "load fusion camera calibration [JSON]",
+  			"description": "Loads one CameraCalibration v1 profile and derives its world-to-camera projection.",
+  			"arguments": { "JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "bufferPoseFrame2D",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "buffer PoseFrame2D JSON [JSON]",
+  			"description": "Validates one PoseFrame2D v1 and inserts it into its camera ring buffer in timestamp order.",
+  			"arguments": { "JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "fuseBufferedPoseFrame3D",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "fuse PoseFrame3D at buffered delay",
+  			"description": "Fuses the instant one configured delay behind the newest buffered timestamp.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "fusePoseFrame3DAt",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "fuse PoseFrame3D at timestamp [TIMESTAMP_US] us",
+  			"description": "Fuses one explicit past instant expressed in the synchronized microsecond time base.",
+  			"arguments": { "TIMESTAMP_US": {
+  				"type": "NUMBER",
+  				"defaultValue": 0
+  			} }
+  		},
+  		{
+  			"opcode": "latestPoseFrame3D",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "latest PoseFrame3D JSON",
+  			"description": "Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "synchronizedPoseSet2D",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "synchronized 2D pose set JSON",
+  			"description": "Returns the last resampled per-camera 2D keypoint set used for triangulation.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionState",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "pose fusion state",
+  			"description": "Returns idle, buffering, fusing, ready, or error.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionReady",
+  			"feature": "poseFusion3D",
+  			"blockType": "BOOLEAN",
+  			"text": "pose fusion ready?",
+  			"description": "Returns true when fusion is started and at least two cameras are calibrated.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionCameraCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fusion calibrated camera count",
+  			"description": "Returns how many camera calibration profiles are loaded for fusion.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionBufferedFrameCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "buffered pose frame count",
+  			"description": "Returns how many PoseFrame2D frames are currently retained across all ring buffers.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionDroppedFrameCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "dropped pose frame count",
+  			"description": "Returns how many frames were rejected as duplicates or as arrivals past the jitter window.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionPersonCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fused person count",
+  			"description": "Returns how many people the last successful fusion produced.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionTimestampUs",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fused timestamp us",
+  			"description": "Returns the synchronized timestamp of the last successful fusion in microseconds.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionReprojectionErrorPx",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fused mean reprojection error px",
+  			"description": "Returns the mean reprojection error of the last successful fusion in pixels.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionErrorCode",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "pose fusion error code",
+  			"description": "Returns the latest fusion error code, or an empty string.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionError",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "pose fusion error",
+  			"description": "Returns the latest fusion error message.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "enableGlowStickMarkers",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "sample glow stick colors at [KEYPOINTS]",
+  			"description": "Samples the named COCO-17 keypoints for a uniquely colored glow stick and reports PoseFrame2D v2.",
+  			"arguments": { "KEYPOINTS": {
+  				"type": "STRING",
+  				"defaultValue": "right_wrist,left_wrist"
+  			} }
+  		},
+  		{
+  			"opcode": "disableGlowStickMarkers",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "stop sampling glow stick colors",
+  			"description": "Returns pose reporting to PoseFrame2D v1 without glow stick markers.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "glowStickMarkerCount",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "glow stick marker count",
+  			"description": "Returns how many glow stick markers the latest pose frame carries.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "loadGlowStickPalette",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "load glow stick palette from PerformanceDSL [JSON]",
+  			"description": "Loads the performer colors from a Performance DSL v1 payload for fusion identity.",
+  			"arguments": { "JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "setPerformerGlowStick",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "set performer [PERFORMER_ID] glow stick at [KEYPOINT]",
+  			"description": "Chooses which COCO-17 keypoint one performer carries the glow stick at.",
+  			"arguments": {
+  				"PERFORMER_ID": {
+  					"type": "STRING",
+  					"defaultValue": "actor-1"
+  				},
+  				"KEYPOINT": {
+  					"type": "STRING",
+  					"defaultValue": "right_wrist"
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "glowStickPaletteSize",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "glow stick palette size",
+  			"description": "Returns how many performers the loaded palette describes.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "identifiedPerformerCount",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "identified performer count",
+  			"description": "Returns how many fused people the last fusion identified by glow stick color.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "mirrorCorrectedViewCount",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "mirror-corrected view count",
+  			"description": "Returns how many camera views the last fusion corrected for swapped left and right labels.",
+  			"arguments": {}
   		}
   	]
   };
@@ -726,7 +979,9 @@
   	protocolV1Codec: overrides?.protocolV1Codec === true,
   	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
   	avatarRetargetV1: overrides?.avatarRetargetV1 === true,
-  	frameSyncPatternV1: overrides?.frameSyncPatternV1 === true
+  	frameSyncPatternV1: overrides?.frameSyncPatternV1 === true,
+  	poseFusion3D: overrides?.poseFusion3D === true,
+  	glowStickMarkers: overrides?.glowStickMarkers === true
   });
   //#endregion
   //#region config/qr-config.ts
@@ -3373,19 +3628,40 @@
   ];
   //#endregion
   //#region src/pose/pose-frame.ts
-  function createPoseFrame2D(poses, context) {
-  	return {
+  /**
+  * Builds a v1 frame, or a v2 frame when glow stick markers were sampled for the
+  * same video frame. Markers are keyed by the index of the pose they belong to.
+  */
+  function createPoseFrame2D(poses, context, markersByPose) {
+  	const header = {
   		schema: "twmp/pose-frame-2d",
-  		version: 1,
   		cameraId: identifier$4(context.cameraId, "camera ID"),
   		peerId: identifier$4(context.peerId, "peer ID"),
   		sequence: safeInteger(context.sequence, "sequence"),
   		captureTimestampUs: safeInteger(context.captureTimestampUs, "capture timestamp"),
   		frameWidth: dimension(context.frameWidth, "frame width"),
   		frameHeight: dimension(context.frameHeight, "frame height"),
-  		calibrationId: identifier$4(context.calibrationId, "calibration ID"),
-  		persons: poses.slice(0, 6).map(toPerson)
+  		calibrationId: identifier$4(context.calibrationId, "calibration ID")
   	};
+  	const retained = poses.slice(0, 6);
+  	if (!markersByPose) return {
+  		...header,
+  		version: 1,
+  		persons: retained.map(toPerson)
+  	};
+  	return {
+  		...header,
+  		version: 2,
+  		persons: retained.map((pose, index) => ({
+  			...toPerson(pose),
+  			markers: (markersByPose.get(index) ?? []).map(marker)
+  		}))
+  	};
+  }
+  function marker(value) {
+  	if (!/^#[0-9A-Fa-f]{6}$/u.test(value.colorHex)) throw new Error(`Invalid glow stick color: ${value.colorHex}`);
+  	if (!isScore(value.coverage)) throw new Error("Glow stick coverage must be between 0 and 1.");
+  	return value;
   }
   function toPerson(pose) {
   	if (!Number.isSafeInteger(pose.id) || Number(pose.id) < 0) throw new Error("MoveNet tracking did not provide a valid person ID.");
@@ -3425,6 +3701,201 @@
   	return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
   }
   //#endregion
+  //#region src/markers/color.ts
+  /** Parses `#RRGGBB`, rejecting every other spelling. */
+  function parseHexColor(value) {
+  	if (!/^#[0-9A-Fa-f]{6}$/u.test(value)) return void 0;
+  	return {
+  		r: Number.parseInt(value.slice(1, 3), 16),
+  		g: Number.parseInt(value.slice(3, 5), 16),
+  		b: Number.parseInt(value.slice(5, 7), 16)
+  	};
+  }
+  function hexFromRgb(r, g, b) {
+  	return `#${[
+  		r,
+  		g,
+  		b
+  	].map(toHexByte).join("")}`;
+  }
+  function rgbToHsv(r, g, b) {
+  	const red = r / 255;
+  	const green = g / 255;
+  	const blue = b / 255;
+  	const max = Math.max(red, green, blue);
+  	const delta = max - Math.min(red, green, blue);
+  	let hue = 0;
+  	if (delta > 0) {
+  		if (max === red) hue = 60 * (((green - blue) / delta + 6) % 6);
+  		else if (max === green) hue = 60 * ((blue - red) / delta + 2);
+  		else hue = 60 * ((red - green) / delta + 4);
+  	}
+  	return {
+  		hue,
+  		saturation: max === 0 ? 0 : delta / max,
+  		value: max
+  	};
+  }
+  function hsvFromHex(value) {
+  	const rgb = parseHexColor(value);
+  	return rgb ? rgbToHsv(rgb.r, rgb.g, rgb.b) : void 0;
+  }
+  /** Shortest distance between two hues in degrees. */
+  function hueDistance(first, second) {
+  	const difference = Math.abs(first - second) % 360;
+  	return difference > 180 ? 360 - difference : difference;
+  }
+  function toHexByte(value) {
+  	return Math.min(Math.max(Math.round(value), 0), 255).toString(16).padStart(2, "0");
+  }
+  //#endregion
+  //#region src/markers/sampler.ts
+  var MIN_PATCH_RADIUS = 6;
+  var MAX_PATCH_RADIUS = 64;
+  var PATCH_SCALE = .28;
+  /**
+  * Dominant saturated color of one RGBA patch. Unsaturated pixels are skipped so
+  * a glow stick wins over skin, clothing, and the venue background; the hue is a
+  * circular mean, which keeps a wrapping red cluster near red.
+  */
+  function dominantSaturatedColor(pixels, options) {
+  	const total = Math.floor(pixels.length / 4);
+  	if (total === 0) return void 0;
+  	let qualifying = 0;
+  	let hueX = 0;
+  	let hueY = 0;
+  	let saturation = 0;
+  	let value = 0;
+  	for (let index = 0; index < total; index += 1) {
+  		const hsv = rgbToHsv(pixels[index * 4] ?? 0, pixels[index * 4 + 1] ?? 0, pixels[index * 4 + 2] ?? 0);
+  		if (hsv.saturation < options.minSaturation) continue;
+  		if (hsv.value < options.minValue) continue;
+  		const radians = hsv.hue * Math.PI / 180;
+  		hueX += Math.cos(radians);
+  		hueY += Math.sin(radians);
+  		saturation += hsv.saturation;
+  		value += hsv.value;
+  		qualifying += 1;
+  	}
+  	const coverage = qualifying / total;
+  	if (qualifying === 0 || coverage < options.minCoverage) return void 0;
+  	return {
+  		colorHex: hexFromHsv((Math.atan2(hueY / qualifying, hueX / qualifying) * 180 / Math.PI + 360) % 360, saturation / qualifying, value / qualifying),
+  		coverage: Math.min(coverage, 1)
+  	};
+  }
+  /** Patch to sample for one keypoint, scaled by the person's own size. */
+  function markerPatchesFor(pose, options) {
+  	const byName = new Map(pose.keypoints.map((keypoint) => [keypoint.name, keypoint]));
+  	const radius = patchRadius(pose);
+  	const patches = [];
+  	for (const keypointId of options.keypointIds) {
+  		const keypoint = byName.get(keypointId);
+  		if (!keypoint || (keypoint.score ?? 0) < options.minKeypointScore) continue;
+  		if (!Number.isFinite(keypoint.x) || !Number.isFinite(keypoint.y)) continue;
+  		patches.push({
+  			keypointId,
+  			patch: {
+  				x: keypoint.x,
+  				y: keypoint.y,
+  				radius
+  			}
+  		});
+  	}
+  	return patches;
+  }
+  /** Keeps the strongest observation per keypoint, bounded by the v2 contract. */
+  function toMarkers(samples) {
+  	const strongest = /* @__PURE__ */ new Map();
+  	for (const { keypointId, color } of samples) {
+  		if (!color) continue;
+  		const existing = strongest.get(keypointId);
+  		if (existing && existing.coverage >= color.coverage) continue;
+  		strongest.set(keypointId, {
+  			keypointId,
+  			colorHex: color.colorHex,
+  			coverage: round$4(color.coverage)
+  		});
+  	}
+  	return [...strongest.values()].sort((left, right) => right.coverage - left.coverage || COCO_17_KEYPOINT_IDS.indexOf(left.keypointId) - COCO_17_KEYPOINT_IDS.indexOf(right.keypointId)).slice(0, 4);
+  }
+  function parseKeypointIds(value) {
+  	const requested = value.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  	if (requested.length === 0) throw new Error("Name at least one COCO-17 keypoint to sample.");
+  	const keypointIds = [];
+  	for (const entry of requested) {
+  		const keypointId = COCO_17_KEYPOINT_IDS.find((id) => id === entry);
+  		if (!keypointId) throw new Error(`Unknown COCO-17 keypoint: ${entry}`);
+  		if (!keypointIds.includes(keypointId)) keypointIds.push(keypointId);
+  	}
+  	return keypointIds;
+  }
+  function patchRadius(pose) {
+  	const byName = new Map(pose.keypoints.map((keypoint) => [keypoint.name, keypoint]));
+  	const leftShoulder = byName.get("left_shoulder");
+  	const rightShoulder = byName.get("right_shoulder");
+  	let scale = 0;
+  	if (leftShoulder && rightShoulder) scale = Math.hypot(leftShoulder.x - rightShoulder.x, leftShoulder.y - rightShoulder.y);
+  	if (scale === 0) {
+  		const xs = pose.keypoints.map((keypoint) => keypoint.x);
+  		const ys = pose.keypoints.map((keypoint) => keypoint.y);
+  		scale = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  	}
+  	const radius = Math.round(scale * PATCH_SCALE);
+  	return Math.min(Math.max(radius, MIN_PATCH_RADIUS), MAX_PATCH_RADIUS);
+  }
+  function hexFromHsv(hue, saturation, value) {
+  	const chroma = value * saturation;
+  	const secondary = chroma * (1 - Math.abs(hue / 60 % 2 - 1));
+  	const match = value - chroma;
+  	const [red, green, blue] = rgbFromSector(hue, chroma, secondary);
+  	return hexFromRgb((red + match) * 255, (green + match) * 255, (blue + match) * 255);
+  }
+  function rgbFromSector(hue, chroma, secondary) {
+  	if (hue < 60) return [
+  		chroma,
+  		secondary,
+  		0
+  	];
+  	if (hue < 120) return [
+  		secondary,
+  		chroma,
+  		0
+  	];
+  	if (hue < 180) return [
+  		0,
+  		chroma,
+  		secondary
+  	];
+  	if (hue < 240) return [
+  		0,
+  		secondary,
+  		chroma
+  	];
+  	if (hue < 300) return [
+  		secondary,
+  		0,
+  		chroma
+  	];
+  	return [
+  		chroma,
+  		0,
+  		secondary
+  	];
+  }
+  function round$4(value) {
+  	return Math.round(value * 1e3) / 1e3;
+  }
+  //#endregion
+  //#region src/markers/types.ts
+  var DEFAULT_MARKER_SAMPLING_OPTIONS = {
+  	keypointIds: ["right_wrist", "left_wrist"],
+  	minKeypointScore: .3,
+  	minSaturation: .45,
+  	minValue: .3,
+  	minCoverage: .08
+  };
+  //#endregion
   //#region src/pose/controller.ts
   var PosePipelineController = class {
   	constructor(options) {
@@ -3435,6 +3906,30 @@
   		this.pipelineErrorMessage = "";
   		this.runtime = options.runtime;
   		this.model = options.model;
+  		this.markerSampler = options.markerSampler;
+  	}
+  	/**
+  	* Turns PoseFrame2D v2 output on: every inference also samples the named
+  	* keypoints for a uniquely colored glow stick.
+  	*/
+  	enableMarkers(keypointIds) {
+  		if (!this.markerSampler) throw new Error("No glow stick image sampler is available.");
+  		this.markerOptions = {
+  			...DEFAULT_MARKER_SAMPLING_OPTIONS,
+  			keypointIds
+  		};
+  	}
+  	disableMarkers() {
+  		this.markerOptions = void 0;
+  	}
+  	markersEnabled() {
+  		return this.markerOptions !== void 0;
+  	}
+  	/** Glow stick markers carried by the latest frame. */
+  	markerCount() {
+  		const frame = this.latestFrame;
+  		if (!frame || frame.version !== 2) return 0;
+  		return frame.persons.reduce((total, person) => total + person.markers.length, 0);
   	}
   	async start(options) {
   		const normalized = normalizeStartOptions$1(options);
@@ -3563,6 +4058,12 @@
   			this.fail("inference-failed", error);
   		}
   		if (operation !== this.operation) return;
+  		let markersByPose;
+  		try {
+  			markersByPose = this.sampleMarkers(poses, frame);
+  		} catch (error) {
+  			this.fail("marker-sampling-failed", error);
+  		}
   		try {
   			this.latestFrame = createPoseFrame2D(poses, {
   				cameraId: options.cameraId,
@@ -3572,13 +4073,49 @@
   				captureTimestampUs,
   				frameWidth: frame.width,
   				frameHeight: frame.height
-  			});
+  			}, markersByPose);
   			this.sequence += 1;
   			this.pipelineState = "ready";
   			this.clearError();
   		} catch (error) {
   			this.fail("invalid-output", error);
   		}
+  	}
+  	/** Samples one patch per configured keypoint of every tracked person. */
+  	sampleMarkers(poses, frame) {
+  		const options = this.markerOptions;
+  		const sampler = this.markerSampler;
+  		if (!options || !sampler) return void 0;
+  		const patches = [];
+  		const owners = [];
+  		poses.slice(0, 6).forEach((pose, index) => {
+  			for (const { keypointId, patch } of markerPatchesFor(pose, options)) {
+  				owners.push({
+  					pose: index,
+  					keypointId
+  				});
+  				patches.push(patch);
+  			}
+  		});
+  		const colors = sampler.sample({
+  			element: frame.element,
+  			width: frame.width,
+  			height: frame.height
+  		}, patches);
+  		const byPose = /* @__PURE__ */ new Map();
+  		owners.forEach((owner, index) => {
+  			const entries = byPose.get(owner.pose) ?? [];
+  			entries.push({
+  				keypointId: owner.keypointId,
+  				color: colors[index]
+  			});
+  			byPose.set(owner.pose, entries);
+  		});
+  		const markers = /* @__PURE__ */ new Map();
+  		poses.slice(0, 6).forEach((_, index) => {
+  			markers.set(index, toMarkers(byPose.get(index) ?? []));
+  		});
+  		return markers;
   	}
   	fail(code, cause) {
   		const detail = cause instanceof Error ? cause.message : String(cause);
@@ -11896,7 +12433,7 @@
   	if (zeroPad == null) zeroPad = computeDefaultPad(inShape, fieldSize, stride);
   	const inputRows = inShape[0];
   	const inputCols = inShape[1];
-  	return [round$2((inputRows - fieldSize + 2 * zeroPad) / stride + 1, roundingMode), round$2((inputCols - fieldSize + 2 * zeroPad) / stride + 1, roundingMode)];
+  	return [round$3((inputRows - fieldSize + 2 * zeroPad) / stride + 1, roundingMode), round$3((inputCols - fieldSize + 2 * zeroPad) / stride + 1, roundingMode)];
   }
   function computeOutputShape4D(inShape, filterShape, outChannels, strides, zeroPad, roundingMode) {
   	if (zeroPad == null) zeroPad = computeDefaultPad(inShape, filterShape[0], strides[0]);
@@ -11906,7 +12443,7 @@
   		0,
   		outChannels
   	];
-  	for (let index = 0; index < 3; index++) if (inShape[index] + 2 * zeroPad >= filterShape[index]) outShape[index] = round$2((inShape[index] - filterShape[index] + 2 * zeroPad) / strides[index] + 1, roundingMode);
+  	for (let index = 0; index < 3; index++) if (inShape[index] + 2 * zeroPad >= filterShape[index]) outShape[index] = round$3((inShape[index] - filterShape[index] + 2 * zeroPad) / strides[index] + 1, roundingMode);
   	return outShape;
   }
   function computeDefaultPad(inputShape, fieldSize, stride, dilation = 1) {
@@ -11989,8 +12526,8 @@
   			right,
   			type: top === 0 && bottom === 0 && left === 0 && right === 0 ? "VALID" : "EXPLICIT"
   		};
-  		outHeight = round$2((inHeight - filterHeight + top + bottom) / strideHeight + 1, roundingMode);
-  		outWidth = round$2((inWidth - filterWidth + left + right) / strideWidth + 1, roundingMode);
+  		outHeight = round$3((inHeight - filterHeight + top + bottom) / strideHeight + 1, roundingMode);
+  		outWidth = round$3((inWidth - filterWidth + left + right) / strideWidth + 1, roundingMode);
   	} else throw Error(`Unknown padding parameter: ${pad}`);
   	return {
   		padInfo,
@@ -12066,7 +12603,7 @@
   * @param roundingMode A string from: 'ceil', 'round', 'floor'. If none is
   *     provided, it will default to truncate.
   */
-  function round$2(value, roundingMode) {
+  function round$3(value, roundingMode) {
   	if (!roundingMode) return Math.trunc(value);
   	switch (roundingMode) {
   		case "round": return Math.round(value);
@@ -15039,14 +15576,14 @@
   		return matMul$1($t1, t22D);
   	}
   }
-  var dot;
+  var dot$1;
   var init_dot = __esmMin((() => {
   	init_tensor_util_env();
   	init_util();
   	init_mat_mul$1();
   	init_operation();
   	init_reshape();
-  	dot = /* @__PURE__ */ op({ dot_ });
+  	dot$1 = /* @__PURE__ */ op({ dot_ });
   }));
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-core/dist/ops/einsum.js
@@ -21249,13 +21786,13 @@
   	const inputs = { x: convertToTensor(x, "x", "round") };
   	return ENGINE.runKernel(Round, inputs);
   }
-  var round$1;
+  var round$2;
   var init_round = __esmMin((() => {
   	init_engine();
   	init_kernel_names();
   	init_tensor_util_env();
   	init_operation();
-  	round$1 = /* @__PURE__ */ op({ round_ });
+  	round$2 = /* @__PURE__ */ op({ round_ });
   }));
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-core/dist/ops/rsqrt.js
@@ -26246,7 +26783,7 @@
   		const $b = mul(b, BLUE_INTENCITY_COEF);
   		grayscale = add$1(add$1($r, $g), $b);
   	} else grayscale = image;
-  	if (method === "otsu") $threshold = otsu(bincount$1(cast$2(round$1(grayscale), "int32"), tensor([]), 256), totalPixelsInImage);
+  	if (method === "otsu") $threshold = otsu(bincount$1(cast$2(round$2(grayscale), "int32"), tensor([]), 256), totalPixelsInImage);
   	const invCondition = inverted ? lessEqual$2(grayscale, $threshold) : greater$2(grayscale, $threshold);
   	return cast$2(mul(invCondition, 255), "int32");
   }
@@ -32711,7 +33248,7 @@
   	disposeVariables: () => disposeVariables,
   	div: () => div,
   	divNoNan: () => divNoNan,
-  	dot: () => dot,
+  	dot: () => dot$1,
   	dropout: () => dropout,
   	einsum: () => einsum$1,
   	elu: () => elu$1,
@@ -32839,7 +33376,7 @@
   	reverse3d: () => reverse3d,
   	reverse4d: () => reverse4d,
   	rfft: () => rfft,
-  	round: () => round$1,
+  	round: () => round$2,
   	rsqrt: () => rsqrt$2,
   	scalar: () => scalar,
   	scatterND: () => scatterND,
@@ -39560,7 +40097,7 @@
   	dilation2d: () => dilation2d,
   	div: () => div,
   	divNoNan: () => divNoNan,
-  	dot: () => dot,
+  	dot: () => dot$1,
   	dropout: () => dropout,
   	einsum: () => einsum$1,
   	elu: () => elu$1,
@@ -39663,7 +40200,7 @@
   	reverse3d: () => reverse3d,
   	reverse4d: () => reverse4d,
   	rfft: () => rfft,
-  	round: () => round$1,
+  	round: () => round$2,
   	rsqrt: () => rsqrt$2,
   	scalar: () => scalar,
   	scatterND: () => scatterND,
@@ -62875,11 +63412,11 @@
   * limitations under the License.
   * =============================================================================
   */
-  var round = unaryKernelFunc$1({ opType: UnaryOpType.ROUND });
+  var round$1 = unaryKernelFunc$1({ opType: UnaryOpType.ROUND });
   var roundConfig = {
   	kernelName: Round,
   	backendName: "webgpu",
-  	kernelFunc: round
+  	kernelFunc: round$1
   };
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-backend-webgpu@4.22.0_@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-backend-webgpu/dist/kernels/Rsqrt.js
@@ -69309,6 +69846,40 @@
   		keypoints: keypoints2d
   	}), { maxItems: 6 })
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v1.json" });
+  var coco17KeypointId = Type.Union(coco17KeypointIds.map((id) => Type.Literal(id)));
+  /**
+  * Glow stick observed on the same video frame as the keypoints: a performer
+  * carries a uniquely colored light at a chosen keypoint, which identifies the
+  * performer and resolves the left/right labelling of a person seen from behind.
+  */
+  var glowStickMarkers = Type.Array(object({
+  	keypointId: coco17KeypointId,
+  	colorHex: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
+  	coverage: score
+  }), { maxItems: 4 });
+  var PoseFrame2DV2Schema = object({
+  	schema: Type.Literal("twmp/pose-frame-2d"),
+  	version: Type.Literal(2),
+  	cameraId: identifier$2,
+  	peerId: identifier$2,
+  	sequence: timestampUs,
+  	captureTimestampUs: timestampUs,
+  	frameWidth: Type.Integer({
+  		minimum: 1,
+  		maximum: 16384
+  	}),
+  	frameHeight: Type.Integer({
+  		minimum: 1,
+  		maximum: 16384
+  	}),
+  	calibrationId: identifier$2,
+  	persons: Type.Array(object({
+  		trackingId: identifier$2,
+  		score,
+  		keypoints: keypoints2d,
+  		markers: glowStickMarkers
+  	}), { maxItems: 6 })
+  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v2.json" });
   var PoseFrame3DSchema = object({
   	schema: Type.Literal("twmp/pose-frame-3d"),
   	version: Type.Literal(1),
@@ -69329,30 +69900,49 @@
   		keypoints: keypoints3d
   	}), { maxItems: 6 })
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-3d-v1.json" });
+  var PerformanceDslSchema = object({
+  	schema: Type.Literal("twmp/performance-dsl"),
+  	version: Type.Literal(1),
+  	performers: Type.Array(object({
+  		performerId: identifier$2,
+  		displayName: Type.String({
+  			minLength: 1,
+  			maxLength: 80
+  		}),
+  		glowStickColor: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
+  		recognitionStartEffect: identifier$2,
+  		recognitionEndEffect: identifier$2,
+  		avatarAsset: identifier$2
+  	}), {
+  		minItems: 1,
+  		maxItems: 6
+  	})
+  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/performance-dsl-v1.json" });
+  /**
+  * Every application contract this package owns, dispatched by schema identifier
+  * and then by explicit version. Applications consume these definitions; they are
+  * not mirrored from another repository.
+  */
   var protocolSchemas = {
-  	"twmp/camera-calibration": CameraCalibrationSchema,
-  	"twmp/performance-dsl": object({
-  		schema: Type.Literal("twmp/performance-dsl"),
-  		version: Type.Literal(1),
-  		performers: Type.Array(object({
-  			performerId: identifier$2,
-  			displayName: Type.String({
-  				minLength: 1,
-  				maxLength: 80
-  			}),
-  			glowStickColor: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
-  			recognitionStartEffect: identifier$2,
-  			recognitionEndEffect: identifier$2,
-  			avatarAsset: identifier$2
-  		}), {
-  			minItems: 1,
-  			maxItems: 6
-  		})
-  	}, { $id: "https://kubohiroya.github.io/multiview-pose/schema/performance-dsl-v1.json" }),
-  	"twmp/pose-frame-2d": PoseFrame2DSchema,
-  	"twmp/pose-frame-3d": PoseFrame3DSchema,
-  	"twmp/session-policy": SessionPolicySchema
+  	"twmp/camera-calibration": { 1: CameraCalibrationSchema },
+  	"twmp/performance-dsl": { 1: PerformanceDslSchema },
+  	"twmp/pose-frame-2d": {
+  		1: PoseFrame2DSchema,
+  		2: PoseFrame2DV2Schema
+  	},
+  	"twmp/pose-frame-3d": { 1: PoseFrame3DSchema },
+  	"twmp/session-policy": { 1: SessionPolicySchema }
   };
+  /** Returns the pinned schema for one contract version, or undefined. */
+  function protocolSchemaFor(schemaId, version) {
+  	if (typeof version !== "number") return void 0;
+  	const versions = protocolSchemas[schemaId];
+  	return Object.prototype.hasOwnProperty.call(versions, version) ? versions[version] : void 0;
+  }
+  /** Versions this package accepts for one contract, ascending. */
+  function protocolVersionsFor(schemaId) {
+  	return Object.keys(protocolSchemas[schemaId]).map(Number).sort((left, right) => left - right);
+  }
   //#endregion
   //#region src/protocol/codec.ts
   var MAX_JSON_BYTES = 1048576;
@@ -69368,6 +69958,64 @@
   	"offer",
   	"sdp"
   ]);
+  /**
+  * Parses one pinned v1 contract without retaining state. The result carries the
+  * schema and version recognized so far even when validation fails.
+  */
+  function decodeProtocolJson(json, nowMilliseconds) {
+  	let schemaId = "";
+  	let schemaVersion;
+  	const failure = (path, message) => ({
+  		ok: false,
+  		json: "",
+  		schema: schemaId,
+  		version: schemaVersion,
+  		diagnostic: {
+  			path,
+  			message
+  		},
+  		value: void 0
+  	});
+  	if (new TextEncoder().encode(json).byteLength > MAX_JSON_BYTES) return failure("/", `JSON exceeds ${MAX_JSON_BYTES} bytes.`);
+  	let value;
+  	try {
+  		value = JSON.parse(json);
+  	} catch (error) {
+  		return failure("/", `Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  	}
+  	if (!isRecord(value)) return failure("/", "Protocol value must be a JSON object.");
+  	if (typeof value.schema !== "string") return failure("/schema", "Schema identifier must be a string.");
+  	schemaId = value.schema;
+  	if (!isProtocolSchemaId(value.schema)) return failure("/schema", `Unsupported schema identifier: ${value.schema}`);
+  	const schema = protocolSchemaFor(value.schema, value.version);
+  	if (!schema) {
+  		schemaVersion = typeof value.version === "number" ? value.version : void 0;
+  		return failure("/version", `Unsupported ${value.schema} version: ${String(value.version)}. Supported: ${protocolVersionsFor(value.schema).join(", ")}.`);
+  	}
+  	schemaVersion = value.version;
+  	const credential = findForbiddenPairingKey(value);
+  	if (credential) return failure(credential, "WebRTC pairing credentials are forbidden in persistent protocol contracts.");
+  	if (!Check(schema, value)) {
+  		const first = Errors(schema, value).First();
+  		return failure(first?.path || "/", first?.message ?? "Protocol value does not match its v1 schema.");
+  	}
+  	if (value.schema === "twmp/session-policy") {
+  		const timeError = validateSessionPolicyWindow(value, nowMilliseconds);
+  		if (timeError) return failure(timeError.path, timeError.message);
+  	}
+  	return {
+  		ok: true,
+  		json: JSON.stringify(value),
+  		schema: schemaId,
+  		version: schemaVersion,
+  		diagnostic: void 0,
+  		value
+  	};
+  }
+  function formatProtocolDiagnostic(diagnostic) {
+  	if (!diagnostic) return "Protocol validation failed.";
+  	return `${diagnostic.path || "/"}: ${diagnostic.message}`;
+  }
   var ProtocolV1Codec = class {
   	constructor(nowMilliseconds = Date.now) {
   		this.encoded = "";
@@ -69379,11 +70027,11 @@
   	}
   	decode(json) {
   		const result = this.process(json, true);
-  		if (!result.ok) throw new Error(formatDiagnostic(result.diagnostic));
+  		if (!result.ok) throw new Error(formatProtocolDiagnostic(result.diagnostic));
   	}
   	encode(json) {
   		const result = this.process(json, true);
-  		if (!result.ok) throw new Error(formatDiagnostic(result.diagnostic));
+  		if (!result.ok) throw new Error(formatProtocolDiagnostic(result.diagnostic));
   		return result.json;
   	}
   	decodedJson() {
@@ -69402,69 +70050,25 @@
   		return this.diagnostic?.message ?? "";
   	}
   	process(json, retain) {
-  		this.resetAttempt();
   		if (retain) {
   			this.decoded = void 0;
   			this.encoded = "";
   		}
-  		if (new TextEncoder().encode(json).byteLength > MAX_JSON_BYTES) return this.failure("/", `JSON exceeds ${MAX_JSON_BYTES} bytes.`);
-  		let value;
-  		try {
-  			value = JSON.parse(json);
-  		} catch (error) {
-  			const message = error instanceof Error ? error.message : String(error);
-  			return this.failure("/", `Invalid JSON: ${message}`);
-  		}
-  		if (!isRecord(value)) return this.failure("/", "Protocol value must be a JSON object.");
-  		if (typeof value.schema !== "string") return this.failure("/schema", "Schema identifier must be a string.");
-  		this.schemaId = value.schema;
-  		if (!isProtocolSchemaId(value.schema)) return this.failure("/schema", `Unsupported schema identifier: ${value.schema}`);
-  		if (value.version !== 1) {
-  			this.schemaVersion = typeof value.version === "number" ? value.version : void 0;
-  			return this.failure("/version", `Unsupported ${value.schema} version: ${String(value.version)}`);
-  		}
-  		this.schemaVersion = 1;
-  		const credential = findForbiddenPairingKey(value);
-  		if (credential) return this.failure(credential, "WebRTC pairing credentials are forbidden in persistent protocol contracts.");
-  		const schema = protocolSchemas[value.schema];
-  		if (!Check(schema, value)) {
-  			const first = Errors(schema, value).First();
-  			return this.failure(first?.path || "/", first?.message ?? "Protocol value does not match its v1 schema.");
-  		}
-  		if (value.schema === "twmp/session-policy") {
-  			const timeError = validateSessionPolicyWindow(value, this.nowMilliseconds());
-  			if (timeError) return this.failure(timeError.path, timeError.message);
-  		}
-  		const encoded = JSON.stringify(value);
-  		if (retain) {
-  			this.decoded = value;
-  			this.encoded = encoded;
+  		const result = decodeProtocolJson(json, this.nowMilliseconds());
+  		this.schemaId = result.schema;
+  		this.schemaVersion = result.version;
+  		this.diagnostic = result.diagnostic;
+  		if (result.ok && retain) {
+  			this.decoded = result.value;
+  			this.encoded = result.json;
   		}
   		return {
-  			ok: true,
-  			json: encoded,
-  			schema: this.schemaId,
-  			version: this.schemaVersion,
-  			diagnostic: void 0
+  			ok: result.ok,
+  			json: result.json,
+  			schema: result.schema,
+  			version: result.version,
+  			diagnostic: result.diagnostic
   		};
-  	}
-  	failure(path, message) {
-  		this.diagnostic = {
-  			path,
-  			message
-  		};
-  		return {
-  			ok: false,
-  			json: "",
-  			schema: this.schemaId,
-  			version: this.schemaVersion,
-  			diagnostic: this.diagnostic
-  		};
-  	}
-  	resetAttempt() {
-  		this.schemaId = "";
-  		this.schemaVersion = void 0;
-  		this.diagnostic = void 0;
   	}
   };
   function isProtocolSchemaId(value) {
@@ -69504,10 +70108,6 @@
   }
   function isRecord(value) {
   	return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function formatDiagnostic(diagnostic) {
-  	if (!diagnostic) return "Protocol validation failed.";
-  	return `${diagnostic.path || "/"}: ${diagnostic.message}`;
   }
   //#endregion
   //#region src/calibration/controller.ts
@@ -80020,6 +80620,1468 @@
   	return Math.max(0, Math.round((now - captured) * 1e3));
   }
   //#endregion
+  //#region src/fusion/geometry.ts
+  var SUPPORTED_DISTORTION_LENGTHS = /* @__PURE__ */ new Set([
+  	0,
+  	4,
+  	5,
+  	8
+  ]);
+  var ORTHONORMAL_TOLERANCE = .001;
+  var UNDISTORT_ITERATIONS = 20;
+  var MINIMUM_DEPTH = 1e-6;
+  /**
+  * Derives the world-to-camera projection model from one CameraCalibration v1
+  * profile. The profile stores `worldFromCameraMatrix`, so the rigid transform is
+  * inverted here instead of during triangulation.
+  */
+  function createCameraModel(calibration) {
+  	const intrinsic = calibration.intrinsicMatrix;
+  	if (intrinsic.length !== 9 || !intrinsic.every(isFiniteNumber)) throw new Error("Intrinsic matrix must contain nine finite numbers.");
+  	const fx = element(intrinsic, 0);
+  	const skew = element(intrinsic, 1);
+  	const cx = element(intrinsic, 2);
+  	const fy = element(intrinsic, 4);
+  	const cy = element(intrinsic, 5);
+  	if (fx <= 0 || fy <= 0) throw new Error("Intrinsic focal lengths must be positive.");
+  	for (const [index, expected] of [
+  		[3, 0],
+  		[6, 0],
+  		[7, 0],
+  		[8, 1]
+  	]) if (Math.abs(element(intrinsic, index) - expected) > 1e-6) throw new Error("Intrinsic matrix must be an upper triangular 3 by 3.");
+  	if (!SUPPORTED_DISTORTION_LENGTHS.has(calibration.distortionCoefficients.length)) throw new Error("Only 0, 4, 5, or 8 OpenCV distortion coefficients are supported.");
+  	const distortion = Array.from({ length: 8 }, (_, index) => calibration.distortionCoefficients[index] ?? 0);
+  	if (!distortion.every(isFiniteNumber)) throw new Error("Distortion coefficients must be finite numbers.");
+  	const worldFromCamera = calibration.worldFromCameraMatrix;
+  	if (worldFromCamera.length !== 16 || !worldFromCamera.every(isFiniteNumber)) throw new Error("worldFromCameraMatrix must contain 16 finite numbers.");
+  	for (const [index, expected] of [
+  		[12, 0],
+  		[13, 0],
+  		[14, 0],
+  		[15, 1]
+  	]) if (Math.abs(element(worldFromCamera, index) - expected) > 1e-6) throw new Error("worldFromCameraMatrix must be an affine transform.");
+  	const worldRotation = [
+  		0,
+  		1,
+  		2,
+  		4,
+  		5,
+  		6,
+  		8,
+  		9,
+  		10
+  	].map((index) => element(worldFromCamera, index));
+  	const worldTranslation = [
+  		3,
+  		7,
+  		11
+  	].map((index) => element(worldFromCamera, index));
+  	requireOrthonormal(worldRotation);
+  	const rotation = [
+  		0,
+  		3,
+  		6,
+  		1,
+  		4,
+  		7,
+  		2,
+  		5,
+  		8
+  	].map((index) => element(worldRotation, index));
+  	const translation = multiplyRotation(rotation, worldTranslation).map((value) => -value);
+  	return {
+  		cameraId: calibration.cameraId,
+  		calibrationId: calibration.calibrationId,
+  		imageWidth: calibration.imageWidth,
+  		imageHeight: calibration.imageHeight,
+  		fx,
+  		fy,
+  		cx,
+  		cy,
+  		skew,
+  		distortion,
+  		rotation,
+  		translation
+  	};
+  }
+  /** Applies the OpenCV rational distortion model to normalized coordinates. */
+  function distortNormalized(model, x, y) {
+  	const [k1, k2, p1, p2, k3, k4, k5, k6] = distortionCoefficients(model);
+  	const r2 = x * x + y * y;
+  	const r4 = r2 * r2;
+  	const r6 = r4 * r2;
+  	const denominator = 1 + k4 * r2 + k5 * r4 + k6 * r6;
+  	const radial = denominator === 0 ? 1 : (1 + k1 * r2 + k2 * r4 + k3 * r6) / denominator;
+  	return {
+  		x: x * radial + 2 * p1 * x * y + p2 * (r2 + 2 * x * x),
+  		y: y * radial + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y
+  	};
+  }
+  function pixelFromNormalized(model, x, y) {
+  	const distorted = distortNormalized(model, x, y);
+  	return {
+  		x: model.fx * distorted.x + model.skew * distorted.y + model.cx,
+  		y: model.fy * distorted.y + model.cy
+  	};
+  }
+  /** Removes intrinsics and distortion from one observed pixel. */
+  function normalizedFromPixel(model, pixelX, pixelY) {
+  	const [k1, k2, p1, p2, k3, k4, k5, k6] = distortionCoefficients(model);
+  	const observedY = (pixelY - model.cy) / model.fy;
+  	const observedX = (pixelX - model.cx - model.skew * observedY) / model.fx;
+  	let x = observedX;
+  	let y = observedY;
+  	for (let iteration = 0; iteration < UNDISTORT_ITERATIONS; iteration += 1) {
+  		const r2 = x * x + y * y;
+  		const r4 = r2 * r2;
+  		const r6 = r4 * r2;
+  		const numerator = 1 + k1 * r2 + k2 * r4 + k3 * r6;
+  		if (numerator === 0) break;
+  		const inverseRadial = (1 + k4 * r2 + k5 * r4 + k6 * r6) / numerator;
+  		const tangentialX = 2 * p1 * x * y + p2 * (r2 + 2 * x * x);
+  		const tangentialY = p1 * (r2 + 2 * y * y) + 2 * p2 * x * y;
+  		x = (observedX - tangentialX) * inverseRadial;
+  		y = (observedY - tangentialY) * inverseRadial;
+  	}
+  	return {
+  		x,
+  		y
+  	};
+  }
+  /** Projects a world point into one camera, or returns undefined behind it. */
+  function projectPoint(model, point) {
+  	const camera = multiplyRotation(model.rotation, [
+  		point.x,
+  		point.y,
+  		point.z
+  	]);
+  	const x = element(camera, 0) + element(model.translation, 0);
+  	const y = element(camera, 1) + element(model.translation, 1);
+  	const z = element(camera, 2) + element(model.translation, 2);
+  	if (!(z > MINIMUM_DEPTH)) return void 0;
+  	return pixelFromNormalized(model, x / z, y / z);
+  }
+  function depthOf(model, point) {
+  	return element(multiplyRotation(model.rotation, [
+  		point.x,
+  		point.y,
+  		point.z
+  	]), 2) + element(model.translation, 2);
+  }
+  /**
+  * Score-weighted linear triangulation. Observations are undistorted normalized
+  * coordinates, so the projection rows are the pure rigid transform.
+  */
+  function triangulate(observations) {
+  	if (observations.length < 2) return void 0;
+  	if (observations.length === 2) {
+  		const [first, second] = observations;
+  		if (first && second) return triangulateTwoViews(first, second);
+  	}
+  	const normal = new Array(16).fill(0);
+  	for (const observation of observations) {
+  		const rotation = observation.model.rotation;
+  		const translation = observation.model.translation;
+  		const rows = [];
+  		for (const axis of [0, 1]) {
+  			const image = axis === 0 ? observation.x : observation.y;
+  			rows.push([
+  				image * element(rotation, 6) - element(rotation, axis * 3),
+  				image * element(rotation, 7) - element(rotation, axis * 3 + 1),
+  				image * element(rotation, 8) - element(rotation, axis * 3 + 2),
+  				image * element(translation, 2) - element(translation, axis)
+  			]);
+  		}
+  		const weight = Math.max(observation.score, .001);
+  		for (const row of rows) for (let i = 0; i < 4; i += 1) for (let j = 0; j < 4; j += 1) normal[i * 4 + j] = element(normal, i * 4 + j) + weight * weight * element(row, i) * element(row, j);
+  	}
+  	const solution = smallestEigenvector4(normal);
+  	const w = element(solution, 3);
+  	if (Math.abs(w) < 1e-12) return void 0;
+  	const point = {
+  		x: element(solution, 0) / w,
+  		y: element(solution, 1) / w,
+  		z: element(solution, 2) / w
+  	};
+  	if (!isFiniteNumber(point.x) || !isFiniteNumber(point.y) || !isFiniteNumber(point.z)) return;
+  	return point;
+  }
+  /**
+  * Closed-form two-view triangulation: the midpoint of the shortest segment
+  * between both viewing rays. Two rays carry no redundancy to weight, so this
+  * replaces the iterative solver on the hot association path.
+  */
+  function triangulateTwoViews(first, second) {
+  	const firstCenter = cameraCenter(first.model);
+  	const secondCenter = cameraCenter(second.model);
+  	const firstRay = rayDirection(first.model, first.x, first.y);
+  	const secondRay = rayDirection(second.model, second.x, second.y);
+  	const between = [
+  		element(firstCenter, 0) - element(secondCenter, 0),
+  		element(firstCenter, 1) - element(secondCenter, 1),
+  		element(firstCenter, 2) - element(secondCenter, 2)
+  	];
+  	const rayDot = dot(firstRay, secondRay);
+  	const denominator = 1 - rayDot * rayDot;
+  	if (Math.abs(denominator) < 1e-12) return void 0;
+  	const firstOffset = dot(firstRay, between);
+  	const secondOffset = dot(secondRay, between);
+  	const firstDepth = (rayDot * secondOffset - firstOffset) / denominator;
+  	const secondDepth = (secondOffset - rayDot * firstOffset) / denominator;
+  	const point = {
+  		x: (element(firstCenter, 0) + firstDepth * element(firstRay, 0) + element(secondCenter, 0) + secondDepth * element(secondRay, 0)) / 2,
+  		y: (element(firstCenter, 1) + firstDepth * element(firstRay, 1) + element(secondCenter, 1) + secondDepth * element(secondRay, 1)) / 2,
+  		z: (element(firstCenter, 2) + firstDepth * element(firstRay, 2) + element(secondCenter, 2) + secondDepth * element(secondRay, 2)) / 2
+  	};
+  	if (!isFiniteNumber(point.x) || !isFiniteNumber(point.y) || !isFiniteNumber(point.z)) return;
+  	return point;
+  }
+  /** Camera position in world coordinates. */
+  function cameraCenter(model) {
+  	return transposedRotationTimes(model.rotation, model.translation).map((value) => -value);
+  }
+  /** Unit viewing ray of one normalized observation in world coordinates. */
+  function rayDirection(model, x, y) {
+  	const direction = transposedRotationTimes(model.rotation, [
+  		x,
+  		y,
+  		1
+  	]);
+  	const length = Math.hypot(element(direction, 0), element(direction, 1), element(direction, 2));
+  	if (length === 0) return [
+  		0,
+  		0,
+  		1
+  	];
+  	return direction.map((value) => value / length);
+  }
+  function transposedRotationTimes(rotation, vector) {
+  	return [
+  		0,
+  		1,
+  		2
+  	].map((row) => element(rotation, row) * element(vector, 0) + element(rotation, row + 3) * element(vector, 1) + element(rotation, row + 6) * element(vector, 2));
+  }
+  function dot(left, right) {
+  	return element(left, 0) * element(right, 0) + element(left, 1) * element(right, 1) + element(left, 2) * element(right, 2);
+  }
+  /** Mean pixel distance between the reprojected point and every observation. */
+  function meanReprojectionError(point, observations) {
+  	let total = 0;
+  	for (const observation of observations) {
+  		const projected = projectPoint(observation.model, point);
+  		if (!projected) return void 0;
+  		total += Math.hypot(projected.x - observation.pixelX, projected.y - observation.pixelY);
+  	}
+  	return observations.length === 0 ? void 0 : total / observations.length;
+  }
+  /** Cyclic Jacobi eigenvalue decomposition of a symmetric 4 by 4 matrix. */
+  function smallestEigenvector4(matrix) {
+  	const a = matrix.slice();
+  	const v = [
+  		1,
+  		0,
+  		0,
+  		0,
+  		0,
+  		1,
+  		0,
+  		0,
+  		0,
+  		0,
+  		1,
+  		0,
+  		0,
+  		0,
+  		0,
+  		1
+  	];
+  	let scale = 0;
+  	for (let index = 0; index < 4; index += 1) scale += element(a, index * 4 + index) ** 2;
+  	const converged = Math.max(scale, 1e-300) * 1e-24;
+  	for (let sweep = 0; sweep < 32; sweep += 1) {
+  		let off = 0;
+  		for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 4; q += 1) off += element(a, p * 4 + q) ** 2;
+  		if (off < converged) break;
+  		for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 4; q += 1) {
+  			const apq = element(a, p * 4 + q);
+  			if (Math.abs(apq) < 1e-18) continue;
+  			const theta = (element(a, q * 4 + q) - element(a, p * 4 + p)) / (2 * apq);
+  			const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+  			const c = 1 / Math.sqrt(t * t + 1);
+  			const s = t * c;
+  			for (let k = 0; k < 4; k += 1) {
+  				const akp = element(a, k * 4 + p);
+  				const akq = element(a, k * 4 + q);
+  				a[k * 4 + p] = c * akp - s * akq;
+  				a[k * 4 + q] = s * akp + c * akq;
+  			}
+  			for (let k = 0; k < 4; k += 1) {
+  				const apk = element(a, p * 4 + k);
+  				const aqk = element(a, q * 4 + k);
+  				a[p * 4 + k] = c * apk - s * aqk;
+  				a[q * 4 + k] = s * apk + c * aqk;
+  			}
+  			for (let k = 0; k < 4; k += 1) {
+  				const vkp = element(v, k * 4 + p);
+  				const vkq = element(v, k * 4 + q);
+  				v[k * 4 + p] = c * vkp - s * vkq;
+  				v[k * 4 + q] = s * vkp + c * vkq;
+  			}
+  		}
+  	}
+  	let best = 0;
+  	for (let index = 1; index < 4; index += 1) if (element(a, index * 4 + index) < element(a, best * 4 + best)) best = index;
+  	return [
+  		0,
+  		1,
+  		2,
+  		3
+  	].map((row) => element(v, row * 4 + best));
+  }
+  function requireOrthonormal(rotation) {
+  	for (let i = 0; i < 3; i += 1) for (let j = 0; j < 3; j += 1) {
+  		let dot = 0;
+  		for (let k = 0; k < 3; k += 1) dot += element(rotation, k * 3 + i) * element(rotation, k * 3 + j);
+  		if (Math.abs(dot - (i === j ? 1 : 0)) > ORTHONORMAL_TOLERANCE) throw new Error("worldFromCameraMatrix rotation must be orthonormal within 1e-3.");
+  	}
+  	const determinant = element(rotation, 0) * (element(rotation, 4) * element(rotation, 8) - element(rotation, 5) * element(rotation, 7)) - element(rotation, 1) * (element(rotation, 3) * element(rotation, 8) - element(rotation, 5) * element(rotation, 6)) + element(rotation, 2) * (element(rotation, 3) * element(rotation, 7) - element(rotation, 4) * element(rotation, 6));
+  	if (Math.abs(determinant - 1) > ORTHONORMAL_TOLERANCE) throw new Error("worldFromCameraMatrix rotation must be a right-handed rotation.");
+  }
+  function multiplyRotation(rotation, vector) {
+  	return [
+  		0,
+  		1,
+  		2
+  	].map((row) => element(rotation, row * 3) * element(vector, 0) + element(rotation, row * 3 + 1) * element(vector, 1) + element(rotation, row * 3 + 2) * element(vector, 2));
+  }
+  function distortionCoefficients(model) {
+  	const d = model.distortion;
+  	return [
+  		d[0] ?? 0,
+  		d[1] ?? 0,
+  		d[2] ?? 0,
+  		d[3] ?? 0,
+  		d[4] ?? 0,
+  		d[5] ?? 0,
+  		d[6] ?? 0,
+  		d[7] ?? 0
+  	];
+  }
+  function element(values, index) {
+  	return values[index] ?? 0;
+  }
+  function isFiniteNumber(value) {
+  	return typeof value === "number" && Number.isFinite(value);
+  }
+  //#endregion
+  //#region src/fusion/glow-stick.ts
+  /** Left/right pairs whose labels MoveNet swaps when a person faces away. */
+  var MIRROR_PAIRS = [
+  	["left_eye", "right_eye"],
+  	["left_ear", "right_ear"],
+  	["left_shoulder", "right_shoulder"],
+  	["left_elbow", "right_elbow"],
+  	["left_wrist", "right_wrist"],
+  	["left_hip", "right_hip"],
+  	["left_knee", "right_knee"],
+  	["left_ankle", "right_ankle"]
+  ];
+  var MIRROR_BY_ID = new Map([...MIRROR_PAIRS.map(([left, right]) => [left, right]), ...MIRROR_PAIRS.map(([left, right]) => [right, left])]);
+  var DEFAULT_GLOW_STICK_MATCH_OPTIONS = {
+  	maxHueDistance: 25,
+  	minCoverage: .08
+  };
+  function mirrorKeypointId(id) {
+  	return MIRROR_BY_ID.get(id) ?? id;
+  }
+  /**
+  * Performer palette taken from the Performance DSL, plus the keypoint each
+  * performer carries the glow stick at. The DSL owns the colors; the carrying
+  * hand is a fusion-side setting because it is not part of that contract.
+  */
+  var GlowStickPalette = class {
+  	constructor() {
+  		this.colors = /* @__PURE__ */ new Map();
+  		this.keypoints = /* @__PURE__ */ new Map();
+  	}
+  	loadPerformers(performers) {
+  		this.colors.clear();
+  		for (const performer of performers) {
+  			if (!hsvFromHex(performer.glowStickColor)) throw new Error(`Performer ${performer.performerId} has an invalid glow stick color.`);
+  			this.colors.set(performer.performerId, performer.glowStickColor);
+  		}
+  		for (const performerId of [...this.keypoints.keys()]) if (!this.colors.has(performerId)) this.keypoints.delete(performerId);
+  	}
+  	setKeypoint(performerId, keypointId) {
+  		if (!this.colors.has(performerId)) throw new Error(`Performer ${performerId} is not in the loaded palette.`);
+  		this.keypoints.set(performerId, keypointId);
+  	}
+  	keypointOf(performerId) {
+  		return this.keypoints.get(performerId) ?? "right_wrist";
+  	}
+  	size() {
+  		return this.colors.size;
+  	}
+  	clear() {
+  		this.colors.clear();
+  		this.keypoints.clear();
+  	}
+  	/** Performer whose color is closest to one observation, if any matches. */
+  	match(colorHex, options) {
+  		const observed = hsvFromHex(colorHex);
+  		if (!observed) return void 0;
+  		let best;
+  		for (const [performerId, performerColor] of this.colors) {
+  			const expected = hsvFromHex(performerColor);
+  			if (!expected) continue;
+  			const distance = hueDistance(observed.hue, expected.hue);
+  			if (distance > options.maxHueDistance) continue;
+  			if (!best || distance < best.distance) best = {
+  				performerId,
+  				distance
+  			};
+  		}
+  		return best;
+  	}
+  	/**
+  	* Assigns performers to the tracked persons of one camera sample. Each
+  	* performer takes at most one person per camera, strongest observation first,
+  	* and a color seen on the mirror of the performer's keypoint marks that view
+  	* as left/right swapped.
+  	*/
+  	assign(sample, options) {
+  		const candidates = [];
+  		for (const person of sample.persons) for (const marker of person.markers) {
+  			if (marker.coverage < options.minCoverage) continue;
+  			const matched = this.match(marker.colorHex, options);
+  			if (!matched) continue;
+  			candidates.push({
+  				trackingId: person.trackingId,
+  				performerId: matched.performerId,
+  				keypointId: marker.keypointId,
+  				coverage: marker.coverage,
+  				distance: matched.distance
+  			});
+  		}
+  		candidates.sort((left, right) => right.coverage - left.coverage || left.distance - right.distance);
+  		const assignments = /* @__PURE__ */ new Map();
+  		const takenPerformers = /* @__PURE__ */ new Set();
+  		for (const candidate of candidates) {
+  			if (assignments.has(candidate.trackingId)) continue;
+  			if (takenPerformers.has(candidate.performerId)) continue;
+  			const expected = this.keypointOf(candidate.performerId);
+  			const mirrored = candidate.keypointId !== expected && candidate.keypointId === mirrorKeypointId(expected);
+  			assignments.set(candidate.trackingId, {
+  				performerId: candidate.performerId,
+  				mirrored,
+  				colorHex: this.colors.get(candidate.performerId) ?? "",
+  				coverage: candidate.coverage
+  			});
+  			takenPerformers.add(candidate.performerId);
+  		}
+  		return assignments;
+  	}
+  };
+  //#endregion
+  //#region src/fusion/fuse.ts
+  var DEFAULT_FUSION_GEOMETRY_OPTIONS = {
+  	minKeypointScore: .3,
+  	minSharedKeypoints: 4,
+  	maxReprojectionErrorPx: 25,
+  	minCamerasPerPerson: 2,
+  	maxPersons: 6
+  };
+  var COORDINATE_LIMIT = 1e6;
+  /** Shared keypoints that already decide one person-pair cost. */
+  var MAX_PAIR_KEYPOINTS = 12;
+  /**
+  * Associates the tracked persons of a synchronized instant across cameras and
+  * triangulates every COCO-17 keypoint of each multi-camera cluster.
+  */
+  function fuseSynchronizedSample(sample, models, options, assignments = /* @__PURE__ */ new Map()) {
+  	const views = collectViews(sample, models, options.minKeypointScore, assignments);
+  	const clusters = associateViews(views, options);
+  	const persons = [];
+  	for (const cluster of clusters) {
+  		const cameraIds = [...new Set(cluster.map((index) => views[index]?.cameraId ?? ""))].filter((cameraId) => cameraId.length > 0).sort();
+  		if (cameraIds.length < options.minCamerasPerPerson) continue;
+  		const clusterViews = cluster.map((index) => views[index]).filter((view) => view !== void 0);
+  		persons.push(fuseCluster(clusterViews, cameraIds, options));
+  	}
+  	return persons.sort((left, right) => right.score - left.score).slice(0, options.maxPersons);
+  }
+  function collectViews(sample, models, minKeypointScore, assignments) {
+  	const views = [];
+  	for (const camera of sample.cameras) {
+  		const model = models.get(camera.cameraId);
+  		if (!model) continue;
+  		const cameraAssignments = assignments.get(camera.cameraId);
+  		for (const person of camera.persons) {
+  			const assignment = cameraAssignments?.get(person.trackingId);
+  			const observations = /* @__PURE__ */ new Map();
+  			for (const keypoint of person.keypoints) {
+  				if (keypoint.score < minKeypointScore) continue;
+  				const normalized = normalizedFromPixel(model, keypoint.x, keypoint.y);
+  				const keypointId = assignment?.mirrored ? mirrorKeypointId(keypoint.id) : keypoint.id;
+  				observations.set(keypointId, {
+  					model,
+  					x: normalized.x,
+  					y: normalized.y,
+  					pixelX: keypoint.x,
+  					pixelY: keypoint.y,
+  					score: keypoint.score
+  				});
+  			}
+  			views.push({
+  				cameraId: camera.cameraId,
+  				trackingId: person.trackingId,
+  				model,
+  				observations,
+  				performerId: assignment?.performerId
+  			});
+  		}
+  	}
+  	return views;
+  }
+  /** Greedy lowest-cost clustering with at most one view per camera per person. */
+  function associateViews(views, options) {
+  	const pairs = [];
+  	for (let left = 0; left < views.length; left += 1) for (let right = left + 1; right < views.length; right += 1) {
+  		const first = views[left];
+  		const second = views[right];
+  		if (!first || !second || first.cameraId === second.cameraId) continue;
+  		if (first.performerId && second.performerId && first.performerId !== second.performerId) continue;
+  		const cost = pairCost(first, second, options);
+  		if (cost === void 0) continue;
+  		pairs.push({
+  			left,
+  			right,
+  			cost
+  		});
+  	}
+  	pairs.sort((first, second) => first.cost - second.cost);
+  	const parent = views.map((_, index) => index);
+  	const cameras = views.map((view) => /* @__PURE__ */ new Set([view.cameraId]));
+  	const performers = views.map((view) => view.performerId ? /* @__PURE__ */ new Set([view.performerId]) : /* @__PURE__ */ new Set());
+  	const byPerformer = /* @__PURE__ */ new Map();
+  	views.forEach((view, index) => {
+  		if (!view.performerId) return;
+  		byPerformer.set(view.performerId, [...byPerformer.get(view.performerId) ?? [], index]);
+  	});
+  	const find = (index) => {
+  		let root = index;
+  		while (parent[root] !== root) root = parent[root] ?? root;
+  		return root;
+  	};
+  	const merge = (left, right) => {
+  		const leftRoot = find(left);
+  		const rightRoot = find(right);
+  		if (leftRoot === rightRoot) return;
+  		const leftCameras = cameras[leftRoot];
+  		const rightCameras = cameras[rightRoot];
+  		const leftPerformers = performers[leftRoot];
+  		const rightPerformers = performers[rightRoot];
+  		if (!leftCameras || !rightCameras || !leftPerformers || !rightPerformers) return;
+  		for (const cameraId of rightCameras) if (leftCameras.has(cameraId)) return;
+  		if ((/* @__PURE__ */ new Set([...leftPerformers, ...rightPerformers])).size > 1) return;
+  		parent[rightRoot] = leftRoot;
+  		for (const cameraId of rightCameras) leftCameras.add(cameraId);
+  		for (const performerId of rightPerformers) leftPerformers.add(performerId);
+  	};
+  	for (const indexes of byPerformer.values()) for (let index = 1; index < indexes.length; index += 1) merge(indexes[0] ?? 0, indexes[index] ?? 0);
+  	for (const pair of pairs) merge(pair.left, pair.right);
+  	const clusters = /* @__PURE__ */ new Map();
+  	for (let index = 0; index < views.length; index += 1) {
+  		const root = find(index);
+  		const cluster = clusters.get(root) ?? [];
+  		cluster.push(index);
+  		clusters.set(root, cluster);
+  	}
+  	return [...clusters.values()];
+  }
+  /**
+  * Mean two-view reprojection error over the shared visible keypoints. The scan
+  * stops once enough evidence is collected and gives up as soon as too few
+  * keypoints remain, because this runs for every cross-camera person pair.
+  */
+  function pairCost(left, right, options) {
+  	let total = 0;
+  	let shared = 0;
+  	for (const [index, keypointId] of COCO_17_KEYPOINT_IDS.entries()) {
+  		if (shared >= MAX_PAIR_KEYPOINTS) break;
+  		const remaining = COCO_17_KEYPOINT_IDS.length - index;
+  		if (shared + remaining < options.minSharedKeypoints) return void 0;
+  		const first = left.observations.get(keypointId);
+  		const second = right.observations.get(keypointId);
+  		if (!first || !second) continue;
+  		const point = triangulate([first, second]);
+  		if (!point || !inFrontOfAll(point, [first, second])) continue;
+  		const error = meanReprojectionError(point, [first, second]);
+  		if (error === void 0) continue;
+  		total += error;
+  		shared += 1;
+  	}
+  	if (shared < options.minSharedKeypoints) return void 0;
+  	const cost = total / shared;
+  	return cost <= options.maxReprojectionErrorPx ? cost : void 0;
+  }
+  function fuseCluster(views, cameraIds, options) {
+  	const members = views.map((view) => ({
+  		cameraId: view.cameraId,
+  		trackingId: view.trackingId
+  	})).sort((left, right) => left.cameraId.localeCompare(right.cameraId));
+  	const keypoints = COCO_17_KEYPOINT_IDS.map((keypointId) => {
+  		const fused = fuseKeypoint(views.map((view) => view.observations.get(keypointId)).filter((observation) => observation !== void 0), options);
+  		return {
+  			id: keypointId,
+  			point: fused?.point,
+  			score: fused?.score ?? 0,
+  			meanReprojectionErrorPx: fused?.error ?? 0
+  		};
+  	});
+  	const fusedKeypoints = keypoints.filter((keypoint) => keypoint.point);
+  	const meanError = fusedKeypoints.length === 0 ? 0 : fusedKeypoints.reduce((total, keypoint) => total + keypoint.meanReprojectionErrorPx, 0) / fusedKeypoints.length;
+  	const score = keypoints.reduce((total, keypoint) => total + keypoint.score, 0) / COCO_17_KEYPOINT_IDS.length;
+  	const performerIds = new Set(views.map((view) => view.performerId).filter((performerId) => performerId !== void 0));
+  	return {
+  		members,
+  		performerId: performerIds.size === 1 ? [...performerIds][0] : void 0,
+  		cameraIds: [...cameraIds],
+  		score: clampScore(score),
+  		meanReprojectionErrorPx: meanError,
+  		keypoints
+  	};
+  }
+  /**
+  * Triangulates one keypoint from every confident view. When the full set does
+  * not agree, the largest two-view consensus set wins, so a minority of wrong
+  * detections is discarded instead of dragging the point away from the truth.
+  */
+  function fuseKeypoint(observations, options) {
+  	if (observations.length < 2) return void 0;
+  	const agreed = evaluateViews(observations, options);
+  	if (agreed) return agreed;
+  	if (observations.length === 2) return void 0;
+  	let best;
+  	for (let left = 0; left < observations.length; left += 1) for (let right = left + 1; right < observations.length; right += 1) {
+  		const first = observations[left];
+  		const second = observations[right];
+  		if (!first || !second) continue;
+  		const seed = triangulate([first, second]);
+  		if (!seed || !withinBounds(seed)) continue;
+  		const inliers = observations.filter((observation) => {
+  			if (depthOf(observation.model, seed) <= 0) return false;
+  			const error = meanReprojectionError(seed, [observation]);
+  			return error !== void 0 && error <= options.maxReprojectionErrorPx;
+  		});
+  		if (inliers.length < 2) continue;
+  		const result = evaluateViews(inliers, options);
+  		if (!result) continue;
+  		if (!best || inliers.length > best.inliers || inliers.length === best.inliers && result.error < best.result.error) best = {
+  			result,
+  			inliers: inliers.length
+  		};
+  	}
+  	return best?.result;
+  }
+  /** Triangulates one view set and rejects it unless every view agrees. */
+  function evaluateViews(views, options) {
+  	const point = triangulate(views);
+  	if (!point || !withinBounds(point)) return void 0;
+  	if (!inFrontOfAll(point, views)) return void 0;
+  	const error = meanReprojectionError(point, views);
+  	if (error === void 0 || error > options.maxReprojectionErrorPx) return;
+  	return {
+  		point,
+  		score: clampScore(views.reduce((total, observation) => total + observation.score, 0) / views.length),
+  		error
+  	};
+  }
+  function inFrontOfAll(point, observations) {
+  	return observations.every((observation) => depthOf(observation.model, point) > 0);
+  }
+  function withinBounds(point) {
+  	return Math.abs(point.x) <= COORDINATE_LIMIT && Math.abs(point.y) <= COORDINATE_LIMIT && Math.abs(point.z) <= COORDINATE_LIMIT;
+  }
+  function clampScore(value) {
+  	if (!Number.isFinite(value)) return 0;
+  	return Math.min(Math.max(value, 0), 1);
+  }
+  //#endregion
+  //#region src/fusion/identity.ts
+  var MAX_TRACKS = 32;
+  /**
+  * Assigns stable `person-N` identifiers to camera/tracking-ID clusters and keeps
+  * the last triangulated position of every keypoint so a momentarily unfused
+  * keypoint can hold its previous value with a zero score.
+  */
+  var PersonIdentityRegistry = class {
+  	constructor(maxUnseenSequences = 30) {
+  		this.maxUnseenSequences = maxUnseenSequences;
+  		this.tracks = /* @__PURE__ */ new Map();
+  		this.nextId = 1;
+  	}
+  	resolve(members, sequence) {
+  		const keys = members.map(memberKey);
+  		let bestId;
+  		let bestOverlap = 0;
+  		for (const [personId, track] of this.tracks) {
+  			if (track.lastSequence === sequence) continue;
+  			let overlap = 0;
+  			for (const key of keys) if (track.members.has(key)) overlap += 1;
+  			if (overlap > bestOverlap) {
+  				bestOverlap = overlap;
+  				bestId = personId;
+  			}
+  		}
+  		const personId = bestId ?? this.createId();
+  		const track = this.tracks.get(personId) ?? {
+  			members: /* @__PURE__ */ new Set(),
+  			lastSequence: sequence,
+  			keypoints: /* @__PURE__ */ new Map()
+  		};
+  		track.members = new Set(keys);
+  		track.lastSequence = sequence;
+  		this.tracks.set(personId, track);
+  		return personId;
+  	}
+  	/** Tracks a cluster under an identifier the caller already resolved. */
+  	adopt(personId, members, sequence) {
+  		const track = this.tracks.get(personId) ?? {
+  			members: /* @__PURE__ */ new Set(),
+  			lastSequence: sequence,
+  			keypoints: /* @__PURE__ */ new Map()
+  		};
+  		track.members = new Set(members.map(memberKey));
+  		track.lastSequence = sequence;
+  		this.tracks.set(personId, track);
+  		return personId;
+  	}
+  	remember(personId, keypointId, point) {
+  		this.tracks.get(personId)?.keypoints.set(keypointId, point);
+  	}
+  	lastPoint(personId, keypointId) {
+  		return this.tracks.get(personId)?.keypoints.get(keypointId);
+  	}
+  	prune(sequence) {
+  		for (const [personId, track] of this.tracks) if (sequence - track.lastSequence > this.maxUnseenSequences) this.tracks.delete(personId);
+  		while (this.tracks.size > MAX_TRACKS) {
+  			const oldest = [...this.tracks.entries()].sort((left, right) => left[1].lastSequence - right[1].lastSequence)[0];
+  			if (!oldest) break;
+  			this.tracks.delete(oldest[0]);
+  		}
+  	}
+  	clear() {
+  		this.tracks.clear();
+  		this.nextId = 1;
+  	}
+  	createId() {
+  		const personId = `person-${this.nextId}`;
+  		this.nextId += 1;
+  		return personId;
+  	}
+  };
+  function memberKey(member) {
+  	return `${member.cameraId}/${member.trackingId}`;
+  }
+  //#endregion
+  //#region src/fusion/jitter-buffer.ts
+  var DEFAULT_JITTER_BUFFER_OPTIONS = {
+  	capacityPerCamera: 120,
+  	jitterWindowUs: 2e5,
+  	maxHoldUs: 1e5,
+  	maxGapUs: 25e4,
+  	minKeypointScore: .3
+  };
+  /**
+  * Timestamp-ordered ring buffer for one camera. Frames may arrive out of order
+  * inside the jitter window; anything older than that window, older than the
+  * retained window when the ring is full, or already buffered is rejected.
+  */
+  var PoseFrameRingBuffer = class {
+  	constructor(capacity) {
+  		this.capacity = capacity;
+  		this.head = 0;
+  		this.count = 0;
+  		if (!Number.isInteger(capacity) || capacity < 2) throw new Error("Ring buffer capacity must be an integer of at least 2.");
+  		this.slots = new Array(capacity).fill(void 0);
+  	}
+  	size() {
+  		return this.count;
+  	}
+  	at(index) {
+  		if (index < 0 || index >= this.count) return void 0;
+  		return this.slots[this.slot(index)];
+  	}
+  	oldestTimestampUs() {
+  		return this.at(0)?.captureTimestampUs;
+  	}
+  	newestTimestampUs() {
+  		return this.at(this.count - 1)?.captureTimestampUs;
+  	}
+  	clear() {
+  		this.slots.fill(void 0);
+  		this.head = 0;
+  		this.count = 0;
+  	}
+  	insert(frame, jitterWindowUs) {
+  		const timestamp = frame.captureTimestampUs;
+  		const newest = this.newestTimestampUs();
+  		if (newest !== void 0 && timestamp < newest - jitterWindowUs) return "late";
+  		let index = this.count;
+  		while (index > 0) {
+  			const candidate = this.at(index - 1);
+  			if (!candidate) break;
+  			if (candidate.captureTimestampUs === timestamp) return "duplicate";
+  			if (candidate.captureTimestampUs < timestamp) break;
+  			index -= 1;
+  		}
+  		if (this.count < this.capacity) {
+  			for (let position = this.count; position > index; position -= 1) this.slots[this.slot(position)] = this.slots[this.slot(position - 1)];
+  			this.slots[this.slot(index)] = frame;
+  			this.count += 1;
+  			return "accepted";
+  		}
+  		if (index === 0) return "late";
+  		if (index === this.count) {
+  			this.head = (this.head + 1) % this.capacity;
+  			this.slots[this.slot(this.count - 1)] = frame;
+  			return "accepted";
+  		}
+  		for (let position = 1; position < index; position += 1) this.slots[this.slot(position - 1)] = this.slots[this.slot(position)];
+  		this.slots[this.slot(index - 1)] = frame;
+  		return "accepted";
+  	}
+  	/** Resamples this camera at one past instant, or returns undefined. */
+  	sampleAt(timestampUs, options) {
+  		const { previous, next } = this.bracket(timestampUs);
+  		if (previous && next) {
+  			if (previous === next) return createSample(previous, previous, 0, false, options);
+  			const gap = next.captureTimestampUs - previous.captureTimestampUs;
+  			if (gap <= options.maxGapUs) return createSample(previous, next, (timestampUs - previous.captureTimestampUs) / (gap === 0 ? 1 : gap), true, options);
+  			const beforeAge = timestampUs - previous.captureTimestampUs;
+  			const afterAge = next.captureTimestampUs - timestampUs;
+  			const nearer = beforeAge <= afterAge ? previous : next;
+  			if (Math.min(beforeAge, afterAge) > options.maxHoldUs) return void 0;
+  			return createSample(nearer, nearer, 0, true, options);
+  		}
+  		if (previous) {
+  			if (timestampUs - previous.captureTimestampUs > options.maxHoldUs) return;
+  			return createSample(previous, previous, 0, true, options);
+  		}
+  		if (next) {
+  			if (next.captureTimestampUs - timestampUs > options.maxHoldUs) return;
+  			return createSample(next, next, 0, true, options);
+  		}
+  	}
+  	bracket(timestampUs) {
+  		let low = 0;
+  		let high = this.count - 1;
+  		let previousIndex = -1;
+  		while (low <= high) {
+  			const middle = low + high >> 1;
+  			const candidate = this.at(middle);
+  			if (!candidate) break;
+  			if (candidate.captureTimestampUs <= timestampUs) {
+  				previousIndex = middle;
+  				low = middle + 1;
+  			} else high = middle - 1;
+  		}
+  		const previous = previousIndex >= 0 ? this.at(previousIndex) : void 0;
+  		if (previous?.captureTimestampUs === timestampUs) return {
+  			previous,
+  			next: previous
+  		};
+  		return {
+  			previous,
+  			next: this.at(previousIndex + 1)
+  		};
+  	}
+  	slot(index) {
+  		return (this.head + index) % this.capacity;
+  	}
+  };
+  /**
+  * Holds one ring buffer per camera and resamples every camera at a shared past
+  * instant. Timestamps stay opaque values from the external synchronized time
+  * service; no clock offset is estimated here.
+  */
+  var MultiCameraJitterBuffer = class {
+  	constructor(options) {
+  		this.options = options;
+  		this.buffers = /* @__PURE__ */ new Map();
+  		this.acceptedFrames = 0;
+  		this.droppedFrames = 0;
+  	}
+  	configure(options) {
+  		this.options = options;
+  		this.clear();
+  	}
+  	ingest(frame) {
+  		let buffer = this.buffers.get(frame.cameraId);
+  		if (!buffer) {
+  			buffer = new PoseFrameRingBuffer(this.options.capacityPerCamera);
+  			this.buffers.set(frame.cameraId, buffer);
+  		}
+  		const outcome = buffer.insert(frame, this.options.jitterWindowUs);
+  		if (outcome === "accepted") this.acceptedFrames += 1;
+  		else this.droppedFrames += 1;
+  		return outcome;
+  	}
+  	cameraIds() {
+  		return [...this.buffers.keys()].sort();
+  	}
+  	bufferedFrameCount() {
+  		let total = 0;
+  		for (const buffer of this.buffers.values()) total += buffer.size();
+  		return total;
+  	}
+  	acceptedFrameCount() {
+  		return this.acceptedFrames;
+  	}
+  	droppedFrameCount() {
+  		return this.droppedFrames;
+  	}
+  	/** Newest buffered timestamp across every camera. */
+  	newestTimestampUs() {
+  		let newest;
+  		for (const buffer of this.buffers.values()) {
+  			const candidate = buffer.newestTimestampUs();
+  			if (candidate === void 0) continue;
+  			if (newest === void 0 || candidate > newest) newest = candidate;
+  		}
+  		return newest;
+  	}
+  	/** Oldest buffered timestamp across every camera. */
+  	oldestTimestampUs() {
+  		let oldest;
+  		for (const buffer of this.buffers.values()) {
+  			const candidate = buffer.oldestTimestampUs();
+  			if (candidate === void 0) continue;
+  			if (oldest === void 0 || candidate < oldest) oldest = candidate;
+  		}
+  		return oldest;
+  	}
+  	sampleAt(timestampUs) {
+  		const cameras = [];
+  		for (const cameraId of this.cameraIds()) {
+  			const sample = this.buffers.get(cameraId)?.sampleAt(timestampUs, this.options);
+  			if (sample) cameras.push(sample);
+  		}
+  		return {
+  			timestampUs,
+  			cameras
+  		};
+  	}
+  	clear() {
+  		for (const buffer of this.buffers.values()) buffer.clear();
+  		this.buffers.clear();
+  		this.acceptedFrames = 0;
+  		this.droppedFrames = 0;
+  	}
+  };
+  function createSample(previous, next, alpha, interpolated, options) {
+  	const clamped = Math.min(Math.max(alpha, 0), 1);
+  	return {
+  		cameraId: previous.cameraId,
+  		calibrationId: previous.calibrationId,
+  		frameWidth: previous.frameWidth,
+  		frameHeight: previous.frameHeight,
+  		previousTimestampUs: previous.captureTimestampUs,
+  		nextTimestampUs: next.captureTimestampUs,
+  		alpha: clamped,
+  		interpolated,
+  		persons: mergePersons(previous, next, clamped, interpolated, options)
+  	};
+  }
+  function mergePersons(previous, next, alpha, interpolated, options) {
+  	const previousPersons = new Map(previous.persons.map((person) => [person.trackingId, person]));
+  	const nextPersons = previous === next ? previousPersons : new Map(next.persons.map((person) => [person.trackingId, person]));
+  	const trackingIds = [.../* @__PURE__ */ new Set([...previousPersons.keys(), ...nextPersons.keys()])];
+  	const persons = [];
+  	for (const trackingId of trackingIds) {
+  		const before = previousPersons.get(trackingId);
+  		const after = nextPersons.get(trackingId);
+  		if (before && after && before !== after) {
+  			persons.push({
+  				trackingId,
+  				score: lerp(before.score, after.score, alpha),
+  				keypoints: mergeKeypoints(before, after, alpha, options),
+  				markers: mergeMarkers(before, after)
+  			});
+  			continue;
+  		}
+  		const single = before ?? after;
+  		if (!single) continue;
+  		persons.push({
+  			trackingId,
+  			score: single.score,
+  			keypoints: singleKeypoints(single, interpolated),
+  			markers: mergeMarkers(single, void 0)
+  		});
+  	}
+  	return persons;
+  }
+  function mergeKeypoints(before, after, alpha, options) {
+  	const beforeById = keypointsById(before);
+  	const afterById = keypointsById(after);
+  	return COCO_17_KEYPOINT_IDS.map((id) => {
+  		const start = beforeById.get(id);
+  		const end = afterById.get(id);
+  		const startValid = isVisible(start, options.minKeypointScore);
+  		const endValid = isVisible(end, options.minKeypointScore);
+  		if (start && end && startValid && endValid) return {
+  			id,
+  			x: lerp(start.x, end.x, alpha),
+  			y: lerp(start.y, end.y, alpha),
+  			score: lerp(start.score, end.score, alpha),
+  			filled: true
+  		};
+  		if (start && startValid) return {
+  			id,
+  			x: start.x,
+  			y: start.y,
+  			score: start.score,
+  			filled: true
+  		};
+  		if (end && endValid) return {
+  			id,
+  			x: end.x,
+  			y: end.y,
+  			score: end.score,
+  			filled: true
+  		};
+  		if (start && end) return {
+  			id,
+  			x: lerp(start.x, end.x, alpha),
+  			y: lerp(start.y, end.y, alpha),
+  			score: lerp(start.score, end.score, alpha),
+  			filled: true
+  		};
+  		const single = start ?? end;
+  		return {
+  			id,
+  			x: single?.x ?? 0,
+  			y: single?.y ?? 0,
+  			score: single?.score ?? 0,
+  			filled: true
+  		};
+  	});
+  }
+  function singleKeypoints(person, interpolated) {
+  	const byId = keypointsById(person);
+  	return COCO_17_KEYPOINT_IDS.map((id) => {
+  		const keypoint = byId.get(id);
+  		return {
+  			id,
+  			x: keypoint?.x ?? 0,
+  			y: keypoint?.y ?? 0,
+  			score: keypoint?.score ?? 0,
+  			filled: interpolated || !keypoint
+  		};
+  	});
+  }
+  /** Keeps the strongest glow stick observation per keypoint of one person. */
+  function mergeMarkers(before, after) {
+  	const strongest = /* @__PURE__ */ new Map();
+  	for (const marker of [...markersOf(before), ...markersOf(after)]) {
+  		const existing = strongest.get(marker.keypointId);
+  		if (existing && existing.coverage >= marker.coverage) continue;
+  		strongest.set(marker.keypointId, marker);
+  	}
+  	return [...strongest.values()];
+  }
+  function markersOf(person) {
+  	return person?.markers ?? [];
+  }
+  function keypointsById(person) {
+  	return new Map(person.keypoints.map((keypoint) => [keypoint.id, keypoint]));
+  }
+  function isVisible(keypoint, minimumScore) {
+  	return keypoint !== void 0 && keypoint.score >= minimumScore;
+  }
+  function lerp(start, end, alpha) {
+  	return start + (end - start) * alpha;
+  }
+  var MAX_DELAY_MS = 5e3;
+  var MAX_JITTER_MS = 2e3;
+  var MIN_RING_SLOTS = 16;
+  var MAX_RING_SLOTS = 600;
+  var ASSUMED_MINIMUM_FRAME_INTERVAL_US = 8e3;
+  var PoseFusionController = class {
+  	constructor() {
+  		this.buffer = new MultiCameraJitterBuffer(DEFAULT_JITTER_BUFFER_OPTIONS);
+  		this.identities = new PersonIdentityRegistry();
+  		this.models = /* @__PURE__ */ new Map();
+  		this.palette = new GlowStickPalette();
+  		this.identifiedPerformers = 0;
+  		this.mirroredViews = 0;
+  		this.jitterOptions = DEFAULT_JITTER_BUFFER_OPTIONS;
+  		this.geometryOptions = DEFAULT_FUSION_GEOMETRY_OPTIONS;
+  		this.delayUs = 0;
+  		this.rejectedFrames = 0;
+  		this.started = false;
+  		this.sequence = 0;
+  		this.fusionState = "idle";
+  		this.fusionErrorCode = "";
+  		this.fusionErrorMessage = "";
+  		this.latestFrameJsonValue = "";
+  	}
+  	start(options) {
+  		const delayMs = requireRange(options.delayMilliseconds, 0, MAX_DELAY_MS, "fusion delay");
+  		const jitterMs = requireRange(options.jitterMilliseconds, 1, MAX_JITTER_MS, "jitter window");
+  		const minKeypointScore = requireRange(options.minKeypointScore, 0, 1, "minimum keypoint score");
+  		this.delayUs = Math.round(delayMs * 1e3);
+  		const jitterWindowUs = Math.round(jitterMs * 1e3);
+  		this.jitterOptions = {
+  			capacityPerCamera: ringSlots(this.delayUs, jitterWindowUs),
+  			jitterWindowUs,
+  			maxHoldUs: jitterWindowUs,
+  			maxGapUs: jitterWindowUs * 2,
+  			minKeypointScore
+  		};
+  		this.geometryOptions = {
+  			...DEFAULT_FUSION_GEOMETRY_OPTIONS,
+  			minKeypointScore
+  		};
+  		this.buffer.configure(this.jitterOptions);
+  		this.identities.clear();
+  		this.rejectedFrames = 0;
+  		this.sequence = 0;
+  		this.latestFrame = void 0;
+  		this.latestFrameJsonValue = "";
+  		this.latestSample = void 0;
+  		this.started = true;
+  		this.fusionState = "buffering";
+  		this.clearError();
+  	}
+  	stop() {
+  		this.buffer.clear();
+  		this.identities.clear();
+  		this.rejectedFrames = 0;
+  		this.sequence = 0;
+  		this.latestFrame = void 0;
+  		this.latestFrameJsonValue = "";
+  		this.latestSample = void 0;
+  		this.identifiedPerformers = 0;
+  		this.mirroredViews = 0;
+  		this.started = false;
+  		this.fusionState = "idle";
+  		this.clearError();
+  	}
+  	/** Releases buffers, calibration profiles, and the glow stick palette. */
+  	cleanup() {
+  		this.stop();
+  		this.models.clear();
+  		this.palette.clear();
+  	}
+  	/**
+  	* Loads the performer palette from a Performance DSL v1 payload. The DSL owns
+  	* the colors; the keypoint each performer carries the light at is a
+  	* fusion-side setting because that contract does not describe it.
+  	*/
+  	loadPerformanceDsl(json) {
+  		const decoded = decodeProtocolJson(json, Date.now());
+  		if (!decoded.ok || decoded.schema !== "twmp/performance-dsl") {
+  			const message = decoded.ok ? `Expected twmp/performance-dsl, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  			this.fail("performance-dsl-invalid", message);
+  		}
+  		const performers = decoded.value.performers;
+  		try {
+  			this.palette.loadPerformers(performers);
+  		} catch (error) {
+  			this.fail("performance-dsl-invalid", errorMessage$1(error));
+  		}
+  		this.clearError();
+  	}
+  	setPerformerKeypoint(performerId, keypointId) {
+  		const resolved = COCO_17_KEYPOINT_IDS.find((id) => id === keypointId);
+  		if (!resolved) this.fail("performance-dsl-invalid", `Unknown COCO-17 keypoint: ${keypointId}`);
+  		try {
+  			this.palette.setKeypoint(performerId, resolved);
+  		} catch (error) {
+  			this.fail("performance-dsl-invalid", errorMessage$1(error));
+  		}
+  		this.clearError();
+  	}
+  	paletteSize() {
+  		return this.palette.size();
+  	}
+  	/** Performers identified by glow stick color in the last fusion. */
+  	identifiedPerformerCount() {
+  		return this.identifiedPerformers;
+  	}
+  	/** Camera views whose left/right labels the last fusion corrected. */
+  	mirrorCorrectedViewCount() {
+  		return this.mirroredViews;
+  	}
+  	loadCalibration(json) {
+  		const decoded = decodeProtocolJson(json, Date.now());
+  		if (!decoded.ok || decoded.schema !== "twmp/camera-calibration") {
+  			const message = decoded.ok ? `Expected twmp/camera-calibration, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  			this.fail("calibration-invalid", message);
+  		}
+  		const calibration = decoded.value;
+  		if (!this.models.has(calibration.cameraId) && this.models.size >= 16) this.fail("calibration-invalid", `At most 16 calibrated cameras can be fused.`);
+  		let model;
+  		try {
+  			model = createCameraModel(calibration);
+  		} catch (error) {
+  			this.fail("calibration-invalid", errorMessage$1(error));
+  		}
+  		this.models.set(calibration.cameraId, model);
+  		this.clearError();
+  	}
+  	/**
+  	* Buffers one PoseFrame2D. Malformed or foreign JSON throws; a frame without a
+  	* matching calibration profile, a duplicate, and a late arrival are counted as
+  	* dropped so a misconfigured peer cannot break a running project script.
+  	*/
+  	ingestFrame(json) {
+  		this.requireStarted();
+  		const decoded = decodeProtocolJson(json, Date.now());
+  		if (!decoded.ok || decoded.schema !== "twmp/pose-frame-2d") {
+  			const message = decoded.ok ? `Expected twmp/pose-frame-2d, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  			this.fail("frame-invalid", message);
+  		}
+  		const frame = decoded.value;
+  		const model = this.models.get(frame.cameraId);
+  		if (!model) {
+  			this.drop("unknown-camera", `No calibration profile is loaded for camera ${frame.cameraId}.`);
+  			return;
+  		}
+  		const mismatch = describeCalibrationMismatch(frame, model);
+  		if (mismatch) {
+  			this.drop("calibration-mismatch", mismatch);
+  			return;
+  		}
+  		const outcome = this.buffer.ingest(frame);
+  		if (outcome === "accepted") {
+  			this.clearError();
+  			if (this.fusionState === "idle") this.fusionState = "buffering";
+  			return;
+  		}
+  		this.fusionErrorCode = "frame-dropped";
+  		this.fusionErrorMessage = `${outcome}: camera ${frame.cameraId} frame at ${frame.captureTimestampUs} us was not buffered.`;
+  	}
+  	/** Fuses the instant that sits one configured delay behind the newest frame. */
+  	fuseBufferedInstant() {
+  		this.requireStarted();
+  		const newest = this.buffer.newestTimestampUs();
+  		if (newest === void 0) {
+  			this.reject("empty-buffer", "No PoseFrame2D has been buffered.");
+  			return false;
+  		}
+  		return this.fuseAt(Math.max(newest - this.delayUs, 0));
+  	}
+  	/** Fuses one explicit past instant expressed in the synchronized time base. */
+  	fuseAt(timestampUs) {
+  		this.requireStarted();
+  		if (!Number.isSafeInteger(timestampUs) || timestampUs < 0) this.fail("invalid-output", "Fusion timestamp must be a non-negative integer in microseconds.");
+  		this.fusionState = "fusing";
+  		const sample = {
+  			timestampUs,
+  			cameras: this.buffer.sampleAt(timestampUs).cameras.filter((camera) => {
+  				const model = this.models.get(camera.cameraId);
+  				return model !== void 0 && !describeCalibrationMismatch(camera, model);
+  			})
+  		};
+  		this.latestSample = sample;
+  		if (sample.cameras.length < this.geometryOptions.minCamerasPerPerson) {
+  			this.reject("insufficient-cameras", `Only ${sample.cameras.length} calibrated camera(s) covered ${timestampUs} us.`);
+  			return false;
+  		}
+  		const assignments = /* @__PURE__ */ new Map();
+  		let mirrored = 0;
+  		if (this.palette.size() > 0) for (const camera of sample.cameras) {
+  			const assigned = this.palette.assign(camera, DEFAULT_GLOW_STICK_MATCH_OPTIONS);
+  			assignments.set(camera.cameraId, assigned);
+  			for (const assignment of assigned.values()) if (assignment.mirrored) mirrored += 1;
+  		}
+  		const persons = fuseSynchronizedSample(sample, this.models, this.geometryOptions, assignments);
+  		if (persons.length === 0) {
+  			this.reject("no-fused-person", `No person was observed by ${this.geometryOptions.minCamerasPerPerson} or more cameras.`);
+  			return false;
+  		}
+  		const frame = {
+  			schema: "twmp/pose-frame-3d",
+  			version: 1,
+  			sequence: this.sequence,
+  			timestampUs,
+  			persons: persons.map((person) => {
+  				const personId = person.performerId ? this.identities.adopt(person.performerId, person.members, this.sequence) : this.identities.resolve(person.members, this.sequence);
+  				return {
+  					personId,
+  					score: round(person.score),
+  					cameraIds: person.cameraIds,
+  					meanReprojectionErrorPx: round(person.meanReprojectionErrorPx),
+  					keypoints: person.keypoints.map((keypoint) => {
+  						if (keypoint.point) {
+  							this.identities.remember(personId, keypoint.id, keypoint.point);
+  							return {
+  								id: keypoint.id,
+  								x: round(keypoint.point.x),
+  								y: round(keypoint.point.y),
+  								z: round(keypoint.point.z),
+  								score: round(keypoint.score)
+  							};
+  						}
+  						const held = this.identities.lastPoint(personId, keypoint.id);
+  						return {
+  							id: keypoint.id,
+  							x: round(held?.x ?? 0),
+  							y: round(held?.y ?? 0),
+  							z: round(held?.z ?? 0),
+  							score: 0
+  						};
+  					})
+  				};
+  			})
+  		};
+  		if (!Check(PoseFrame3DSchema, frame)) {
+  			const first = Errors(PoseFrame3DSchema, frame).First();
+  			this.latestSample = sample;
+  			this.fail("invalid-output", `${first?.path || "/"}: ${first?.message ?? "Fused frame does not match PoseFrame3D v1."}`);
+  		}
+  		this.identities.prune(this.sequence);
+  		this.sequence += 1;
+  		this.identifiedPerformers = new Set(persons.map((person) => person.performerId).filter((performerId) => performerId !== void 0)).size;
+  		this.mirroredViews = mirrored;
+  		this.latestFrame = frame;
+  		this.latestFrameJsonValue = JSON.stringify(frame);
+  		this.fusionState = "ready";
+  		this.clearError();
+  		return true;
+  	}
+  	state() {
+  		return this.fusionState;
+  	}
+  	ready() {
+  		return this.started && this.models.size >= this.geometryOptions.minCamerasPerPerson;
+  	}
+  	cameraCount() {
+  		return this.models.size;
+  	}
+  	bufferedFrameCount() {
+  		return this.buffer.bufferedFrameCount();
+  	}
+  	droppedFrameCount() {
+  		return this.buffer.droppedFrameCount() + this.rejectedFrames;
+  	}
+  	personCount() {
+  		const persons = this.latestFrame?.persons;
+  		return Array.isArray(persons) ? persons.length : 0;
+  	}
+  	fusedTimestampUs() {
+  		const timestamp = this.latestFrame?.timestampUs;
+  		return typeof timestamp === "number" ? timestamp : 0;
+  	}
+  	meanReprojectionErrorPx() {
+  		const persons = this.latestFrame?.persons;
+  		if (!Array.isArray(persons) || persons.length === 0) return 0;
+  		let total = 0;
+  		for (const person of persons) {
+  			const error = person.meanReprojectionErrorPx;
+  			total += typeof error === "number" ? error : 0;
+  		}
+  		return round(total / persons.length);
+  	}
+  	latestFrameJson() {
+  		return this.latestFrameJsonValue;
+  	}
+  	synchronizedSampleJson() {
+  		return this.latestSample ? JSON.stringify(this.latestSample) : "";
+  	}
+  	errorCode() {
+  		return this.fusionErrorCode;
+  	}
+  	errorMessage() {
+  		return this.fusionErrorMessage;
+  	}
+  	requireStarted() {
+  		if (!this.started) throw new Error("Pose fusion has not been started.");
+  	}
+  	/** Rejected before buffering: counted as dropped instead of thrown. */
+  	drop(code, message) {
+  		this.rejectedFrames += 1;
+  		this.fusionErrorCode = code;
+  		this.fusionErrorMessage = `${code}: ${message}`;
+  	}
+  	/** Expected transient shortage: no throw, no replacement of the last frame. */
+  	reject(code, message) {
+  		this.fusionState = "buffering";
+  		this.fusionErrorCode = code;
+  		this.fusionErrorMessage = `${code}: ${message}`;
+  	}
+  	fail(code, message) {
+  		this.fusionState = "error";
+  		this.fusionErrorCode = code;
+  		this.fusionErrorMessage = `${code}: ${message}`;
+  		throw new Error(this.fusionErrorMessage);
+  	}
+  	clearError() {
+  		this.fusionErrorCode = "";
+  		this.fusionErrorMessage = "";
+  	}
+  };
+  /** Rejects frames that a profile cannot describe, instead of fusing them. */
+  function describeCalibrationMismatch(frame, model) {
+  	if (frame.calibrationId !== model.calibrationId) return `Camera ${frame.cameraId} reports calibration ${frame.calibrationId} but profile ${model.calibrationId} is loaded.`;
+  	if (frame.frameWidth !== model.imageWidth || frame.frameHeight !== model.imageHeight) return `Camera ${frame.cameraId} reports ${frame.frameWidth}x${frame.frameHeight} but profile ${model.calibrationId} was solved at ${model.imageWidth}x${model.imageHeight}.`;
+  }
+  function ringSlots(delayUs, jitterWindowUs) {
+  	const span = delayUs + jitterWindowUs * 2;
+  	const slots = Math.ceil(span / ASSUMED_MINIMUM_FRAME_INTERVAL_US) + 8;
+  	return Math.min(Math.max(slots, MIN_RING_SLOTS), MAX_RING_SLOTS);
+  }
+  function requireRange(value, minimum, maximum, label) {
+  	if (!Number.isFinite(value) || value < minimum || value > maximum) throw new Error(`Invalid ${label}: expected ${minimum} to ${maximum}, received ${value}.`);
+  	return value;
+  }
+  function round(value) {
+  	return Math.round(value * 1e6) / 1e6;
+  }
+  function errorMessage$1(error) {
+  	return error instanceof Error ? error.message : String(error);
+  }
+  //#endregion
+  //#region src/markers/canvas-sampler.ts
+  /**
+  * Copies the current video frame into one temporary canvas and reads each patch
+  * from it. The canvas is released after every call, like the calibration
+  * backend does, so no frame data outlives the sampling request.
+  */
+  var CanvasGlowStickSampler = class {
+  	constructor(options) {
+  		this.options = options;
+  		this.name = "canvas-2d";
+  	}
+  	sample(frame, patches) {
+  		if (patches.length === 0) return [];
+  		const canvas = document.createElement("canvas");
+  		canvas.width = frame.width;
+  		canvas.height = frame.height;
+  		const context = canvas.getContext("2d", { willReadFrequently: true });
+  		if (!context) throw new Error("A 2D canvas context is unavailable.");
+  		try {
+  			context.drawImage(frame.element, 0, 0, frame.width, frame.height);
+  			return patches.map((patch) => {
+  				const left = Math.max(Math.round(patch.x - patch.radius), 0);
+  				const top = Math.max(Math.round(patch.y - patch.radius), 0);
+  				const right = Math.min(Math.round(patch.x + patch.radius), frame.width);
+  				const bottom = Math.min(Math.round(patch.y + patch.radius), frame.height);
+  				if (right - left < 1 || bottom - top < 1) return void 0;
+  				return dominantSaturatedColor(context.getImageData(left, top, right - left, bottom - top).data, this.options);
+  			});
+  		} finally {
+  			canvas.width = 0;
+  			canvas.height = 0;
+  		}
+  	}
+  };
+  //#endregion
   //#region src/extension.ts
   var blockDefinitions = block_definitions_default.blocks;
   var FRAME_SYNC_ANALYSIS_WIDTH = 240;
@@ -80029,13 +82091,17 @@
   		this.state = "idle";
   		this.lastError = "";
   		this.operation = 0;
-  		this.stopListener = () => {
+  		this.runStopListener = () => {
   			this.endOfferQrDisplay();
   			this.pose.stop();
   			this.calibration.cancel();
   			this.avatar.reset();
   			this.frameSync?.stop();
   			this.frameSyncOverlay?.hide();
+  		};
+  		this.stopListener = () => {
+  			this.runStopListener();
+  			this.fusion.stop();
   		};
   		this.disposeListener = () => this.dispose();
   		this.targetRemovedListener = (target) => {
@@ -80047,12 +82113,15 @@
   		this.calibrationEnabled = options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
   		this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
   		this.frameSyncEnabled = options.frameSyncEnabled ?? featureFlags.frameSyncPatternV1;
+  		this.fusionEnabled = options.fusionEnabled ?? featureFlags.poseFusion3D;
+  		this.markersEnabled = options.markersEnabled ?? featureFlags.glowStickMarkers;
   		this.errorCorrectionLevel = options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.skins = new TemporarySpriteSkinManager(this.runtime);
   		this.pose = new PosePipelineController({
   			runtime: this.runtime,
-  			model: options.poseModel ?? new TfjsWebGpuMoveNet()
+  			model: options.poseModel ?? new TfjsWebGpuMoveNet(),
+  			markerSampler: options.markerSampler ?? new CanvasGlowStickSampler(DEFAULT_MARKER_SAMPLING_OPTIONS)
   		});
   		this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
   		this.calibration = new CameraCalibrationController({
@@ -80063,8 +82132,9 @@
   		this.avatar = new AvatarRetargetController(this.runtime, options.avatarPoseSolver);
   		this.frameSync = options.frameSyncController;
   		this.frameSyncOverlay = options.frameSyncDisplay;
+  		this.fusion = new PoseFusionController();
   		this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
-  		this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
+  		this.runtime.on?.("PROJECT_RUN_STOP", this.runStopListener);
   		this.runtime.on?.("PROJECT_LOADED", this.stopListener);
   		this.runtime.on?.("RUNTIME_DISPOSED", this.disposeListener);
   		this.runtime.on?.("targetWasRemoved", this.targetRemovedListener);
@@ -80381,6 +82451,102 @@
   		});
   		return this.frameSync;
   	}
+  	startPoseFusion(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.start({
+  			delayMilliseconds: Scratch.Cast.toNumber(args.DELAY_MS),
+  			jitterMilliseconds: Scratch.Cast.toNumber(args.JITTER_MS),
+  			minKeypointScore: Scratch.Cast.toNumber(args.MIN_SCORE)
+  		});
+  	}
+  	stopPoseFusion() {
+  		this.fusion.stop();
+  	}
+  	cleanupPoseFusion() {
+  		this.fusion.cleanup();
+  	}
+  	loadFusionCameraCalibration(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.loadCalibration(Scratch.Cast.toString(args.JSON));
+  	}
+  	bufferPoseFrame2D(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.ingestFrame(Scratch.Cast.toString(args.JSON));
+  	}
+  	fuseBufferedPoseFrame3D() {
+  		this.requireFusionEnabled();
+  		this.fusion.fuseBufferedInstant();
+  	}
+  	fusePoseFrame3DAt(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.fuseAt(Scratch.Cast.toNumber(args.TIMESTAMP_US));
+  	}
+  	latestPoseFrame3D() {
+  		return this.fusionEnabled ? this.fusion.latestFrameJson() : "";
+  	}
+  	synchronizedPoseSet2D() {
+  		return this.fusionEnabled ? this.fusion.synchronizedSampleJson() : "";
+  	}
+  	poseFusionState() {
+  		return this.fusionEnabled ? this.fusion.state() : "disabled";
+  	}
+  	poseFusionReady() {
+  		return this.fusionEnabled && this.fusion.ready();
+  	}
+  	poseFusionCameraCount() {
+  		return this.fusion.cameraCount();
+  	}
+  	poseFusionBufferedFrameCount() {
+  		return this.fusion.bufferedFrameCount();
+  	}
+  	poseFusionDroppedFrameCount() {
+  		return this.fusion.droppedFrameCount();
+  	}
+  	poseFusionPersonCount() {
+  		return this.fusion.personCount();
+  	}
+  	poseFusionTimestampUs() {
+  		return this.fusion.fusedTimestampUs();
+  	}
+  	poseFusionReprojectionErrorPx() {
+  		return this.fusion.meanReprojectionErrorPx();
+  	}
+  	poseFusionErrorCode() {
+  		return this.fusion.errorCode();
+  	}
+  	poseFusionError() {
+  		return this.fusion.errorMessage();
+  	}
+  	enableGlowStickMarkers(args) {
+  		this.requireMarkersEnabled();
+  		this.requirePoseEnabled();
+  		this.pose.enableMarkers(parseKeypointIds(Scratch.Cast.toString(args.KEYPOINTS)));
+  	}
+  	disableGlowStickMarkers() {
+  		this.pose.disableMarkers();
+  	}
+  	glowStickMarkerCount() {
+  		return this.markersEnabled ? this.pose.markerCount() : 0;
+  	}
+  	loadGlowStickPalette(args) {
+  		this.requireMarkersEnabled();
+  		this.requireFusionEnabled();
+  		this.fusion.loadPerformanceDsl(Scratch.Cast.toString(args.JSON));
+  	}
+  	setPerformerGlowStick(args) {
+  		this.requireMarkersEnabled();
+  		this.requireFusionEnabled();
+  		this.fusion.setPerformerKeypoint(Scratch.Cast.toString(args.PERFORMER_ID).trim(), Scratch.Cast.toString(args.KEYPOINT).trim());
+  	}
+  	glowStickPaletteSize() {
+  		return this.markersEnabled ? this.fusion.paletteSize() : 0;
+  	}
+  	identifiedPerformerCount() {
+  		return this.markersEnabled ? this.fusion.identifiedPerformerCount() : 0;
+  	}
+  	mirrorCorrectedViewCount() {
+  		return this.markersEnabled ? this.fusion.mirrorCorrectedViewCount() : 0;
+  	}
   	dispose() {
   		this.endOfferQrDisplay();
   		this.pose.stop();
@@ -80388,8 +82554,9 @@
   		this.avatar.reset();
   		this.frameSync?.stop();
   		this.frameSyncOverlay?.hide();
+  		this.fusion.stop();
   		this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
-  		this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
+  		this.runtime.off?.("PROJECT_RUN_STOP", this.runStopListener);
   		this.runtime.off?.("PROJECT_LOADED", this.stopListener);
   		this.runtime.off?.("RUNTIME_DISPOSED", this.disposeListener);
   		this.runtime.off?.("targetWasRemoved", this.targetRemovedListener);
@@ -80403,6 +82570,12 @@
   	requireProtocolEnabled() {
   		if (!this.protocolEnabled) throw new Error("Protocol v1 codec is disabled. Enable it before the project starts.");
   	}
+  	requireMarkersEnabled() {
+  		if (!this.markersEnabled) throw new Error("Glow stick markers are disabled. Enable them before the project starts.");
+  	}
+  	requireFusionEnabled() {
+  		if (!this.fusionEnabled) throw new Error("Pose fusion 3D is disabled. Enable it before the project starts.");
+  	}
   	requireCalibrationEnabled() {
   		if (!this.calibrationEnabled) throw new Error("Camera calibration v1 is disabled. Enable it before the project starts.");
   	}
@@ -80415,7 +82588,9 @@
   		if (feature === "protocolV1Codec") return this.protocolEnabled;
   		if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
   		if (feature === "avatarRetargetV1") return this.avatarEnabled;
-  		return this.frameSyncEnabled;
+  		if (feature === "frameSyncPatternV1") return this.frameSyncEnabled;
+  		if (feature === "poseFusion3D") return this.fusionEnabled;
+  		return this.markersEnabled;
   	}
   	requireSession() {
   		if (!this.session) throw new Error("Prepare an offer QR before displaying a part.");
