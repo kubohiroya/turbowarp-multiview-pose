@@ -3,7 +3,6 @@ export interface MultiviewPoseFeatureFlags {
   readonly webgpuMoveNetMultiPose: boolean;
   readonly protocolV1Codec: boolean;
   readonly cameraCalibrationV1: boolean;
-  readonly poseFusion3D: boolean;
 }
 
 interface FeatureFlagGlobal {
@@ -18,5 +17,4 @@ export const featureFlags: MultiviewPoseFeatureFlags = Object.freeze({
   webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
   protocolV1Codec: overrides?.protocolV1Codec === true,
   cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
-  poseFusion3D: overrides?.poseFusion3D === true,
 });

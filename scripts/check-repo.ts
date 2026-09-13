@@ -85,8 +85,6 @@ const calibrationController = await readFile(
   "src/calibration/controller.ts",
   "utf8",
 );
-const fusionController = await readFile("src/fusion/controller.ts", "utf8");
-const fusionBuffer = await readFile("src/fusion/jitter-buffer.ts", "utf8");
 const featureFlagSource = await readFile("config/feature-flags.ts", "utf8");
 const protocolIntegrity = JSON.parse(
   await readFile("schemas/protocol-v1-integrity.json", "utf8"),
@@ -99,7 +97,6 @@ checkLicense();
 checkGeneratedArtifacts();
 checkPosePolicy();
 checkCalibrationPolicy();
-checkFusionPolicy();
 await checkProtocolSchemaIntegrity();
 await checkPackContents();
 
@@ -308,30 +305,6 @@ function checkCalibrationPolicy() {
   }
   if (!featureFlagSource.includes("cameraCalibrationV1")) {
     errors.push("Camera calibration must have a startup-fixed feature flag");
-  }
-}
-
-function checkFusionPolicy() {
-  if (!featureFlagSource.includes("poseFusion3D")) {
-    errors.push("Pose fusion must have a startup-fixed feature flag");
-  }
-  if (!fusionController.includes("PoseFrame3DSchema")) {
-    errors.push(
-      "Fusion must validate every fused frame against the pinned PoseFrame3D v1 schema",
-    );
-  }
-  for (const [name, source] of [
-    ["src/fusion/controller.ts", fusionController],
-    ["src/fusion/jitter-buffer.ts", fusionBuffer],
-  ] as const) {
-    if (/performance\.(?:timeOrigin|now)|clockId|clock-probe/u.test(source)) {
-      errors.push(
-        `${name} must carry external timestamps without implementing a clock`,
-      );
-    }
-    if (source.includes("getUserMedia(")) {
-      errors.push(`${name} must not capture media directly`);
-    }
   }
 }
 

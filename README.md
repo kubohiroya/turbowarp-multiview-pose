@@ -16,8 +16,6 @@ as a temporary sprite skin.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
 - Validates and round-trips all five pinned multiview-pose v1 application contracts.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
-- Buffers jittered PoseFrame2D streams per camera and resamples every camera at one past instant.
-- Triangulates the synchronized 2D sets into `twmp/pose-frame-3d` version 1 poses.
 
 ## Requirements and safety
 
@@ -51,12 +49,6 @@ Enable camera calibration independently:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
-```
-
-Enable multi-camera 3D pose fusion independently:
-
-```js
-globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -129,50 +121,6 @@ the actual Camera Source frame at session start. Sample acceptance requires the 
 grid, quality at least 0.2, and normalized corner displacement at least 0.015 from every retained
 sample. Between 8 and 40 samples are retained. A solve above the configured reprojection RMS is
 rejected without replacing the last validated profile.
-
-The fusion app pipeline consumes PoseFrame2D JSON that WebRTC data channels deliver from every
-camera peer, and needs one CameraCalibration v1 profile per camera:
-
-```text
-load fusion camera calibration [(camera-1 profile JSON)]
-load fusion camera calibration [(camera-2 profile JSON)]
-start pose fusion delay [120] ms jitter [80] ms min keypoint score [0.3]
-forever:
-  buffer PoseFrame2D JSON [(received data channel message)]
-  fuse PoseFrame3D at buffered delay
-  set [poseJson] to (latest PoseFrame3D JSON)
-stop pose fusion
-```
-
-Each camera keeps its own timestamp-ordered ring buffer. A frame that arrives out of order inside
-the jitter window is inserted at its timestamp position. A frame is counted by
-`dropped pose frame count` instead of being buffered when its camera has no loaded profile
-(`unknown-camera`), when its `calibrationId` or frame size does not match that profile
-(`calibration-mismatch`), when its timestamp is already buffered, when it is older than the jitter
-window, and when it is older than the retained window of a full ring. Load every camera profile
-before the frames of that camera start arriving.
-
-`fuse PoseFrame3D at buffered delay` fuses the instant one configured delay behind the newest
-buffered timestamp, which is why the delay must cover the slowest camera's jitter. Every camera is
-resampled at that shared instant: a bracketed keypoint is interpolated linearly, a keypoint that is
-occluded on one side of the bracket keeps the visible observation, and a camera without a bracket
-holds its nearest frame for at most one jitter window. Use `fuse PoseFrame3D at timestamp [] us` to
-fuse an explicit past instant instead.
-
-The synchronized 2D sets are associated across cameras by two-view reprojection error, so one person
-never takes two views from the same camera. Each cluster seen by at least two cameras is triangulated
-per keypoint with score weighting and a cheirality check, and keeps a stable `person-N` identifier.
-When the views of a keypoint disagree, the largest set of views that agree on one point within the
-reprojection threshold wins, so a minority of wrong detections is discarded rather than pulling the
-keypoint away from the truth. A keypoint left with fewer than two confident views holds its last
-triangulated position and reports score `0`.
-
-Transient shortages do not throw and do not replace the last fused frame: `fuse` reports `false`,
-`pose fusion state` returns `buffering`, and `pose fusion error code` returns `empty-buffer`,
-`insufficient-cameras`, or `no-fused-person`. Frames that cannot be buffered report
-`unknown-camera`, `calibration-mismatch`, or `frame-dropped` without throwing, so one misconfigured
-peer cannot break a running project script. Invalid JSON, a foreign schema, and an invalid
-calibration profile throw.
 
 ## Block reference
 
@@ -576,183 +524,6 @@ Exports the last validated exact v1 profile, or an empty string when none exists
 | Type | Reporter |
 | Opcode | `cameraCalibrationJson` |
 
-### `start pose fusion delay [DELAY_MS] ms jitter [JITTER_MS] ms min keypoint score [MIN_SCORE]`
-
-Starts the multi-camera jitter buffer that fuses one past instant behind the newest frame.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `startPoseFusion` |
-| `DELAY_MS` | Number, default: `120` |
-| `JITTER_MS` | Number, default: `80` |
-| `MIN_SCORE` | Number, default: `0.3` |
-
-### `stop pose fusion`
-
-Clears every buffered frame and fused result while keeping loaded calibration profiles.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `stopPoseFusion` |
-
-### `cleanup pose fusion`
-
-Clears buffered frames, fused results, and every loaded fusion calibration profile.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `cleanupPoseFusion` |
-
-### `load fusion camera calibration [JSON]`
-
-Loads one CameraCalibration v1 profile and derives its world-to-camera projection.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `loadFusionCameraCalibration` |
-| `JSON` | String, default: `{}` |
-
-### `buffer PoseFrame2D JSON [JSON]`
-
-Validates one PoseFrame2D v1 and inserts it into its camera ring buffer in timestamp order.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `bufferPoseFrame2D` |
-| `JSON` | String, default: `{}` |
-
-### `fuse PoseFrame3D at buffered delay`
-
-Fuses the instant one configured delay behind the newest buffered timestamp.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `fuseBufferedPoseFrame3D` |
-
-### `fuse PoseFrame3D at timestamp [TIMESTAMP_US] us`
-
-Fuses one explicit past instant expressed in the synchronized microsecond time base.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `fusePoseFrame3DAt` |
-| `TIMESTAMP_US` | Number, default: `0` |
-
-### `latest PoseFrame3D JSON`
-
-Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `latestPoseFrame3D` |
-
-### `synchronized 2D pose set JSON`
-
-Returns the last resampled per-camera 2D keypoint set used for triangulation.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `synchronizedPoseSet2D` |
-
-### `pose fusion state`
-
-Returns idle, buffering, fusing, ready, or error.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionState` |
-
-### `pose fusion ready?`
-
-Returns true when fusion is started and at least two cameras are calibrated.
-
-| Property | Value |
-|---|---|
-| Type | Boolean |
-| Opcode | `poseFusionReady` |
-
-### `fusion calibrated camera count`
-
-Returns how many camera calibration profiles are loaded for fusion.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionCameraCount` |
-
-### `buffered pose frame count`
-
-Returns how many PoseFrame2D frames are currently retained across all ring buffers.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionBufferedFrameCount` |
-
-### `dropped pose frame count`
-
-Returns how many frames were rejected as duplicates or as arrivals past the jitter window.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionDroppedFrameCount` |
-
-### `fused person count`
-
-Returns how many people the last successful fusion produced.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionPersonCount` |
-
-### `fused timestamp us`
-
-Returns the synchronized timestamp of the last successful fusion in microseconds.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionTimestampUs` |
-
-### `fused mean reprojection error px`
-
-Returns the mean reprojection error of the last successful fusion in pixels.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionReprojectionErrorPx` |
-
-### `pose fusion error code`
-
-Returns the latest fusion error code, or an empty string.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionErrorCode` |
-
-### `pose fusion error`
-
-Returns the latest fusion error message.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionError` |
-
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -775,13 +546,6 @@ Returns the latest fusion error message.
 | Resolution changes mid-session | The sample is rejected with `resolution-mismatch`. |
 | Weak or duplicate board view | The sample is rejected without entering the solve set. |
 | Cancel/reload/disposal | Camera lease and temporary samples are released; the last valid profile remains. |
-| Fusion flag OFF | Fusion blocks are hidden; the other vertical slices remain independent. |
-| Late or duplicate 2D frame | The frame is counted by `dropped pose frame count` and never enters a ring buffer. |
-| Instant without two cameras | Fusion reports `insufficient-cameras`, keeps the last fused frame, and does not throw. |
-| Keypoint with fewer than two views | Its last triangulated position is held and its score is reported as `0`. |
-| Frame without a matching profile | The frame is dropped with `unknown-camera` or `calibration-mismatch`; it never reaches a ring buffer. |
-| Scripts finish running | Buffered frames survive; only the stop button, project reload, and disposal clear them. |
-| Fusion stop/reload/disposal | Buffers and fused results are cleared; loaded calibration profiles survive until cleanup. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.

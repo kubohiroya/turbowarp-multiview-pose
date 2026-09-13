@@ -38,10 +38,6 @@
   <p>The independent <code>cameraCalibrationV1</code> flag is OFF by default. A high-level state machine leases the named Camera Source stream, fixes its real resolution, accepts diverse chessboard samples, and exports an exact CameraCalibration v1 profile.</p>
   <p>The bundled, exact-pinned OpenCV.js 4.12 WebAssembly backend is the sole solver. It estimates intrinsic, distortion, and world-from-camera values and rejects insufficient samples, resolution changes, weak views, excessive reprojection RMS, unknown profile versions, and pairing credentials.</p>
 
-  <h2>Multi-camera 3D pose fusion</h2>
-  <p>The independent <code>poseFusion3D</code> flag is OFF by default. When enabled, blocks buffer PoseFrame2D JSON per camera in timestamp-ordered ring buffers, resample every camera at one past instant behind a configured delay, and triangulate the synchronized 2D sets into PoseFrame3D version 1 JSON.</p>
-  <p>Out-of-order frames inside the jitter window are reordered, while duplicates, late arrivals, and frames that no loaded calibration profile describes are counted as dropped. Occluded keypoints are filled from the visible side of their bracket, disagreeing views are resolved by the largest consensus set, and a keypoint without two confident views holds its last triangulated position with score zero.</p>
-
   <h2>Development</h2>
   <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>
 </body>
