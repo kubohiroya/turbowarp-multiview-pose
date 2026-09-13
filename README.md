@@ -14,7 +14,7 @@ as a temporary sprite skin.
 - Restores the sprite's original skin and discards sensitive temporary data on cleanup.
 - Runs MoveNet MultiPose Lightning for up to six tracked people through TensorFlow.js WebGPU only.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
-- Validates and round-trips all five pinned multiview-pose v1 application contracts.
+- Owns and validates the multiview-pose application contracts, including PoseFrame2D v1 and v2.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
 - Buffers jittered PoseFrame2D streams per camera and resamples every camera at one past instant.
 - Triangulates the synchronized 2D sets into `twmp/pose-frame-3d` version 1 poses.
@@ -813,11 +813,11 @@ tracking IDs, non-overlap behavior, fail-closed backend checks, and cleanup. The
 real WebGPU adapter or download the production model; browser/GPU compatibility and throughput
 must be verified separately on deployment hardware.
 
-`schemas/protocol-v1-integrity.json` pins the source repository commit and canonical SHA-256 for all
-five schemas. Repository checks always compare the runtime TypeBox definitions to those digests and,
-when a sibling multiview-pose checkout (or `MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`) is available, also
-fail on upstream working-copy drift. Contract fixtures are copied from that pinned package and
-cross-checked against both the schema and block-facing codec.
+This package owns the application contracts. `src/protocol/schemas.ts` is their source of truth, and
+`pnpm run schemas` regenerates the published JSON Schemas in `schemas/`, which the repository check
+compares against the TypeBox definitions. Applications depend on this package; this package never
+reads contract definitions from an application repository. Contract fixtures are validated against
+both the schema and the block-facing codec.
 
 Calibration uses one production backend: exact-pinned `@techstark/opencv-js` 4.12.0-release.1. A
 requested sample lazily initializes the bundled backend and copies one video frame to a temporary

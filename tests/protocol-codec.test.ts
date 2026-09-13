@@ -2,7 +2,11 @@ import { readFile } from "node:fs/promises";
 import { Value } from "@sinclair/typebox/value";
 import { describe, expect, it } from "vitest";
 import { ProtocolV1Codec } from "../src/protocol/codec.js";
-import { coco17KeypointIds, protocolSchemas } from "../src/protocol/schemas.js";
+import {
+  coco17KeypointIds,
+  protocolSchemaFiles,
+  protocolSchemas,
+} from "../src/protocol/schemas.js";
 
 const keypoints2d = coco17KeypointIds.map((id, index) => ({
   id,
@@ -122,22 +126,101 @@ describe("ProtocolV1Codec", () => {
     }
   });
 
-  it("classifies the upstream committed fixtures like the pinned schemas", async () => {
+  it("accepts PoseFrame2D v2 while v1 keeps rejecting it", () => {
+    const frameV2 = {
+      schema: "twmp/pose-frame-2d",
+      version: 2,
+      cameraId: "camera-1",
+      peerId: "source-1",
+      sequence: 42,
+      captureTimestampUs: 123_456_789,
+      frameWidth: 1920,
+      frameHeight: 1080,
+      calibrationId: "calibration-1",
+      persons: [
+        {
+          trackingId: "person-1",
+          score: 0.9,
+          keypoints: keypoints2d,
+          markers: [
+            { keypointId: "right_wrist", colorHex: "#00FFAA", coverage: 0.42 },
+          ],
+        },
+      ],
+    };
+    const instance = codec();
+    expect(instance.validate(JSON.stringify(frameV2))).toBe(true);
+    expect(instance.schema()).toBe("twmp/pose-frame-2d");
+    expect(instance.version()).toBe(2);
+    expect(Value.Check(protocolSchemas["twmp/pose-frame-2d"][1], frameV2)).toBe(
+      false,
+    );
+    expect(Value.Check(protocolSchemas["twmp/pose-frame-2d"][2], frameV2)).toBe(
+      true,
+    );
+
+    // Markers stay bounded, colored, and anchored to a COCO-17 keypoint.
+    const withMarkers = (markers: unknown) => ({
+      ...frameV2,
+      persons: [{ ...frameV2.persons[0], markers }],
+    });
+    expect(instance.validate(JSON.stringify(withMarkers([])))).toBe(true);
+    expect(
+      instance.validate(
+        JSON.stringify(
+          withMarkers([
+            { keypointId: "right_hand", colorHex: "#00FFAA", coverage: 0.4 },
+          ]),
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      instance.validate(
+        JSON.stringify(
+          withMarkers([
+            { keypointId: "right_wrist", colorHex: "00FFAA", coverage: 0.4 },
+          ]),
+        ),
+      ),
+    ).toBe(false);
+    expect(instance.validate(JSON.stringify({ ...frameV2, version: 3 }))).toBe(
+      false,
+    );
+    expect(instance.errorPath()).toBe("/version");
+    expect(instance.errorMessage()).toMatch(/Supported: 1, 2/u);
+  });
+
+  it("publishes one generated JSON Schema per dispatched contract version", async () => {
+    const versions = Object.values(protocolSchemas).reduce(
+      (total, byVersion) => total + Object.keys(byVersion).length,
+      0,
+    );
+    expect(Object.keys(protocolSchemaFiles).length).toBe(versions);
+    for (const [filename, schema] of Object.entries(protocolSchemaFiles)) {
+      const published = await readFile(
+        new URL(`../schemas/${filename}`, import.meta.url),
+        "utf8",
+      );
+      expect(JSON.parse(published)).toEqual(JSON.parse(JSON.stringify(schema)));
+    }
+  });
+
+  it("classifies the committed fixtures like the owned schemas", async () => {
     const valid = await fixture("valid/performance-dsl.json");
     const invalidVersion = await fixture("invalid/performance-dsl-v2.json");
     const credential = await fixture(
       "invalid/session-policy-with-credential.json",
     );
-    expect(Value.Check(protocolSchemas["twmp/performance-dsl"], valid)).toBe(
+    expect(Value.Check(protocolSchemas["twmp/performance-dsl"][1], valid)).toBe(
       true,
     );
     expect(codec().validate(JSON.stringify(valid))).toBe(true);
     expect(
-      Value.Check(protocolSchemas["twmp/performance-dsl"], invalidVersion),
+      Value.Check(protocolSchemas["twmp/performance-dsl"][1], invalidVersion),
     ).toBe(false);
     expect(codec().validate(JSON.stringify(invalidVersion))).toBe(false);
     expect(
-      Value.Check(protocolSchemas["twmp/session-policy"], credential),
+      Value.Check(protocolSchemas["twmp/session-policy"][1], credential),
     ).toBe(false);
     const credentialCodec = codec();
     expect(credentialCodec.validate(JSON.stringify(credential))).toBe(false);

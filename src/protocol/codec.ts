@@ -1,5 +1,10 @@
 import { Value } from "@sinclair/typebox/value";
-import { protocolSchemas, type ProtocolSchemaId } from "./schemas.js";
+import {
+  protocolSchemaFor,
+  protocolSchemas,
+  protocolVersionsFor,
+  type ProtocolSchemaId,
+} from "./schemas.js";
 
 const MAX_JSON_BYTES = 1_048_576;
 const FORBIDDEN_PAIRING_KEYS = new Set([
@@ -73,15 +78,16 @@ export function decodeProtocolJson(
   if (!isProtocolSchemaId(value.schema)) {
     return failure("/schema", `Unsupported schema identifier: ${value.schema}`);
   }
-  if (value.version !== 1) {
+  const schema = protocolSchemaFor(value.schema, value.version);
+  if (!schema) {
     schemaVersion =
       typeof value.version === "number" ? value.version : undefined;
     return failure(
       "/version",
-      `Unsupported ${value.schema} version: ${String(value.version)}`,
+      `Unsupported ${value.schema} version: ${String(value.version)}. Supported: ${protocolVersionsFor(value.schema).join(", ")}.`,
     );
   }
-  schemaVersion = 1;
+  schemaVersion = value.version as number;
 
   const credential = findForbiddenPairingKey(value);
   if (credential) {
@@ -91,7 +97,6 @@ export function decodeProtocolJson(
     );
   }
 
-  const schema = protocolSchemas[value.schema];
   if (!Value.Check(schema, value)) {
     const first = Value.Errors(schema, value).First();
     return failure(

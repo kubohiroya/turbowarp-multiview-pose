@@ -57,10 +57,18 @@ QR skinへ切り替えます。明示終了、project停止、extension dispose�
 version推測やfallbackは行いません。decode成功時はcompact JSONを1件保持し、失敗時は保持値を
 消去して、最初の診断をJSON Pointer pathとmessageとして公開します。
 
-schema定義は`schemas/protocol-v1-integrity.json`に記録したcommit時点の
-`@multiview-pose/protocol`を反映します。5 runtime定義すべてをcanonical JSON SHA-256で固定し、
-利用可能な上流working checkoutともrepository checkで比較します。schema変更時はpin、実装、
-fixture、compatibility判断を同時に更新しない限りcheckが失敗します。
+契約は本packageが所有します。正本は`src/protocol/schemas.ts`、`pnpm run schemas`が`schemas/`配下の
+配布用JSON Schemaを生成し、repository checkは、生成物が定義からdriftした場合、file名が宣言した
+`version` literalや`$id`と食い違う場合、dispatch対象のversionに対応するfileが無い場合に失敗します。
+applicationは本packageと配布された`schemas/`を通して契約を利用します。本packageがapplication
+repositoryから契約定義を読むことはなく、依存方向はapplication → extensionの一方向に保たれます。
+
+契約はversionを切って追加し、公開済みversionを書き換えません。`protocolSchemas`はschema識別子と
+versionの2段でdispatchするため、`twmp/pose-frame-2d`はv1とv2を受理し、v1利用者はv2 payloadを
+拒否し続けます。PoseFrame2D v2は人物ごとに最大4件のサイリウムmarkerを追加します。各markerは、
+一意な色の発光体を観測したCOCO-17 keypoint、`#RRGGBB`の色、patch内で色が占めた割合を持ちます。
+色はkeypointと同一の映像frame・同一のcapture timestampの観測なので、別messageではなくpose frame
+内で運び、受信側での時刻対応付けを不要にします。
 
 TypeBoxのtuple／array制約でCOCO-17順序、6人上限、matrix size、各数値境界を保証します。
 別の再帰key guardにより、WebRTC offer／answer、SDP、ICE／DTLS material、credential fieldを

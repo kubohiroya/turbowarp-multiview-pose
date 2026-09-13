@@ -14,7 +14,7 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - 終了時に元のskinを復元し、一時skinとpairing情報を破棄します。
 - TensorFlow.js WebGPU限定でMoveNet MultiPose Lightningを実行し、最大6人を追跡します。
 - COCO-17観測を`twmp/pose-frame-2d` version 1 JSONとして取得できます。
-- multiview-poseの5種類のv1 application contractを検証し、JSONをround-tripします。
+- multiview-poseのapplication契約（PoseFrame2D v1／v2を含む）を所有し、検証とround-tripを行います。
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
 - jitterを含むPoseFrame2D streamをcameraごとにbufferingし、過去の同一瞬間で再sampleします。
 - 同期した2D setを三角測量し、`twmp/pose-frame-3d` version 1の3D poseへ統合します。
@@ -173,10 +173,10 @@ unit testではmodel／camera portを注入し、protocol、6人上限、trackin
 backend fail closed、cleanupを検証します。実WebGPU adapterとproduction model downloadは
 test環境では実行しないため、実機browser／GPUで互換性とthroughputを別途検証します。
 
-`schemas/protocol-v1-integrity.json`は上流source commitと5 schemaのcanonical SHA-256を
-固定します。repository checkはruntime TypeBox定義との一致を常時検証し、隣接する
-multiview-pose checkoutまたは`MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`があれば上流作業copyの
-driftも検出します。上流fixtureのcopyはschemaとblock向けcodecの両方でcross-checkします。
+application契約は本packageが所有します。正本は`src/protocol/schemas.ts`で、`pnpm run schemas`が
+`schemas/`配下の配布用JSON Schemaを再生成し、repository checkがTypeBox定義との一致を検証します。
+applicationが本packageに依存する一方向の関係であり、本packageがapplication repositoryから
+契約定義を読むことはありません。fixtureはschemaとblock向けcodecの両方でcross-checkします。
 
 calibrationのproduction backendはexact pinした`@techstark/opencv-js` 4.12.0-release.1だけです。
 最初のsampleまたはsolveでbundle内backendを遅延初期化し、sample要求時だけvideo frameを

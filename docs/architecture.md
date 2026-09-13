@@ -78,19 +78,29 @@ lease, and clears the last frame. The TensorFlow.js backend is process-global an
 because doing so would invalidate resources owned by other extensions; disposing the detector
 releases this feature's model resources.
 
-## Pinned application-contract codec
+## Owned application contracts and their codec
 
 `protocolV1Codec` is an independent startup-fixed, default-OFF flag. The codec parses at most 1 MiB
-of JSON, reads the root `schema` and `version`, and dispatches only the five explicitly supported v1
-TypeBox schemas. It performs no version inference or fallback. A successful decode retains one
-compact JSON value; any failed decode clears it and exposes the first diagnostic as a JSON Pointer
-path and message.
+of JSON, reads the root `schema` and `version`, and dispatches only explicitly supported TypeBox
+schemas. It performs no version inference or fallback. A successful decode retains one compact JSON
+value; any failed decode clears it and exposes the first diagnostic as a JSON Pointer path and
+message.
 
-The schema definitions mirror `@multiview-pose/protocol` at the commit recorded in
-`schemas/protocol-v1-integrity.json`. Canonical JSON SHA-256 values bind all five runtime definitions
-to that commit. The repository check also compares an available upstream working checkout, making
-schema edits fail until the pin, implementation, fixtures, and compatibility decision are updated
-together.
+This package owns the contracts. `src/protocol/schemas.ts` is the source of truth, `pnpm run schemas`
+generates the published JSON Schemas under `schemas/`, and the repository check fails when a
+generated file drifts from its definition, when a file name disagrees with the `version` literal or
+`$id` it declares, or when a dispatched version has no published file. Applications consume these
+definitions through this package and through the published `schemas/` directory; nothing here reads
+contract definitions from an application repository, which keeps the dependency pointing from the
+application to the extension.
+
+Contracts are versioned, never edited in place. `protocolSchemas` dispatches by schema identifier and
+then by version, so `twmp/pose-frame-2d` accepts v1 and v2 while a v1 consumer still rejects a v2
+payload. PoseFrame2D v2 adds up to four glow stick markers per person, each naming the COCO-17
+keypoint where a uniquely colored light was observed, its `#RRGGBB` color, and the patch coverage
+that produced it. The color is observed on the same video frame and at the same capture timestamp as
+the keypoints, so it travels inside the pose frame instead of a second message that a receiver would
+have to time-align.
 
 TypeBox tuple and array constraints enforce COCO-17 ordering, six-person limits, matrix sizes, and
 all bounded values. A separate recursive key guard rejects WebRTC offers, answers, SDP, ICE/DTLS
