@@ -21,11 +21,14 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - 同期した2D setを三角測量し、`twmp/pose-frame-3d` version 1の3D poseへ統合します。
 - 演者ごとに固有色のサイリウムを読み取り、識別・追跡と背面/腹面の取り違え補正に使います。
 
+- 時刻を符号化したパターンを表示し、カメラごとに復号してフレーム記録の遅延を計測します。
+
 ## 要件と安全性
 
 - unsandboxed custom extensionを利用できるTurboWarp
 - 先に読み込まれた、runtime capability v2対応の`@kubohiroya/turbowarp-webrtc` 0.3.0
 - 姿勢推定より先に読み込まれた`@kubohiroya/turbowarp-camera-source` 0.5.0
+- フレーム同期の復号にはCamera SourceとWebRTCの同期時刻reporterが必要
 - TensorFlow.js WebGPUに対応するbrowser／GPU
 - avatar利用時は先に読み込んだscene capability v1対応`turbowarp-aframe` 0.3.0
 - 起動前に明示的に有効化する`qrCourierPairing` feature flag（既定OFF）
@@ -227,6 +230,38 @@ occlusion、再入場、tracking ID変化をまたいで同一性が保たれ、
 ことになるため、三角測量の前にその視点の左右labelを入れ替えます。これにより、手首が体を横切って
 しまうような背面/腹面の取り違えを取り除きます。効果は`identified performer count`と
 `mirror-corrected view count`で確認できます。
+
+フレーム同期の縦スライスは、投影されたパターンに対して各カメラPCがどれだけ遅れてフレームを記録し終えるかを計測します。
+
+```text
+（プロジェクタを出す側のPC）
+show frame sync pattern
+
+（各カメラPC）
+start frame sync decoder for camera [camera-1] calibrating for [8] seconds
+repeat until <計測時間が終わるまで>:
+  if <frame sync observation available?> then
+    take next frame sync observation
+    record frame sync sample for camera [camera-1]
+      capture (frame sync frame timestamp us) pattern (frame sync pattern timestamp us)
+      wrap (frame sync pattern wrap us) from peer [fusion]
+send frame sync report for camera [camera-1] to peer [fusion]
+stop frame sync decoder
+```
+
+パターンは4×4のセルです。12セルが4096msで一周するミリ秒カウンタを、4セルがチェックビットを持ちます。
+露光が画面のリフレッシュをまたいだ読み取りは、誤った時刻として報告される代わりに捨てられます。
+キャリブレーションは時間方向に変化する画素からパネル位置を求め、各セルの明暗レベルを学習し、
+信用できない数値を出す代わりに `panel-not-found`、`low-contrast`、`decode-unstable` で失敗します。
+キャリブレーション時間は6.2秒以上が必要です。最も遅いセルは2048msに1回しか変化せず、
+レベル学習に使えるのは窓の一部なので、それより短いとセルが片側のレベルのまま終わり、
+操作者には対処のしようがない理由で失敗します。
+
+`frame sync frame timestamp us` は、このPCがフレームを記録し終えた時刻で、`captureTimestampUs` と
+同じ外部の同期時刻サービスから読み取ります。センサの露光時刻が必要な場合は `frame sync frame age us`
+を引いてください。clock probe・latencyサンプル・カメラ別の集計レポートは
+`@kubohiroya/turbowarp-webrtc` 側にあります。プロジェクタのように全カメラ共通の遅延は、
+絶対値としてのlatencyには残りますが、カメラ間のoffsetでは相殺されます。
 
 ## 開発
 
