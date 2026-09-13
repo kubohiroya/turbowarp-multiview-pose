@@ -77,6 +77,7 @@ const calibrationController = await readFile(
   "utf8",
 );
 const fusionController = await readFile("src/fusion/controller.ts", "utf8");
+const markerSampler = await readFile("src/markers/canvas-sampler.ts", "utf8");
 const fusionBuffer = await readFile("src/fusion/jitter-buffer.ts", "utf8");
 const featureFlagSource = await readFile("config/feature-flags.ts", "utf8");
 const protocolCodec = await readFile("src/protocol/codec.ts", "utf8");
@@ -89,6 +90,7 @@ checkGeneratedArtifacts();
 checkPosePolicy();
 checkCalibrationPolicy();
 checkFusionPolicy();
+checkGlowStickPolicy();
 await checkProtocolOwnership();
 await checkPackContents();
 
@@ -321,6 +323,22 @@ function checkFusionPolicy() {
     if (source.includes("getUserMedia(")) {
       errors.push(`${name} must not capture media directly`);
     }
+  }
+}
+
+function checkGlowStickPolicy() {
+  if (!featureFlagSource.includes("glowStickMarkers")) {
+    errors.push("Glow stick markers must have a startup-fixed feature flag");
+  }
+  if (markerSampler.includes("getUserMedia(")) {
+    errors.push("Glow stick sampling must read the leased camera frame only");
+  }
+  if (
+    !JSON.stringify(protocolSchemas["twmp/pose-frame-2d"][2]).includes(
+      "markers",
+    )
+  ) {
+    errors.push("PoseFrame2D v2 must carry glow stick markers");
   }
 }
 

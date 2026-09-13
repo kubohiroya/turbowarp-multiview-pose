@@ -6,6 +6,7 @@ import {
   normalizedFromPixel,
   triangulate,
 } from "./geometry.js";
+import { mirrorKeypointId, type GlowStickAssignment } from "./glow-stick.js";
 import type {
   CameraModel,
   FusedPerson,
@@ -50,6 +51,8 @@ interface PersonView {
   trackingId: string;
   model: CameraModel;
   observations: Map<Coco17KeypointId, KeypointObservation>;
+  /** Performer identified by a glow stick color, when one was matched. */
+  performerId: string | undefined;
 }
 
 /**
@@ -60,8 +63,17 @@ export function fuseSynchronizedSample(
   sample: SynchronizedPoseSample,
   models: ReadonlyMap<string, CameraModel>,
   options: FusionGeometryOptions,
+  assignments: ReadonlyMap<
+    string,
+    ReadonlyMap<string, GlowStickAssignment>
+  > = new Map(),
 ): FusedPerson[] {
-  const views = collectViews(sample, models, options.minKeypointScore);
+  const views = collectViews(
+    sample,
+    models,
+    options.minKeypointScore,
+    assignments,
+  );
   const clusters = associateViews(views, options);
   const persons: FusedPerson[] = [];
   for (const cluster of clusters) {
@@ -85,17 +97,25 @@ function collectViews(
   sample: SynchronizedPoseSample,
   models: ReadonlyMap<string, CameraModel>,
   minKeypointScore: number,
+  assignments: ReadonlyMap<string, ReadonlyMap<string, GlowStickAssignment>>,
 ): PersonView[] {
   const views: PersonView[] = [];
   for (const camera of sample.cameras) {
     const model = models.get(camera.cameraId);
     if (!model) continue;
+    const cameraAssignments = assignments.get(camera.cameraId);
     for (const person of camera.persons) {
+      const assignment = cameraAssignments?.get(person.trackingId);
       const observations = new Map<Coco17KeypointId, KeypointObservation>();
       for (const keypoint of person.keypoints) {
         if (keypoint.score < minKeypointScore) continue;
         const normalized = normalizedFromPixel(model, keypoint.x, keypoint.y);
-        observations.set(keypoint.id, {
+        // A glow stick seen on the mirror of its performer's keypoint means
+        // this view labelled the person as if seen from the front.
+        const keypointId = assignment?.mirrored
+          ? mirrorKeypointId(keypoint.id)
+          : keypoint.id;
+        observations.set(keypointId, {
           model,
           x: normalized.x,
           y: normalized.y,
@@ -109,6 +129,7 @@ function collectViews(
         trackingId: person.trackingId,
         model,
         observations,
+        performerId: assignment?.performerId,
       });
     }
   }
@@ -126,6 +147,13 @@ function associateViews(
       const first = views[left];
       const second = views[right];
       if (!first || !second || first.cameraId === second.cameraId) continue;
+      if (
+        first.performerId &&
+        second.performerId &&
+        first.performerId !== second.performerId
+      ) {
+        continue;
+      }
       const cost = pairCost(first, second, options);
       if (cost === undefined) continue;
       pairs.push({ left, right, cost });
@@ -135,26 +163,52 @@ function associateViews(
 
   const parent = views.map((_, index) => index);
   const cameras = views.map((view) => new Set([view.cameraId]));
+  const performers = views.map((view) =>
+    view.performerId ? new Set([view.performerId]) : new Set<string>(),
+  );
+
+  // Views identified as the same performer belong together regardless of their
+  // reprojection cost; views of different performers must never merge.
+  const byPerformer = new Map<string, number[]>();
+  views.forEach((view, index) => {
+    if (!view.performerId) return;
+    byPerformer.set(view.performerId, [
+      ...(byPerformer.get(view.performerId) ?? []),
+      index,
+    ]);
+  });
   const find = (index: number): number => {
     let root = index;
     while (parent[root] !== root) root = parent[root] ?? root;
     return root;
   };
-  for (const pair of pairs) {
-    const leftRoot = find(pair.left);
-    const rightRoot = find(pair.right);
-    if (leftRoot === rightRoot) continue;
+  const merge = (left: number, right: number): void => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot === rightRoot) return;
     const leftCameras = cameras[leftRoot];
     const rightCameras = cameras[rightRoot];
-    if (!leftCameras || !rightCameras) continue;
-    let conflict = false;
-    for (const cameraId of rightCameras) {
-      if (leftCameras.has(cameraId)) conflict = true;
+    const leftPerformers = performers[leftRoot];
+    const rightPerformers = performers[rightRoot];
+    if (!leftCameras || !rightCameras || !leftPerformers || !rightPerformers) {
+      return;
     }
-    if (conflict) continue;
+    for (const cameraId of rightCameras) {
+      if (leftCameras.has(cameraId)) return;
+    }
+    const united = new Set([...leftPerformers, ...rightPerformers]);
+    if (united.size > 1) return;
     parent[rightRoot] = leftRoot;
     for (const cameraId of rightCameras) leftCameras.add(cameraId);
+    for (const performerId of rightPerformers) leftPerformers.add(performerId);
+  };
+
+  for (const indexes of byPerformer.values()) {
+    for (let index = 1; index < indexes.length; index += 1) {
+      merge(indexes[0] ?? 0, indexes[index] ?? 0);
+    }
   }
+  for (const pair of pairs) merge(pair.left, pair.right);
 
   const clusters = new Map<number, number[]>();
   for (let index = 0; index < views.length; index += 1) {
@@ -231,8 +285,16 @@ function fuseCluster(
   const score =
     keypoints.reduce((total, keypoint) => total + keypoint.score, 0) /
     COCO_17_KEYPOINT_IDS.length;
+  const performerIds = new Set(
+    views
+      .map((view) => view.performerId)
+      .filter(
+        (performerId): performerId is string => performerId !== undefined,
+      ),
+  );
   return {
     members,
+    performerId: performerIds.size === 1 ? [...performerIds][0] : undefined,
     cameraIds: [...cameraIds],
     score: clampScore(score),
     meanReprojectionErrorPx: meanError,

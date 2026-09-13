@@ -1,4 +1,4 @@
-import type { Coco17KeypointId } from "../pose/types.js";
+import type { Coco17KeypointId, PoseMarkerV2 } from "../pose/types.js";
 
 /** One temporally resampled COCO-17 keypoint of one tracked person. */
 export interface SynchronizedKeypoint2D {
@@ -14,6 +14,8 @@ export interface SynchronizedPerson2D {
   trackingId: string;
   score: number;
   keypoints: SynchronizedKeypoint2D[];
+  /** Glow stick observations carried by PoseFrame2D v2, empty for v1. */
+  markers: PoseMarkerV2[];
 }
 
 /** One camera's contribution to a single synchronized instant. */
@@ -87,6 +89,8 @@ export interface FusedPersonMember {
 
 export interface FusedPerson {
   members: FusedPersonMember[];
+  /** Performer resolved from glow stick color, when one was identified. */
+  performerId: string | undefined;
   cameraIds: string[];
   score: number;
   meanReprojectionErrorPx: number;

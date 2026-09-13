@@ -170,3 +170,23 @@ schema、不正なcalibration profileはerrorになります。停止ボタン�
 `PROJECT_RUN_STOP`では解放しません。runtimeはthread queueが空になるたびにこのeventを出すため、
 hat scriptでframeをbufferするevent駆動のprojectがmessageの合間にjitter bufferを失ってしまいます。
 camera leaseと一時skinはこのeventでも解放します。
+
+## サイリウムによる識別と向きの補正
+
+`glowStickMarkers`は独立した起動時固定・既定OFF flagです。camera側では推論のたびに、追跡中の各
+人物について設定したkeypointごとに1つのpatchを、keypointと同一の映像frameから、直後に破棄する
+一時canvas経由でsampleします。patchはhueで評価します。彩度または明度が閾値未満のpixelは無視し、
+残りのhueを円環平均するため、0度をまたぐ赤は赤のまま扱えます。色が占める割合が閾値を超えた場合
+だけmarkerとして採用し、keypointごとに最も強い観測をPoseFrame2D v2のmarkerにします。sampleを
+止めている間、frameはv1のままです。
+
+fusion側では、performance DSLが演者の色を与え、演者がサイリウムを持つkeypointはfusion側の設定と
+します（その契約は持ち手を記述しないため）。cameraのsampleごとに、観測の強い順で貪欲に割り当て、
+1人の演者が同じcameraで2人を占めることはありません。
+
+割り当ては2つの効果を持ちます。1つは識別です。統合された人物は演者IDを`personId`とするため、
+occlusion、再入場、tracking ID変化をまたいで同一性が保たれ、対応付けでは別演者の視点の統合を拒否し、
+同一演者の視点はreprojection costより先に統合します。もう1つは向きの補正です。指定keypointの
+左右反転側で色が見つかった場合、そのcameraは背面を腹面として読んでいるため、三角測量の前に
+その視点の左右keypointを入れ替えます。補正しなければ、その視点は手足を体の反対側へ引きずるか、
+reprojection判定で落ちてしまいます。

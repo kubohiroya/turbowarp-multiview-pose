@@ -3,6 +3,7 @@ import { MultiviewPoseExtension } from "../src/extension.js";
 import { WEBRTC_CAPABILITY_KEY } from "../src/webrtc-capability.js";
 import {
   lookAtCalibration,
+  performanceDsl,
   poseFrame2D,
   projectPerson,
   skeleton,
@@ -158,6 +159,57 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(fusionOpcodes).toContain("startPoseFusion");
     expect(fusionOpcodes).toContain("latestPoseFrame3D");
     expect(fusionOpcodes).not.toContain("startCameraCalibration");
+  });
+
+  it("gates glow stick blocks on their own startup flag", () => {
+    setup();
+    const disabled = new MultiviewPoseExtension({ markersEnabled: false });
+    const hidden = (disabled.getInfo().blocks as Array<{ opcode: string }>).map(
+      ({ opcode }) => opcode,
+    );
+    expect(hidden).not.toContain("enableGlowStickMarkers");
+    expect(disabled.glowStickMarkerCount()).toBe(0);
+    expect(disabled.glowStickPaletteSize()).toBe(0);
+    expect(() =>
+      disabled.enableGlowStickMarkers({ KEYPOINTS: "right_wrist" }),
+    ).toThrow(/disabled/u);
+
+    const enabled = new MultiviewPoseExtension({
+      markersEnabled: true,
+      poseEnabled: true,
+      fusionEnabled: true,
+      poseModel: {
+        initializeWebGpu: vi.fn(async () => undefined),
+        backend: vi.fn(() => "webgpu"),
+        createMultiPoseDetector: vi.fn(async () => ({
+          estimatePoses: vi.fn(async () => []),
+          dispose: vi.fn(),
+        })),
+      },
+    });
+    const opcodes = (enabled.getInfo().blocks as Array<{ opcode: string }>).map(
+      ({ opcode }) => opcode,
+    );
+    expect(opcodes).toContain("enableGlowStickMarkers");
+    expect(opcodes).toContain("setPerformerGlowStick");
+    enabled.loadGlowStickPalette({
+      JSON: performanceDsl([
+        { performerId: "actor-1", glowStickColor: "#00FFAA" },
+      ]),
+    });
+    expect(enabled.glowStickPaletteSize()).toBe(1);
+    enabled.setPerformerGlowStick({
+      PERFORMER_ID: "actor-1",
+      KEYPOINT: "left_wrist",
+    });
+    expect(() =>
+      enabled.setPerformerGlowStick({
+        PERFORMER_ID: "actor-1",
+        KEYPOINT: "right_hand",
+      }),
+    ).toThrow(/Unknown COCO-17/u);
+    expect(enabled.identifiedPerformerCount()).toBe(0);
+    expect(enabled.mirrorCorrectedViewCount()).toBe(0);
   });
 
   it("keeps pose fusion blocks hidden while the startup flag is off", () => {

@@ -18,6 +18,7 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
 - jitterを含むPoseFrame2D streamをcameraごとにbufferingし、過去の同一瞬間で再sampleします。
 - 同期した2D setを三角測量し、`twmp/pose-frame-3d` version 1の3D poseへ統合します。
+- 演者ごとに固有色のサイリウムを読み取り、識別・追跡と背面/腹面の取り違え補正に使います。
 
 ## 要件と安全性
 
@@ -54,6 +55,12 @@ globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
+```
+
+サイリウムmarkerも独立して有効化します。
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {glowStickMarkers: true};
 ```
 
 起動時にTensorFlow.js backendとして`webgpu`を明示選択し、それ以外なら
@@ -157,6 +164,37 @@ reprojection閾値内で1点に一致する最大の視点集合を採用する�
 誤ったpeer 1台で実行中のscriptが止まることはありません。不正なJSON、他contractのschema、
 不正なcalibration profileはerrorになります。scriptが走り終わっただけではbufferを破棄せず、
 停止ボタン、project reload、disposeで破棄します。
+
+演者が固有色のサイリウムを持つ場合、camera appはkeypointと同一の映像frameから色をsampleします。
+
+```text
+start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
+sample glow stick colors at [right_wrist,left_wrist]
+forever:
+  infer latest pose frame timestamp [(同期済みtimestamp us)] us
+  set [poseJson] to (latest PoseFrame2D JSON)
+```
+
+sample中は`latest PoseFrame2D JSON`が`twmp/pose-frame-2d` version 2を返します。各人物は最大4件の
+markerを持ち、彩度の高い色を見つけたCOCO-17 keypoint、`#RRGGBB`の色、patch内の占有率を含みます。
+sampleを止めればversion 1に戻ります。色はpose frame内を運ばれるため、fusion app側で別messageとの
+時刻対応付けは不要です。
+
+fusion appは、`glowStickColor`を既に持つperformance DSLで色と演者を対応付け、演者ごとに
+サイリウムを持つkeypointを指定します。
+
+```text
+load glow stick palette from PerformanceDSL [(performance DSLのJSON)]
+set performer [actor-1] glow stick at [right_wrist]
+set performer [actor-2] glow stick at [right_wrist]
+```
+
+paletteは精度に2つの効果があります。色で識別できた人物は`personId`が演者IDになるため、
+occlusion、再入場、tracking ID変化をまたいで同一性が保たれ、別演者の視点同士が統合されることも
+ありません。色が指定keypointの左右反転側で見つかった場合、そのcameraは背面を腹面として読んだ
+ことになるため、三角測量の前にその視点の左右labelを入れ替えます。これにより、手首が体を横切って
+しまうような背面/腹面の取り違えを取り除きます。効果は`identified performer count`と
+`mirror-corrected view count`で確認できます。
 
 ## 開発
 

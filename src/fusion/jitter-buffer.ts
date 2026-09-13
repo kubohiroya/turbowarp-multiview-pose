@@ -1,9 +1,10 @@
 import { COCO_17_KEYPOINT_IDS } from "../pose/types.js";
 import type {
   Coco17KeypointId,
+  PoseFrame2D,
   PoseFrame2DKeypointV1,
   PoseFrame2DPersonV1,
-  PoseFrame2DV1,
+  PoseMarkerV2,
 } from "../pose/types.js";
 import type {
   SynchronizedCameraSample,
@@ -41,7 +42,7 @@ export const DEFAULT_JITTER_BUFFER_OPTIONS: JitterBufferOptions = {
  * retained window when the ring is full, or already buffered is rejected.
  */
 export class PoseFrameRingBuffer {
-  private readonly slots: Array<PoseFrame2DV1 | undefined>;
+  private readonly slots: Array<PoseFrame2D | undefined>;
   private head = 0;
   private count = 0;
 
@@ -49,14 +50,14 @@ export class PoseFrameRingBuffer {
     if (!Number.isInteger(capacity) || capacity < 2) {
       throw new Error("Ring buffer capacity must be an integer of at least 2.");
     }
-    this.slots = new Array<PoseFrame2DV1 | undefined>(capacity).fill(undefined);
+    this.slots = new Array<PoseFrame2D | undefined>(capacity).fill(undefined);
   }
 
   public size(): number {
     return this.count;
   }
 
-  public at(index: number): PoseFrame2DV1 | undefined {
+  public at(index: number): PoseFrame2D | undefined {
     if (index < 0 || index >= this.count) return undefined;
     return this.slots[this.slot(index)];
   }
@@ -75,7 +76,7 @@ export class PoseFrameRingBuffer {
     this.count = 0;
   }
 
-  public insert(frame: PoseFrame2DV1, jitterWindowUs: number): IngestOutcome {
+  public insert(frame: PoseFrame2D, jitterWindowUs: number): IngestOutcome {
     const timestamp = frame.captureTimestampUs;
     const newest = this.newestTimestampUs();
     if (newest !== undefined && timestamp < newest - jitterWindowUs) {
@@ -152,8 +153,8 @@ export class PoseFrameRingBuffer {
   }
 
   private bracket(timestampUs: number): {
-    previous: PoseFrame2DV1 | undefined;
-    next: PoseFrame2DV1 | undefined;
+    previous: PoseFrame2D | undefined;
+    next: PoseFrame2D | undefined;
   } {
     let low = 0;
     let high = this.count - 1;
@@ -198,7 +199,7 @@ export class MultiCameraJitterBuffer {
     this.clear();
   }
 
-  public ingest(frame: PoseFrame2DV1): IngestOutcome {
+  public ingest(frame: PoseFrame2D): IngestOutcome {
     let buffer = this.buffers.get(frame.cameraId);
     if (!buffer) {
       buffer = new PoseFrameRingBuffer(this.options.capacityPerCamera);
@@ -270,8 +271,8 @@ export class MultiCameraJitterBuffer {
 }
 
 function createSample(
-  previous: PoseFrame2DV1,
-  next: PoseFrame2DV1,
+  previous: PoseFrame2D,
+  next: PoseFrame2D,
   alpha: number,
   interpolated: boolean,
   options: JitterBufferOptions,
@@ -291,8 +292,8 @@ function createSample(
 }
 
 function mergePersons(
-  previous: PoseFrame2DV1,
-  next: PoseFrame2DV1,
+  previous: PoseFrame2D,
+  next: PoseFrame2D,
   alpha: number,
   interpolated: boolean,
   options: JitterBufferOptions,
@@ -316,6 +317,7 @@ function mergePersons(
         trackingId,
         score: lerp(before.score, after.score, alpha),
         keypoints: mergeKeypoints(before, after, alpha, options),
+        markers: mergeMarkers(before, after),
       });
       continue;
     }
@@ -325,6 +327,7 @@ function mergePersons(
       trackingId,
       score: single.score,
       keypoints: singleKeypoints(single, interpolated),
+      markers: mergeMarkers(single, undefined),
     });
   }
   return persons;
@@ -395,6 +398,27 @@ function singleKeypoints(
       filled: interpolated || !keypoint,
     };
   });
+}
+
+/** Keeps the strongest glow stick observation per keypoint of one person. */
+function mergeMarkers(
+  before: PoseFrame2DPersonV1,
+  after: PoseFrame2DPersonV1 | undefined,
+): PoseMarkerV2[] {
+  const strongest = new Map<Coco17KeypointId, PoseMarkerV2>();
+  for (const marker of [...markersOf(before), ...markersOf(after)]) {
+    const existing = strongest.get(marker.keypointId);
+    if (existing && existing.coverage >= marker.coverage) continue;
+    strongest.set(marker.keypointId, marker);
+  }
+  return [...strongest.values()];
+}
+
+function markersOf(
+  person: PoseFrame2DPersonV1 | undefined,
+): readonly PoseMarkerV2[] {
+  const markers = (person as { markers?: PoseMarkerV2[] } | undefined)?.markers;
+  return markers ?? [];
 }
 
 function keypointsById(

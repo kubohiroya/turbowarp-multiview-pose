@@ -48,6 +48,23 @@ export class PersonIdentityRegistry {
     return personId;
   }
 
+  /** Tracks a cluster under an identifier the caller already resolved. */
+  public adopt(
+    personId: string,
+    members: readonly FusedPersonMember[],
+    sequence: number,
+  ): string {
+    const track = this.tracks.get(personId) ?? {
+      members: new Set<string>(),
+      lastSequence: sequence,
+      keypoints: new Map<Coco17KeypointId, Vector3>(),
+    };
+    track.members = new Set(members.map(memberKey));
+    track.lastSequence = sequence;
+    this.tracks.set(personId, track);
+    return personId;
+  }
+
   public remember(
     personId: string,
     keypointId: Coco17KeypointId,

@@ -12,6 +12,11 @@ import {
   type FusionGeometryOptions,
 } from "./fuse.js";
 import { createCameraModel } from "./geometry.js";
+import {
+  DEFAULT_GLOW_STICK_MATCH_OPTIONS,
+  GlowStickPalette,
+  type GlowStickAssignment,
+} from "./glow-stick.js";
 import { PersonIdentityRegistry } from "./identity.js";
 import {
   DEFAULT_JITTER_BUFFER_OPTIONS,
@@ -19,6 +24,8 @@ import {
   type JitterBufferOptions,
 } from "./jitter-buffer.js";
 import type { CameraModel, SynchronizedPoseSample } from "./types.js";
+import { COCO_17_KEYPOINT_IDS } from "../pose/types.js";
+import type { Coco17KeypointId } from "../pose/types.js";
 
 export type PoseFusionState =
   "idle" | "buffering" | "fusing" | "ready" | "error";
@@ -27,6 +34,7 @@ export type PoseFusionErrorCode =
   | ""
   | "calibration-invalid"
   | "calibration-mismatch"
+  | "performance-dsl-invalid"
   | "frame-invalid"
   | "frame-dropped"
   | "unknown-camera"
@@ -56,6 +64,9 @@ export class PoseFusionController {
   );
   private readonly identities = new PersonIdentityRegistry();
   private readonly models = new Map<string, CameraModel>();
+  private readonly palette = new GlowStickPalette();
+  private identifiedPerformers = 0;
+  private mirroredViews = 0;
   private jitterOptions: JitterBufferOptions = DEFAULT_JITTER_BUFFER_OPTIONS;
   private geometryOptions: FusionGeometryOptions =
     DEFAULT_FUSION_GEOMETRY_OPTIONS;
@@ -122,15 +133,74 @@ export class PoseFusionController {
     this.latestFrame = undefined;
     this.latestFrameJsonValue = "";
     this.latestSample = undefined;
+    this.identifiedPerformers = 0;
+    this.mirroredViews = 0;
     this.started = false;
     this.fusionState = "idle";
     this.clearError();
   }
 
-  /** Releases buffers and every loaded calibration profile. */
+  /** Releases buffers, calibration profiles, and the glow stick palette. */
   public cleanup(): void {
     this.stop();
     this.models.clear();
+    this.palette.clear();
+  }
+
+  /**
+   * Loads the performer palette from a Performance DSL v1 payload. The DSL owns
+   * the colors; the keypoint each performer carries the light at is a
+   * fusion-side setting because that contract does not describe it.
+   */
+  public loadPerformanceDsl(json: string): void {
+    const decoded = decodeProtocolJson(json, Date.now());
+    if (!decoded.ok || decoded.schema !== "twmp/performance-dsl") {
+      const message = decoded.ok
+        ? `Expected twmp/performance-dsl, received ${decoded.schema}.`
+        : formatProtocolDiagnostic(decoded.diagnostic);
+      this.fail("performance-dsl-invalid", message);
+    }
+    const performers = (
+      decoded.value as unknown as {
+        performers: Array<{ performerId: string; glowStickColor: string }>;
+      }
+    ).performers;
+    try {
+      this.palette.loadPerformers(performers);
+    } catch (error) {
+      this.fail("performance-dsl-invalid", errorMessage(error));
+    }
+    this.clearError();
+  }
+
+  public setPerformerKeypoint(performerId: string, keypointId: string): void {
+    const resolved = COCO_17_KEYPOINT_IDS.find((id) => id === keypointId);
+    if (!resolved) {
+      this.fail(
+        "performance-dsl-invalid",
+        `Unknown COCO-17 keypoint: ${keypointId}`,
+      );
+    }
+    try {
+      this.palette.setKeypoint(performerId, resolved as Coco17KeypointId);
+    } catch (error) {
+      this.fail("performance-dsl-invalid", errorMessage(error));
+    }
+    this.clearError();
+  }
+
+  public paletteSize(): number {
+    return this.palette.size();
+  }
+
+  /** Performers identified by glow stick color in the last fusion. */
+  public identifiedPerformerCount(): number {
+    return this.identifiedPerformers;
+  }
+
+  /** Camera views whose left/right labels the last fusion corrected. */
+  public mirrorCorrectedViewCount(): number {
+    return this.mirroredViews;
   }
 
   public loadCalibration(json: string): void {
@@ -241,10 +311,26 @@ export class PoseFusionController {
       return false;
     }
 
+    const assignments = new Map<string, Map<string, GlowStickAssignment>>();
+    let mirrored = 0;
+    if (this.palette.size() > 0) {
+      for (const camera of sample.cameras) {
+        const assigned = this.palette.assign(
+          camera,
+          DEFAULT_GLOW_STICK_MATCH_OPTIONS,
+        );
+        assignments.set(camera.cameraId, assigned);
+        for (const assignment of assigned.values()) {
+          if (assignment.mirrored) mirrored += 1;
+        }
+      }
+    }
+
     const persons = fuseSynchronizedSample(
       sample,
       this.models,
       this.geometryOptions,
+      assignments,
     );
     if (persons.length === 0) {
       this.reject(
@@ -260,7 +346,13 @@ export class PoseFusionController {
       sequence: this.sequence,
       timestampUs,
       persons: persons.map((person) => {
-        const personId = this.identities.resolve(person.members, this.sequence);
+        const personId = person.performerId
+          ? this.identities.adopt(
+              person.performerId,
+              person.members,
+              this.sequence,
+            )
+          : this.identities.resolve(person.members, this.sequence);
         return {
           personId,
           score: round(person.score),
@@ -302,6 +394,14 @@ export class PoseFusionController {
     }
     this.identities.prune(this.sequence);
     this.sequence += 1;
+    this.identifiedPerformers = new Set(
+      persons
+        .map((person) => person.performerId)
+        .filter(
+          (performerId): performerId is string => performerId !== undefined,
+        ),
+    ).size;
+    this.mirroredViews = mirrored;
     this.latestFrame = frame;
     this.latestFrameJsonValue = JSON.stringify(frame);
     this.fusionState = "ready";

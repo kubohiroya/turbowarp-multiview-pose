@@ -33,6 +33,17 @@ export interface PoseFrame2DPersonV1 {
   keypoints: PoseFrame2DKeypointV1[];
 }
 
+/** One glow stick color observed at a COCO-17 keypoint (PoseFrame2D v2). */
+export interface PoseMarkerV2 {
+  keypointId: Coco17KeypointId;
+  colorHex: string;
+  coverage: number;
+}
+
+export interface PoseFrame2DPersonV2 extends PoseFrame2DPersonV1 {
+  markers: PoseMarkerV2[];
+}
+
 export interface PoseFrame2DV1 {
   schema: "twmp/pose-frame-2d";
   version: 1;
@@ -45,6 +56,16 @@ export interface PoseFrame2DV1 {
   calibrationId: string;
   persons: PoseFrame2DPersonV1[];
 }
+
+export interface PoseFrame2DV2 extends Omit<
+  PoseFrame2DV1,
+  "version" | "persons"
+> {
+  version: 2;
+  persons: PoseFrame2DPersonV2[];
+}
+
+export type PoseFrame2D = PoseFrame2DV1 | PoseFrame2DV2;
 
 export interface ModelKeypoint {
   name?: string;

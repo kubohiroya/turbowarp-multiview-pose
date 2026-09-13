@@ -1,31 +1,7 @@
 import type { Coco17KeypointId } from "../pose/types.js";
 
-/** One glow stick color observed near one keypoint of one tracked person. */
-export interface MarkerObservation {
-  trackingId: string;
-  keypointId: Coco17KeypointId;
-  colorHex: string;
-  /** Fraction of the sampled patch that carried the saturated color. */
-  coverage: number;
-  x: number;
-  y: number;
-}
-
-/**
- * Extension-local courier for glow stick observations. It is deliberately not a
- * pinned multiview-pose contract: PoseFrame2D v1 is hash-pinned and cannot
- * carry color, so the camera app sends this envelope next to its pose frames.
- */
-export interface MarkerFrameV1 {
-  schema: "twmp-marker/1";
-  cameraId: string;
-  captureTimestampUs: number;
-  frameWidth: number;
-  frameHeight: number;
-  observations: MarkerObservation[];
-}
-
 export interface MarkerPatch {
+  /** Patch center in frame pixels. */
   x: number;
   y: number;
   radius: number;
@@ -33,6 +9,7 @@ export interface MarkerPatch {
 
 export interface SampledColor {
   colorHex: string;
+  /** Fraction of the patch that carried the saturated color, 0 to 1. */
   coverage: number;
 }
 
@@ -42,11 +19,31 @@ export interface MarkerFrame {
   height: number;
 }
 
+/** Reads the dominant saturated color of each patch of one video frame. */
 export interface MarkerImageSamplerPort {
   readonly name: string;
-  /** Returns the dominant saturated color of each patch, or undefined. */
   sample(
     frame: MarkerFrame,
     patches: readonly MarkerPatch[],
   ): Array<SampledColor | undefined>;
 }
+
+export interface MarkerSamplingOptions {
+  /** Keypoints that may carry a glow stick. */
+  keypointIds: Coco17KeypointId[];
+  /** Keypoint score required before its patch is sampled. */
+  minKeypointScore: number;
+  /** Saturation and value required of a glow stick pixel. */
+  minSaturation: number;
+  minValue: number;
+  /** Fraction of the patch that must qualify before a marker is reported. */
+  minCoverage: number;
+}
+
+export const DEFAULT_MARKER_SAMPLING_OPTIONS: MarkerSamplingOptions = {
+  keypointIds: ["right_wrist", "left_wrist"],
+  minKeypointScore: 0.3,
+  minSaturation: 0.45,
+  minValue: 0.3,
+  minCoverage: 0.08,
+};

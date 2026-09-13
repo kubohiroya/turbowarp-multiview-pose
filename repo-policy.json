@@ -34,6 +34,7 @@
     "Keep multi-camera 3D pose fusion behind its independent startup-fixed default-OFF flag.",
     "Keep fusion limited to buffering, reordering, and resampling supplied timestamps; do not estimate per-camera clock offsets.",
     "Validate every fused frame against the pinned PoseFrame3D v1 schema before retaining it.",
+    "Keep glow stick markers behind their independent startup-fixed default-OFF flag and sample colors only from the leased camera frame.",
     "Own the application contracts here: src/protocol/schemas.ts is the source of truth and schemas/ holds its generated JSON Schemas.",
     "Never take contract definitions from the application repository; applications depend on this package, never the reverse.",
     "Reject unknown versions and pairing credentials in persistent contracts, and add a new contract version instead of editing a published one.",

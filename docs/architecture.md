@@ -196,3 +196,25 @@ loaded calibration profiles. `PROJECT_RUN_STOP` deliberately does not: the runti
 the thread queue empties, and an event-driven fusion project that buffers frames from hat scripts
 would otherwise lose its jitter buffer between messages. Camera leases and temporary skins are still
 released there.
+
+## Glow stick assisted identity and orientation
+
+`glowStickMarkers` is an independent startup-fixed, default-OFF flag. On the camera side, each
+inference samples one patch per configured keypoint of every tracked person from the same video
+frame, in one temporary canvas that is released immediately. A patch is scored by hue: pixels below
+the saturation or value threshold are ignored, the remaining hues are averaged circularly so a
+wrapping red stays red, and a patch qualifies only when enough of it carried the color. The strongest
+observation per keypoint becomes a PoseFrame2D v2 marker; the frame stays v1 while sampling is off.
+
+On the fusion side the Performance DSL supplies the performer colors, and a fusion-side setting says
+which keypoint each performer carries the light at, because that contract does not describe the
+carrying hand. Each camera sample is assigned greedily from the strongest observation, and one
+performer never claims two people in the same camera.
+
+An assignment does two things. It fixes identity: the fused person takes the performer's identifier,
+so `personId` survives occlusion, re-entry, and tracking-ID churn, and the association step refuses
+to merge views of different performers while merging views of the same performer before any
+reprojection cost is considered. It also fixes orientation: a color found on the mirror of the
+performer's keypoint means that camera labelled a back view as a front view, so the view's left and
+right keypoints are swapped before triangulation. Without that correction the swapped view pulls
+every limb across the body or fails the reprojection gate entirely.

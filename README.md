@@ -18,6 +18,7 @@ as a temporary sprite skin.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
 - Buffers jittered PoseFrame2D streams per camera and resamples every camera at one past instant.
 - Triangulates the synchronized 2D sets into `twmp/pose-frame-3d` version 1 poses.
+- Reads a uniquely colored glow stick per performer to name and track them and to fix back views.
 
 ## Requirements and safety
 
@@ -57,6 +58,12 @@ Enable multi-camera 3D pose fusion independently:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
+```
+
+Enable glow stick markers independently:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {glowStickMarkers: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -173,6 +180,40 @@ Transient shortages do not throw and do not replace the last fused frame: `fuse`
 `unknown-camera`, `calibration-mismatch`, or `frame-dropped` without throwing, so one misconfigured
 peer cannot break a running project script. Invalid JSON, a foreign schema, and an invalid
 calibration profile throw.
+
+Performers may also carry a uniquely colored glow stick, which the camera app samples on the same
+video frame as the keypoints:
+
+```text
+start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
+sample glow stick colors at [right_wrist,left_wrist]
+forever:
+  infer latest pose frame timestamp [(synchronized timestamp us)] us
+  set [poseJson] to (latest PoseFrame2D JSON)
+```
+
+While sampling is on, `latest PoseFrame2D JSON` reports `twmp/pose-frame-2d` version 2: every person
+carries up to four markers naming the COCO-17 keypoint where a saturated color was found, its
+`#RRGGBB` value, and the patch coverage behind it. Turning sampling off returns the reporter to
+version 1. The color travels inside the pose frame, so the fusion app never has to time-align a
+second message.
+
+The fusion app maps colors to performers with the Performance DSL, which already owns
+`glowStickColor`, and chooses which keypoint each performer carries the light at:
+
+```text
+load glow stick palette from PerformanceDSL [(performance DSL JSON)]
+set performer [actor-1] glow stick at [right_wrist]
+set performer [actor-2] glow stick at [right_wrist]
+```
+
+The palette does two things for accuracy. A fused person identified by color takes its `personId`
+from the performer, so identity survives occlusion, re-entry, and tracking-ID churn, and two views of
+different performers are never merged. When the color instead appears on the mirror of the
+performer's keypoint, that camera read a back view as a front view: the fusion swaps the left and
+right labels of that view before triangulating, which removes the front/back confusion that
+otherwise drags a wrist across the body. `identified performer count` and
+`mirror-corrected view count` report both effects.
 
 ## Block reference
 
@@ -753,6 +794,82 @@ Returns the latest fusion error message.
 | Type | Reporter |
 | Opcode | `poseFusionError` |
 
+### `sample glow stick colors at [KEYPOINTS]`
+
+Samples the named COCO-17 keypoints for a uniquely colored glow stick and reports PoseFrame2D v2.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `enableGlowStickMarkers` |
+| `KEYPOINTS` | String, default: `right_wrist,left_wrist` |
+
+### `stop sampling glow stick colors`
+
+Returns pose reporting to PoseFrame2D v1 without glow stick markers.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `disableGlowStickMarkers` |
+
+### `glow stick marker count`
+
+Returns how many glow stick markers the latest pose frame carries.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `glowStickMarkerCount` |
+
+### `load glow stick palette from PerformanceDSL [JSON]`
+
+Loads the performer colors from a Performance DSL v1 payload for fusion identity.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `loadGlowStickPalette` |
+| `JSON` | String, default: `{}` |
+
+### `set performer [PERFORMER_ID] glow stick at [KEYPOINT]`
+
+Chooses which COCO-17 keypoint one performer carries the glow stick at.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `setPerformerGlowStick` |
+| `PERFORMER_ID` | String, default: `actor-1` |
+| `KEYPOINT` | String, default: `right_wrist` |
+
+### `glow stick palette size`
+
+Returns how many performers the loaded palette describes.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `glowStickPaletteSize` |
+
+### `identified performer count`
+
+Returns how many fused people the last fusion identified by glow stick color.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `identifiedPerformerCount` |
+
+### `mirror-corrected view count`
+
+Returns how many camera views the last fusion corrected for swapped left and right labels.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `mirrorCorrectedViewCount` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -782,6 +899,9 @@ Returns the latest fusion error message.
 | Frame without a matching profile | The frame is dropped with `unknown-camera` or `calibration-mismatch`; it never reaches a ring buffer. |
 | Scripts finish running | Buffered frames survive; only the stop button, project reload, and disposal clear them. |
 | Fusion stop/reload/disposal | Buffers and fused results are cleared; loaded calibration profiles survive until cleanup. |
+| Glow stick flag OFF | Marker blocks are hidden, pose frames stay version 1, and fusion behaves exactly as before. |
+| Unmatched glow stick color | The person keeps a `person-N` identity; no performer is claimed twice in one camera. |
+| Color on the mirrored keypoint | That view's left and right labels are swapped before triangulation. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.

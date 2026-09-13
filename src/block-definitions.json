@@ -515,6 +515,78 @@
       "text": "pose fusion error",
       "description": "Returns the latest fusion error message.",
       "arguments": {}
+    },
+    {
+      "opcode": "enableGlowStickMarkers",
+      "feature": "glowStickMarkers",
+      "blockType": "COMMAND",
+      "text": "sample glow stick colors at [KEYPOINTS]",
+      "description": "Samples the named COCO-17 keypoints for a uniquely colored glow stick and reports PoseFrame2D v2.",
+      "arguments": {
+        "KEYPOINTS": {
+          "type": "STRING",
+          "defaultValue": "right_wrist,left_wrist"
+        }
+      }
+    },
+    {
+      "opcode": "disableGlowStickMarkers",
+      "feature": "glowStickMarkers",
+      "blockType": "COMMAND",
+      "text": "stop sampling glow stick colors",
+      "description": "Returns pose reporting to PoseFrame2D v1 without glow stick markers.",
+      "arguments": {}
+    },
+    {
+      "opcode": "glowStickMarkerCount",
+      "feature": "glowStickMarkers",
+      "blockType": "REPORTER",
+      "text": "glow stick marker count",
+      "description": "Returns how many glow stick markers the latest pose frame carries.",
+      "arguments": {}
+    },
+    {
+      "opcode": "loadGlowStickPalette",
+      "feature": "glowStickMarkers",
+      "blockType": "COMMAND",
+      "text": "load glow stick palette from PerformanceDSL [JSON]",
+      "description": "Loads the performer colors from a Performance DSL v1 payload for fusion identity.",
+      "arguments": { "JSON": { "type": "STRING", "defaultValue": "{}" } }
+    },
+    {
+      "opcode": "setPerformerGlowStick",
+      "feature": "glowStickMarkers",
+      "blockType": "COMMAND",
+      "text": "set performer [PERFORMER_ID] glow stick at [KEYPOINT]",
+      "description": "Chooses which COCO-17 keypoint one performer carries the glow stick at.",
+      "arguments": {
+        "PERFORMER_ID": { "type": "STRING", "defaultValue": "actor-1" },
+        "KEYPOINT": { "type": "STRING", "defaultValue": "right_wrist" }
+      }
+    },
+    {
+      "opcode": "glowStickPaletteSize",
+      "feature": "glowStickMarkers",
+      "blockType": "REPORTER",
+      "text": "glow stick palette size",
+      "description": "Returns how many performers the loaded palette describes.",
+      "arguments": {}
+    },
+    {
+      "opcode": "identifiedPerformerCount",
+      "feature": "glowStickMarkers",
+      "blockType": "REPORTER",
+      "text": "identified performer count",
+      "description": "Returns how many fused people the last fusion identified by glow stick color.",
+      "arguments": {}
+    },
+    {
+      "opcode": "mirrorCorrectedViewCount",
+      "feature": "glowStickMarkers",
+      "blockType": "REPORTER",
+      "text": "mirror-corrected view count",
+      "description": "Returns how many camera views the last fusion corrected for swapped left and right labels.",
+      "arguments": {}
     }
   ]
 }

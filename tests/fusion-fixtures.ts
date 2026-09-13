@@ -2,7 +2,14 @@ import type { CameraCalibrationV1 } from "../src/calibration/types.js";
 import { createCameraModel, projectPoint } from "../src/fusion/geometry.js";
 import type { Vector3 } from "../src/fusion/types.js";
 import { COCO_17_KEYPOINT_IDS } from "../src/pose/types.js";
-import type { PoseFrame2DPersonV1, PoseFrame2DV1 } from "../src/pose/types.js";
+import type {
+  Coco17KeypointId,
+  PoseFrame2DPersonV1,
+  PoseFrame2DPersonV2,
+  PoseFrame2DV1,
+  PoseFrame2DV2,
+  PoseMarkerV2,
+} from "../src/pose/types.js";
 
 export const IMAGE_WIDTH = 1280;
 export const IMAGE_HEIGHT = 720;
@@ -131,4 +138,75 @@ function normalize(vector: Vector3): Vector3 {
   const length = Math.hypot(vector.x, vector.y, vector.z);
   if (length === 0) throw new Error("Cannot normalize a zero vector.");
   return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
+}
+
+const MIRROR_PAIRS: ReadonlyArray<[Coco17KeypointId, Coco17KeypointId]> = [
+  ["left_eye", "right_eye"],
+  ["left_ear", "right_ear"],
+  ["left_shoulder", "right_shoulder"],
+  ["left_elbow", "right_elbow"],
+  ["left_wrist", "right_wrist"],
+  ["left_hip", "right_hip"],
+  ["left_knee", "right_knee"],
+  ["left_ankle", "right_ankle"],
+];
+
+/**
+ * Projects a skeleton and optionally swaps the left/right labels, which is what
+ * MoveNet does when it reads a person seen from behind as facing the camera.
+ */
+export function projectPersonV2(
+  calibration: CameraCalibrationV1,
+  trackingId: string,
+  points: readonly Vector3[],
+  options: { mirrored?: boolean; markers?: PoseMarkerV2[] } = {},
+): PoseFrame2DPersonV2 {
+  const person = projectPerson(calibration, trackingId, points);
+  const keypoints = [...person.keypoints];
+  if (options.mirrored) {
+    const byId = new Map(keypoints.map((keypoint) => [keypoint.id, keypoint]));
+    for (const [left, right] of MIRROR_PAIRS) {
+      const first = byId.get(left);
+      const second = byId.get(right);
+      if (!first || !second) continue;
+      const swapped = { x: first.x, y: first.y, score: first.score };
+      first.x = second.x;
+      first.y = second.y;
+      first.score = second.score;
+      second.x = swapped.x;
+      second.y = swapped.y;
+      second.score = swapped.score;
+    }
+  }
+  return { ...person, keypoints, markers: options.markers ?? [] };
+}
+
+export function poseFrame2DV2(
+  cameraId: string,
+  captureTimestampUs: number,
+  persons: PoseFrame2DPersonV2[],
+  sequence = 0,
+): PoseFrame2DV2 {
+  return {
+    ...poseFrame2D(cameraId, captureTimestampUs, [], sequence),
+    version: 2,
+    persons,
+  };
+}
+
+export function performanceDsl(
+  performers: ReadonlyArray<{ performerId: string; glowStickColor: string }>,
+): string {
+  return JSON.stringify({
+    schema: "twmp/performance-dsl",
+    version: 1,
+    performers: performers.map((performer, index) => ({
+      performerId: performer.performerId,
+      displayName: `Performer ${index + 1}`,
+      glowStickColor: performer.glowStickColor,
+      recognitionStartEffect: "fade-in",
+      recognitionEndEffect: "fade-out",
+      avatarAsset: `avatar-${index + 1}`,
+    })),
+  });
 }
