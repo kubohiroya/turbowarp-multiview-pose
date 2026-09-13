@@ -29,8 +29,8 @@
   <p>The independent <code>webgpuMoveNetMultiPose</code> flag is OFF by default. When enabled, the extension leases frames from TurboWarp Camera Source, explicitly requires the TensorFlow.js <code>webgpu</code> backend, and returns up to six tracked COCO-17 poses as PoseFrame2D version 1 JSON.</p>
   <p>No CPU, WASM, or WebGL inference fallback is provided. The first model load generally requires network access; prepare the browser cache before an offline venue run.</p>
 
-  <h2>Pinned protocol v1 codec</h2>
-  <p>The independent <code>protocolV1Codec</code> flag is OFF by default. When enabled, blocks validate and round-trip SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, and Performance DSL JSON using schemas pinned by source commit and SHA-256.</p>
+  <h2>Application contract codec</h2>
+  <p>The independent <code>protocolV1Codec</code> flag is OFF by default. When enabled, blocks validate and round-trip SessionPolicy, CameraCalibration, PoseFrame2D (v1 and v2), PoseFrame3D, and Performance DSL JSON. This extension owns those contracts and publishes their generated JSON Schemas; applications depend on the extension, never the reverse.</p>
   <p>Unknown schemas, versions, fields, malformed COCO-17 tuples, and pairing credential keys fail closed. Diagnostic reporters expose the JSON Pointer path and message.</p>
   <p>Pose timestamps are opaque values supplied by a separate synchronized local time service. This extension carries them unchanged and implements no clock probes, offset estimation, ping, or pong logic.</p>
 
@@ -42,6 +42,13 @@
   <p>The independent <code>avatarRetargetV1</code> flag is OFF by default. The adapter requires TurboWarp-A-Frame 0.3.0 scene capability v1 and uses only its public template, selector transform, event, count, and delete operations.</p>
   <p>Corresponding external PoseFrame3D and PoseFrame2D v1 values can drive up to six declarative rigs. The adapter matches person IDs, expands COCO-17 to BlazePose-33, and uses exact-pinned Kalidokit 1.1.5 as its only rotation solver before sending public selector transforms to A-Frame.</p>
   <p>The deterministic expansion uses reduced-visibility duplicates for unavailable hand, foot, and face landmarks and is less precise than native BlazePose input. Kalidokit is deprecated upstream, so intended GLTF rigs require real-browser validation. This extension provides no custom solver fallback and does not align frames, query history, triangulate, or solve 3D data.</p>
+  <h2>Multi-camera 3D pose fusion</h2>
+  <p>The independent <code>poseFusion3D</code> flag is OFF by default. When enabled, blocks buffer PoseFrame2D JSON per camera in timestamp-ordered ring buffers, resample every camera at one past instant behind a configured delay, and triangulate the synchronized 2D sets into PoseFrame3D version 1 JSON.</p>
+  <p>Out-of-order frames inside the jitter window are reordered, while duplicates, late arrivals, and frames that no loaded calibration profile describes are counted as dropped. Occluded keypoints are filled from the visible side of their bracket, disagreeing views are resolved by the largest consensus set, and a keypoint without two confident views holds its last triangulated position with score zero.</p>
+
+  <h2>Glow stick markers</h2>
+  <p>The independent <code>glowStickMarkers</code> flag is OFF by default. When enabled, the camera app samples the keypoints you name for a uniquely colored glow stick on the same video frame as the pose and reports PoseFrame2D version 2.</p>
+  <p>The fusion app maps those colors to performers with the Performance DSL palette. An identified person keeps the performer's identifier across occlusion and re-entry, views of different performers never merge, and a color seen on the mirrored keypoint tells the fusion that the camera read a back view as a front view, so that view's left and right labels are swapped before triangulation.</p>
 
   <h2>Development</h2>
   <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>

@@ -144,6 +144,50 @@ export const PoseFrame2DSchema = object(
   },
 );
 
+const coco17KeypointId = Type.Union(
+  coco17KeypointIds.map((id) => Type.Literal(id)),
+);
+
+/**
+ * Glow stick observed on the same video frame as the keypoints: a performer
+ * carries a uniquely colored light at a chosen keypoint, which identifies the
+ * performer and resolves the left/right labelling of a person seen from behind.
+ */
+const glowStickMarkers = Type.Array(
+  object({
+    keypointId: coco17KeypointId,
+    colorHex: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
+    coverage: score,
+  }),
+  { maxItems: 4 },
+);
+
+export const PoseFrame2DV2Schema = object(
+  {
+    schema: Type.Literal("twmp/pose-frame-2d"),
+    version: Type.Literal(2),
+    cameraId: identifier,
+    peerId: identifier,
+    sequence: timestampUs,
+    captureTimestampUs: timestampUs,
+    frameWidth: Type.Integer({ minimum: 1, maximum: 16_384 }),
+    frameHeight: Type.Integer({ minimum: 1, maximum: 16_384 }),
+    calibrationId: identifier,
+    persons: Type.Array(
+      object({
+        trackingId: identifier,
+        score,
+        keypoints: keypoints2d,
+        markers: glowStickMarkers,
+      }),
+      { maxItems: 6 },
+    ),
+  },
+  {
+    $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v2.json",
+  },
+);
+
 export const PoseFrame3DSchema = object(
   {
     schema: Type.Literal("twmp/pose-frame-3d"),
@@ -194,12 +238,46 @@ export const PerformanceDslSchema = object(
   },
 );
 
+/**
+ * Every application contract this package owns, dispatched by schema identifier
+ * and then by explicit version. Applications consume these definitions; they are
+ * not mirrored from another repository.
+ */
 export const protocolSchemas = {
-  "twmp/camera-calibration": CameraCalibrationSchema,
-  "twmp/performance-dsl": PerformanceDslSchema,
-  "twmp/pose-frame-2d": PoseFrame2DSchema,
-  "twmp/pose-frame-3d": PoseFrame3DSchema,
-  "twmp/session-policy": SessionPolicySchema,
+  "twmp/camera-calibration": { 1: CameraCalibrationSchema },
+  "twmp/performance-dsl": { 1: PerformanceDslSchema },
+  "twmp/pose-frame-2d": { 1: PoseFrame2DSchema, 2: PoseFrame2DV2Schema },
+  "twmp/pose-frame-3d": { 1: PoseFrame3DSchema },
+  "twmp/session-policy": { 1: SessionPolicySchema },
 } as const;
 
 export type ProtocolSchemaId = keyof typeof protocolSchemas;
+
+/** Published JSON Schema files generated from the definitions above. */
+export const protocolSchemaFiles = {
+  "camera-calibration-v1.json": CameraCalibrationSchema,
+  "performance-dsl-v1.json": PerformanceDslSchema,
+  "pose-frame-2d-v1.json": PoseFrame2DSchema,
+  "pose-frame-2d-v2.json": PoseFrame2DV2Schema,
+  "pose-frame-3d-v1.json": PoseFrame3DSchema,
+  "session-policy-v1.json": SessionPolicySchema,
+} as const;
+
+/** Returns the pinned schema for one contract version, or undefined. */
+export function protocolSchemaFor(
+  schemaId: ProtocolSchemaId,
+  version: unknown,
+): TSchema | undefined {
+  if (typeof version !== "number") return undefined;
+  const versions = protocolSchemas[schemaId] as Record<number, TSchema>;
+  return Object.prototype.hasOwnProperty.call(versions, version)
+    ? versions[version]
+    : undefined;
+}
+
+/** Versions this package accepts for one contract, ascending. */
+export function protocolVersionsFor(schemaId: ProtocolSchemaId): number[] {
+  return Object.keys(protocolSchemas[schemaId])
+    .map(Number)
+    .sort((left, right) => left - right);
+}

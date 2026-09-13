@@ -13,10 +13,13 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - QR Version 40までのlossless SVGを生成し、実行中スプライトに表示します。
 - 終了時に元のskinを復元し、一時skinとpairing情報を破棄します。
 - TensorFlow.js WebGPU限定でMoveNet MultiPose Lightningを実行し、最大6人を追跡します。
-- COCO-17観測を`twmp/pose-frame-2d` version 1 JSONとして取得できます。
-- multiview-poseの5種類のv1 application contractを検証し、JSONをround-tripします。
+- COCO-17観測を`twmp/pose-frame-2d` version 1、サイリウムmarker併用時はversion 2として取得できます。
+- multiview-poseのapplication契約（PoseFrame2D v1／v2を含む）を所有し、検証とround-tripを行います。
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
 - 外部PoseFrame3D v1を最大6人の宣言的A-Frame avatar rigへretargetします。
+- jitterを含むPoseFrame2D streamをcameraごとにbufferingし、過去の同一瞬間で再sampleします。
+- 同期した2D setを三角測量し、`twmp/pose-frame-3d` version 1の3D poseへ統合します。
+- 演者ごとに固有色のサイリウムを読み取り、識別・追跡と背面/腹面の取り違え補正に使います。
 
 ## 要件と安全性
 
@@ -57,6 +60,16 @@ avatar retargetも独立して有効化します。
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {avatarRetargetV1: true};
+多視点3D pose fusionも独立して有効化します。
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
+```
+
+サイリウムmarkerも独立して有効化します。
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {glowStickMarkers: true};
 ```
 
 起動時にTensorFlow.js backendとして`webgpu`を明示選択し、それ以外なら
@@ -143,6 +156,77 @@ PoseFrame3Dは別実装の3D serviceが生成する境界dataです。この機�
 recognition eventへ移すだけで、frame alignment、履歴保存／query、triangulation、3D solveを
 実装しません。Kalidokitは上流でdeprecatedとなっておりBlazePose landmark向けなので、release
 時には対象GLTF rigと実browser動作を検証する必要があります。自前solver fallbackはありません。
+fusion appのpipelineは、各camera peerがWebRTC data channelで送るPoseFrame2D JSONと、
+camera 1台につき1件のCameraCalibration v1 profileを使います。
+
+```text
+load fusion camera calibration [(camera-1のprofile JSON)]
+load fusion camera calibration [(camera-2のprofile JSON)]
+start pose fusion delay [120] ms jitter [80] ms min keypoint score [0.3]
+forever:
+  buffer PoseFrame2D JSON [(data channelで受信したmessage)]
+  fuse PoseFrame3D at buffered delay
+  set [poseJson] to (latest PoseFrame3D JSON)
+stop pose fusion
+```
+
+cameraごとにtimestamp順のring bufferを持ちます。jitter window内で順序が入れ替わって届いた
+frameはtimestamp位置へ挿入します。profile未読み込みのcamera（`unknown-camera`）、profileと
+`calibrationId`や解像度が一致しないframe（`calibration-mismatch`）、timestampの重複、jitter window
+より古い到着、満杯のringより古い到着は、`dropped pose frame count`へ計上してbufferしません。
+各cameraのprofileは、そのcameraのframeが届き始める前に読み込んでください。
+
+`fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayだけ過去の瞬間を
+統合します。delayは最も遅いcameraのjitterを吸収できる値にしてください。その共通の瞬間で
+全cameraを再sampleし、前後のframeで挟めたkeypointは線形補間、片側がocclusionのkeypointは
+見えている側の観測を採用し、前後で挟めないcameraは最大1 jitter window分だけ直近frameを保持
+します。明示した過去の瞬間を統合する場合は`fuse PoseFrame3D at timestamp [] us`を使います。
+
+同期した2D setは2視点のreprojection誤差でcamera間対応付けし、1人が同じcameraから2視点を
+取ることはありません。2台以上のcameraが観測したclusterをkeypointごとに、score重み付けと
+cheirality判定付きで三角測量し、`person-N`のidentityを維持します。視点同士が食い違う場合は、
+reprojection閾値内で1点に一致する最大の視点集合を採用するため、少数の誤検出はkeypointを
+引きずらずに捨てられます。確信のある視点が2つ未満のkeypointは、最後に三角測量できた位置を
+保持しscore `0`を返します。
+
+一時的な不足ではerrorをthrowせず、直前の統合結果も置き換えません。`fuse`は`false`を返し、
+`pose fusion state`は`buffering`、`pose fusion error code`は`empty-buffer`、
+`insufficient-cameras`、`no-fused-person`のいずれかを返します。bufferできないframeも
+`unknown-camera`、`calibration-mismatch`、`frame-dropped`を返すだけでthrowしないため、設定を
+誤ったpeer 1台で実行中のscriptが止まることはありません。不正なJSON、他contractのschema、
+不正なcalibration profileはerrorになります。scriptが走り終わっただけではbufferを破棄せず、
+停止ボタン、project reload、disposeで破棄します。
+
+演者が固有色のサイリウムを持つ場合、camera appはkeypointと同一の映像frameから色をsampleします。
+
+```text
+start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
+sample glow stick colors at [right_wrist,left_wrist]
+forever:
+  infer latest pose frame timestamp [(同期済みtimestamp us)] us
+  set [poseJson] to (latest PoseFrame2D JSON)
+```
+
+sample中は`latest PoseFrame2D JSON`が`twmp/pose-frame-2d` version 2を返します。各人物は最大4件の
+markerを持ち、彩度の高い色を見つけたCOCO-17 keypoint、`#RRGGBB`の色、patch内の占有率を含みます。
+sampleを止めればversion 1に戻ります。色はpose frame内を運ばれるため、fusion app側で別messageとの
+時刻対応付けは不要です。
+
+fusion appは、`glowStickColor`を既に持つperformance DSLで色と演者を対応付け、演者ごとに
+サイリウムを持つkeypointを指定します。
+
+```text
+load glow stick palette from PerformanceDSL [(performance DSLのJSON)]
+set performer [actor-1] glow stick at [right_wrist]
+set performer [actor-2] glow stick at [right_wrist]
+```
+
+paletteは精度に2つの効果があります。色で識別できた人物は`personId`が演者IDになるため、
+occlusion、再入場、tracking ID変化をまたいで同一性が保たれ、別演者の視点同士が統合されることも
+ありません。色が指定keypointの左右反転側で見つかった場合、そのcameraは背面を腹面として読んだ
+ことになるため、三角測量の前にその視点の左右labelを入れ替えます。これにより、手首が体を横切って
+しまうような背面/腹面の取り違えを取り除きます。効果は`identified performer count`と
+`mirror-corrected view count`で確認できます。
 
 ## 開発
 
@@ -159,10 +243,10 @@ unit testではmodel／camera portを注入し、protocol、6人上限、trackin
 backend fail closed、cleanupを検証します。実WebGPU adapterとproduction model downloadは
 test環境では実行しないため、実機browser／GPUで互換性とthroughputを別途検証します。
 
-`schemas/protocol-v1-integrity.json`は上流source commitと5 schemaのcanonical SHA-256を
-固定します。repository checkはruntime TypeBox定義との一致を常時検証し、隣接する
-multiview-pose checkoutまたは`MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`があれば上流作業copyの
-driftも検出します。上流fixtureのcopyはschemaとblock向けcodecの両方でcross-checkします。
+application契約は本packageが所有します。正本は`src/protocol/schemas.ts`で、`pnpm run schemas`が
+`schemas/`配下の配布用JSON Schemaを再生成し、repository checkがTypeBox定義との一致を検証します。
+applicationが本packageに依存する一方向の関係であり、本packageがapplication repositoryから
+契約定義を読むことはありません。fixtureはschemaとblock向けcodecの両方でcross-checkします。
 
 calibrationのproduction backendはexact pinした`@techstark/opencv-js` 4.12.0-release.1だけです。
 最初のsampleまたはsolveでbundle内backendを遅延初期化し、sample要求時だけvideo frameを

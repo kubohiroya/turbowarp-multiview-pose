@@ -18,6 +18,13 @@ import { OpenCvChessboardCalibrationBackend } from "./calibration/opencv-backend
 import type { CalibrationBackendPort } from "./calibration/types.js";
 import { AvatarRetargetController } from "./avatar/controller.js";
 import type { AvatarPoseSolverPort } from "./avatar/types.js";
+import { PoseFusionController } from "./fusion/controller.js";
+import { CanvasGlowStickSampler } from "./markers/canvas-sampler.js";
+import { parseKeypointIds } from "./markers/sampler.js";
+import {
+  DEFAULT_MARKER_SAMPLING_OPTIONS,
+  type MarkerImageSamplerPort,
+} from "./markers/types.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -36,7 +43,9 @@ interface BlockDefinition {
     | "webgpuMoveNetMultiPose"
     | "protocolV1Codec"
     | "cameraCalibrationV1"
-    | "avatarRetargetV1";
+    | "avatarRetargetV1"
+    | "poseFusion3D"
+    | "glowStickMarkers";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -56,6 +65,9 @@ export interface MultiviewPoseExtensionOptions {
   protocolEnabled?: boolean;
   calibrationEnabled?: boolean;
   avatarEnabled?: boolean;
+  fusionEnabled?: boolean;
+  markersEnabled?: boolean;
+  markerSampler?: MarkerImageSamplerPort;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
@@ -72,6 +84,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly protocolEnabled: boolean;
   private readonly calibrationEnabled: boolean;
   private readonly avatarEnabled: boolean;
+  private readonly fusionEnabled: boolean;
+  private readonly markersEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
@@ -79,15 +93,26 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly protocol: ProtocolV1Codec;
   private readonly calibration: CameraCalibrationController;
   private readonly avatar: AvatarRetargetController;
+  private readonly fusion: PoseFusionController;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
   private operation = 0;
-  private readonly stopListener = () => {
+  /**
+   * Runs whenever the thread queue empties, which releases camera leases and
+   * temporary skins but must keep buffered fusion state alive: event-driven
+   * projects buffer frames from hat scripts that finish between messages.
+   */
+  private readonly runStopListener = () => {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
     this.avatar.reset();
+  };
+  /** The stop button and project reload also discard buffered fusion state. */
+  private readonly stopListener = () => {
+    this.runStopListener();
+    this.fusion.stop();
   };
   private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
@@ -104,6 +129,9 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.calibrationEnabled =
       options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
     this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
+    this.fusionEnabled = options.fusionEnabled ?? featureFlags.poseFusion3D;
+    this.markersEnabled =
+      options.markersEnabled ?? featureFlags.glowStickMarkers;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -111,6 +139,9 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.pose = new PosePipelineController({
       runtime: this.runtime,
       model: options.poseModel ?? new TfjsWebGpuMoveNet(),
+      markerSampler:
+        options.markerSampler ??
+        new CanvasGlowStickSampler(DEFAULT_MARKER_SAMPLING_OPTIONS),
     });
     this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
     this.calibration = new CameraCalibrationController({
@@ -125,8 +156,9 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       this.runtime,
       options.avatarPoseSolver,
     );
+    this.fusion = new PoseFusionController();
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
-    this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
+    this.runtime.on?.("PROJECT_RUN_STOP", this.runStopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
     this.runtime.on?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.on?.("targetWasRemoved", this.targetRemovedListener);
@@ -491,13 +523,149 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.avatar.error();
   }
 
+  public startPoseFusion(args: {
+    DELAY_MS: unknown;
+    JITTER_MS: unknown;
+    MIN_SCORE: unknown;
+  }): void {
+    this.requireFusionEnabled();
+    this.fusion.start({
+      delayMilliseconds: Scratch.Cast.toNumber(args.DELAY_MS),
+      jitterMilliseconds: Scratch.Cast.toNumber(args.JITTER_MS),
+      minKeypointScore: Scratch.Cast.toNumber(args.MIN_SCORE),
+    });
+  }
+
+  public stopPoseFusion(): void {
+    this.fusion.stop();
+  }
+
+  public cleanupPoseFusion(): void {
+    this.fusion.cleanup();
+  }
+
+  public loadFusionCameraCalibration(args: { JSON: unknown }): void {
+    this.requireFusionEnabled();
+    this.fusion.loadCalibration(Scratch.Cast.toString(args.JSON));
+  }
+
+  public bufferPoseFrame2D(args: { JSON: unknown }): void {
+    this.requireFusionEnabled();
+    this.fusion.ingestFrame(Scratch.Cast.toString(args.JSON));
+  }
+
+  public fuseBufferedPoseFrame3D(): void {
+    this.requireFusionEnabled();
+    this.fusion.fuseBufferedInstant();
+  }
+
+  public fusePoseFrame3DAt(args: { TIMESTAMP_US: unknown }): void {
+    this.requireFusionEnabled();
+    this.fusion.fuseAt(Scratch.Cast.toNumber(args.TIMESTAMP_US));
+  }
+
+  public latestPoseFrame3D(): string {
+    return this.fusionEnabled ? this.fusion.latestFrameJson() : "";
+  }
+
+  public synchronizedPoseSet2D(): string {
+    return this.fusionEnabled ? this.fusion.synchronizedSampleJson() : "";
+  }
+
+  public poseFusionState(): string {
+    return this.fusionEnabled ? this.fusion.state() : "disabled";
+  }
+
+  public poseFusionReady(): boolean {
+    return this.fusionEnabled && this.fusion.ready();
+  }
+
+  public poseFusionCameraCount(): number {
+    return this.fusion.cameraCount();
+  }
+
+  public poseFusionBufferedFrameCount(): number {
+    return this.fusion.bufferedFrameCount();
+  }
+
+  public poseFusionDroppedFrameCount(): number {
+    return this.fusion.droppedFrameCount();
+  }
+
+  public poseFusionPersonCount(): number {
+    return this.fusion.personCount();
+  }
+
+  public poseFusionTimestampUs(): number {
+    return this.fusion.fusedTimestampUs();
+  }
+
+  public poseFusionReprojectionErrorPx(): number {
+    return this.fusion.meanReprojectionErrorPx();
+  }
+
+  public poseFusionErrorCode(): string {
+    return this.fusion.errorCode();
+  }
+
+  public poseFusionError(): string {
+    return this.fusion.errorMessage();
+  }
+
+  public enableGlowStickMarkers(args: { KEYPOINTS: unknown }): void {
+    this.requireMarkersEnabled();
+    this.requirePoseEnabled();
+    this.pose.enableMarkers(
+      parseKeypointIds(Scratch.Cast.toString(args.KEYPOINTS)),
+    );
+  }
+
+  public disableGlowStickMarkers(): void {
+    this.pose.disableMarkers();
+  }
+
+  public glowStickMarkerCount(): number {
+    return this.markersEnabled ? this.pose.markerCount() : 0;
+  }
+
+  public loadGlowStickPalette(args: { JSON: unknown }): void {
+    this.requireMarkersEnabled();
+    this.requireFusionEnabled();
+    this.fusion.loadPerformanceDsl(Scratch.Cast.toString(args.JSON));
+  }
+
+  public setPerformerGlowStick(args: {
+    PERFORMER_ID: unknown;
+    KEYPOINT: unknown;
+  }): void {
+    this.requireMarkersEnabled();
+    this.requireFusionEnabled();
+    this.fusion.setPerformerKeypoint(
+      Scratch.Cast.toString(args.PERFORMER_ID).trim(),
+      Scratch.Cast.toString(args.KEYPOINT).trim(),
+    );
+  }
+
+  public glowStickPaletteSize(): number {
+    return this.markersEnabled ? this.fusion.paletteSize() : 0;
+  }
+
+  public identifiedPerformerCount(): number {
+    return this.markersEnabled ? this.fusion.identifiedPerformerCount() : 0;
+  }
+
+  public mirrorCorrectedViewCount(): number {
+    return this.markersEnabled ? this.fusion.mirrorCorrectedViewCount() : 0;
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
     this.avatar.reset();
+    this.fusion.stop();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
-    this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
+    this.runtime.off?.("PROJECT_RUN_STOP", this.runStopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
     this.runtime.off?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.off?.("targetWasRemoved", this.targetRemovedListener);
@@ -527,6 +695,22 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     }
   }
 
+  private requireMarkersEnabled(): void {
+    if (!this.markersEnabled) {
+      throw new Error(
+        "Glow stick markers are disabled. Enable them before the project starts.",
+      );
+    }
+  }
+
+  private requireFusionEnabled(): void {
+    if (!this.fusionEnabled) {
+      throw new Error(
+        "Pose fusion 3D is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
   private requireCalibrationEnabled(): void {
     if (!this.calibrationEnabled) {
       throw new Error(
@@ -548,7 +732,9 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
     if (feature === "protocolV1Codec") return this.protocolEnabled;
     if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
-    return this.avatarEnabled;
+    if (feature === "avatarRetargetV1") return this.avatarEnabled;
+    if (feature === "poseFusion3D") return this.fusionEnabled;
+    return this.markersEnabled;
   }
 
   private requireSession(): OfferQrSession {

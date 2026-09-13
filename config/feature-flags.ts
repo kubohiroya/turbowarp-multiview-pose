@@ -4,6 +4,8 @@ export interface MultiviewPoseFeatureFlags {
   readonly protocolV1Codec: boolean;
   readonly cameraCalibrationV1: boolean;
   readonly avatarRetargetV1: boolean;
+  readonly poseFusion3D: boolean;
+  readonly glowStickMarkers: boolean;
 }
 
 interface FeatureFlagGlobal {
@@ -19,4 +21,6 @@ export const featureFlags: MultiviewPoseFeatureFlags = Object.freeze({
   protocolV1Codec: overrides?.protocolV1Codec === true,
   cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
   avatarRetargetV1: overrides?.avatarRetargetV1 === true,
+  poseFusion3D: overrides?.poseFusion3D === true,
+  glowStickMarkers: overrides?.glowStickMarkers === true,
 });
