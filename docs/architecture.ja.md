@@ -49,3 +49,19 @@ chunkごとに4096文字までです。
 表示はrenderer上だけの一時SVG skinです。現在のdrawable skinを保持し、VM costumeを追加せず
 QR skinへ切り替えます。明示終了、project停止、extension dispose、表示target削除で元skinを
 復元し、一時resourceとQR dataを破棄します。
+
+## WebGPU MoveNet MultiPoseの縦切り
+
+`webgpuMoveNetMultiPose`は独立した起動時固定・既定OFF flagです。TensorFlow.jsではWebGPU
+backendだけをimportし、`setBackend("webgpu")`の結果を検証してから、trackingとbounding-box
+trackerを有効にした`MULTIPOSE_LIGHTNING`を生成します。backendがWebGPU以外ならfail closedし、
+CPU／WASM／WebGL推論fallbackは行いません。
+
+controllerはCamera Sourceから`{cameraId: "pose"}`のleaseを取得し、media captureを所有しません。
+同時に呼ばれた推論blockは1つのPromiseを共有するため、detector実行は重ならず、古いframe要求を
+蓄積しません。成功時は最新video frameから最大6人を推定し、model tracking IDと17個すべての
+名前付きCOCO keypointを必須として、`twmp/pose-frame-2d` version 1へserializeします。
+
+停止時は実行中の初期化／推論を待ち、detectorをdisposeし、camera leaseと最新frameを解放します。
+TensorFlow.js backendはprocess全体で共有されるためresetせず、本機能が所有するmodel resourceは
+detectorのdisposeで解放します。

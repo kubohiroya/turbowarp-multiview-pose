@@ -12,11 +12,15 @@ as a temporary sprite skin.
 - Splits the unchanged pairing code into independently decodable QR courier envelopes.
 - Generates lossless QR SVGs through Version 40 and displays them on a sprite.
 - Restores the sprite's original skin and discards sensitive temporary data on cleanup.
+- Runs MoveNet MultiPose Lightning for up to six tracked people through TensorFlow.js WebGPU only.
+- Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
 
 ## Requirements and safety
 
 - TurboWarp with custom unsandboxed extensions enabled.
 - `@kubohiroya/turbowarp-webrtc` with runtime capability v2, loaded first.
+- `@kubohiroya/turbowarp-camera-source` 0.4 or later, loaded before pose startup.
+- A browser and GPU combination supported by TensorFlow.js WebGPU.
 - The startup-fixed `qrCourierPairing` feature flag is OFF by default.
 
 Set the flag before loading the extension:
@@ -25,6 +29,18 @@ Set the flag before loading the extension:
 globalThis.__TWMP_FEATURE_FLAGS__ = {qrCourierPairing: true};
 globalThis.__TWMP_QR_CONFIG__ = {errorCorrectionLevel: "M"}; // L, M, Q, or H
 ```
+
+Enable pose inference independently when needed:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {webgpuMoveNetMultiPose: true};
+```
+
+Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
+backend. There is no CPU, WASM, or WebGL inference fallback. The extension never calls
+`getUserMedia()`; it obtains the named `pose` stream through Camera Source's `acquireCamera()` API.
+The first model load normally fetches MoveNet MultiPose Lightning from TensorFlow Hub, so cache the
+model before taking a venue LAN offline.
 
 Pairing codes can contain LAN addresses, ICE credentials, and DTLS fingerprints. Show QR codes only
 in a trusted venue, do not retain screenshots, and call the cleanup block after pairing. This
@@ -49,6 +65,19 @@ end offer QR display
 ```
 
 Part indices exposed to blocks are one-based. The wire envelope uses zero-based `partIndex`.
+
+The pose vertical slice is:
+
+```text
+start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
+forever:
+  infer latest pose frame
+  set [poseJson] to (latest PoseFrame2D JSON)
+stop WebGPU MoveNet MultiPose
+```
+
+Concurrent inference requests share one in-flight operation. Calls do not build a frame backlog;
+the next call after completion reads the latest frame from the shared Camera Source video.
 
 ## Block reference
 
@@ -140,6 +169,90 @@ Returns the latest QR pairing error message.
 | Type | Reporter |
 | Opcode | `offerQrError` |
 
+### `start WebGPU MoveNet MultiPose camera [CAMERA_ID] peer [PEER_ID] calibration [CALIBRATION_ID]`
+
+Loads MoveNet MultiPose Lightning on WebGPU and leases a named Camera Source camera.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `startWebGpuMoveNetMultiPose` |
+| `CAMERA_ID` | String, default: `pose` |
+| `PEER_ID` | String, default: `source-1` |
+| `CALIBRATION_ID` | String, default: `uncalibrated` |
+
+### `stop WebGPU MoveNet MultiPose`
+
+Stops inference and releases the detector and camera lease.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `stopWebGpuMoveNetMultiPose` |
+
+### `infer latest pose frame`
+
+Runs at most one inference and coalesces concurrent requests into that latest-frame operation.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `inferNextPoseFrame` |
+
+### `WebGPU MoveNet ready?`
+
+Reports whether the WebGPU detector and Camera Source lease are ready.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `webGpuMoveNetReady` |
+
+### `pose backend`
+
+Returns the selected TensorFlow.js backend; successful startup always reports webgpu.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseBackend` |
+
+### `pose pipeline state`
+
+Returns the current WebGPU MoveNet pipeline lifecycle state.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `posePipelineState` |
+
+### `pose error code`
+
+Returns a stable code distinguishing WebGPU, model, camera, inference, and output errors.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseErrorCode` |
+
+### `pose error`
+
+Returns the latest detailed pose pipeline error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `poseError` |
+
+### `latest PoseFrame2D JSON`
+
+Returns the latest protocol-v1 COCO-17 pose frame as JSON, or an empty string before inference.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `latestPoseFrame2D` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -151,6 +264,10 @@ Returns the latest QR pairing error message.
 | Project stop or disposal | Original skins are restored and temporary skins/session strings are discarded. |
 | Stage or clone target | The display command fails explicitly; the initial release supports original sprites only. |
 | Missing capability v2 | Offer preparation fails before accessing any unversioned extension internals. |
+| Pose feature flag OFF | Pose blocks are hidden; QR and manual pairing remain independent. |
+| Non-WebGPU backend | Startup fails with `webgpu-unavailable`; no fallback is attempted. |
+| Camera or model failure | `pose error code` distinguishes startup, ended-camera, inference, and invalid-output failures. |
+| Pose stop/reload/disposal | In-flight work settles, then the detector and named camera lease are released. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.
@@ -177,11 +294,18 @@ The jsQR integration test rasterizes every generated part, decodes it with the s
 by `turbowarp-jsqr`, shuffles the decoded texts, introduces a duplicate, and verifies exact
 reassembly.
 
+Unit tests inject the model and camera ports, verify the protocol payload, six-person limit,
+tracking IDs, non-overlap behavior, fail-closed backend checks, and cleanup. They do not execute a
+real WebGPU adapter or download the production model; browser/GPU compatibility and throughput
+must be verified separately on deployment hardware.
+
 ## Rollback
 
 Set `qrCourierPairing` to `false` before extension startup, stop the project to release temporary
 skins, and use TurboWarp WebRTC's manual offer/answer copy-and-paste blocks. QR transport does not
 change the WebRTC pairing code or protocol.
+To roll back pose inference only, set `webgpuMoveNetMultiPose` to `false` before startup and reload
+the project. Camera preview and pairing blocks remain independently available.
 
 ## License
 

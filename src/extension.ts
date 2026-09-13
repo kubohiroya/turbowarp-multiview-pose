@@ -9,6 +9,9 @@ import {
 import { createQrSvg } from "./qr-svg.js";
 import { TemporarySpriteSkinManager } from "./sprite-skin.js";
 import { requireWebRtcOfferCapability } from "./webrtc-capability.js";
+import { PosePipelineController } from "./pose/controller.js";
+import { TfjsWebGpuMoveNet } from "./pose/tfjs-movenet.js";
+import type { PoseModelPort } from "./pose/types.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -22,6 +25,7 @@ interface DefinitionArgument {
 
 interface BlockDefinition {
   opcode: string;
+  feature: "qrCourierPairing" | "webgpuMoveNetMultiPose";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -37,22 +41,32 @@ interface OfferQrSession {
 
 export interface MultiviewPoseExtensionOptions {
   enabled?: boolean;
+  poseEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
+  poseModel?: PoseModelPort;
+  nowMilliseconds?: () => number;
+  clockId?: string;
 }
 
 const blockDefinitions = definitions.blocks as readonly BlockDefinition[];
 
 export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly enabled: boolean;
+  private readonly poseEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
+  private readonly pose: PosePipelineController;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
   private operation = 0;
-  private readonly stopListener = () => this.endOfferQrDisplay();
+  private readonly stopListener = () => {
+    this.endOfferQrDisplay();
+    void this.pose.stop();
+  };
+  private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
     if (isTarget(target) && this.skins.isDisplaying(target))
       this.endOfferQrDisplay();
@@ -60,12 +74,24 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
 
   public constructor(options: MultiviewPoseExtensionOptions = {}) {
     this.enabled = options.enabled ?? featureFlags.qrCourierPairing;
+    this.poseEnabled =
+      options.poseEnabled ?? featureFlags.webgpuMoveNetMultiPose;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
     this.skins = new TemporarySpriteSkinManager(this.runtime);
+    this.pose = new PosePipelineController({
+      runtime: this.runtime,
+      model: options.poseModel ?? new TfjsWebGpuMoveNet(),
+      ...(options.nowMilliseconds
+        ? { nowMilliseconds: options.nowMilliseconds }
+        : {}),
+      ...(options.clockId ? { clockId: options.clockId } : {}),
+    });
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
+    this.runtime.on?.("PROJECT_LOADED", this.stopListener);
+    this.runtime.on?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.on?.("targetWasRemoved", this.targetRemovedListener);
   }
 
@@ -75,9 +101,9 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       name: Scratch.translate(definitions.extensionName),
       docsURI: extensionConfig.docsURI,
       blockIconURI: extensionConfig.blockIconURI,
-      blocks: this.enabled
-        ? blockDefinitions.map((block) => this.toScratchBlock(block))
-        : [],
+      blocks: blockDefinitions
+        .filter((block) => this.blockEnabled(block.feature))
+        .map((block) => this.toScratchBlock(block)),
     };
   }
 
@@ -192,10 +218,59 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.lastError;
   }
 
+  public async startWebGpuMoveNetMultiPose(args: {
+    CAMERA_ID: unknown;
+    PEER_ID: unknown;
+    CALIBRATION_ID: unknown;
+  }): Promise<void> {
+    this.requirePoseEnabled();
+    await this.pose.start({
+      cameraId: Scratch.Cast.toString(args.CAMERA_ID).trim(),
+      peerId: Scratch.Cast.toString(args.PEER_ID).trim(),
+      calibrationId: Scratch.Cast.toString(args.CALIBRATION_ID).trim(),
+    });
+  }
+
+  public async stopWebGpuMoveNetMultiPose(): Promise<void> {
+    await this.pose.stop();
+  }
+
+  public async inferNextPoseFrame(): Promise<void> {
+    this.requirePoseEnabled();
+    await this.pose.inferLatestFrame();
+  }
+
+  public webGpuMoveNetReady(): boolean {
+    return this.poseEnabled && this.pose.ready();
+  }
+
+  public poseBackend(): string {
+    return this.poseEnabled ? this.pose.backend() : "disabled";
+  }
+
+  public posePipelineState(): string {
+    return this.poseEnabled ? this.pose.state() : "disabled";
+  }
+
+  public poseErrorCode(): string {
+    return this.pose.errorCode();
+  }
+
+  public poseError(): string {
+    return this.pose.errorMessage();
+  }
+
+  public latestPoseFrame2D(): string {
+    return this.pose.latestFrameJson();
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
+    void this.pose.stop();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
+    this.runtime.off?.("PROJECT_LOADED", this.stopListener);
+    this.runtime.off?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.off?.("targetWasRemoved", this.targetRemovedListener);
   }
 
@@ -205,6 +280,18 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
         "QR courier pairing is disabled. Enable it before the project starts.",
       );
     }
+  }
+
+  private requirePoseEnabled(): void {
+    if (!this.poseEnabled) {
+      throw new Error(
+        "WebGPU MoveNet MultiPose is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
+  private blockEnabled(feature: BlockDefinition["feature"]): boolean {
+    return feature === "qrCourierPairing" ? this.enabled : this.poseEnabled;
   }
 
   private requireSession(): OfferQrSession {

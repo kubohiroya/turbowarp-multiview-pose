@@ -3,6 +3,7 @@
   "blocks": [
     {
       "opcode": "prepareOfferQr",
+      "feature": "qrCourierPairing",
       "blockType": "COMMAND",
       "text": "prepare offer QR for peer [PEER]",
       "description": "Creates a WebRTC offer and prepares one or more QR courier parts.",
@@ -10,6 +11,7 @@
     },
     {
       "opcode": "showOfferQrPart",
+      "feature": "qrCourierPairing",
       "blockType": "COMMAND",
       "text": "show offer QR part [INDEX] on this sprite",
       "description": "Shows the selected one-based offer QR part using a temporary sprite skin.",
@@ -17,6 +19,7 @@
     },
     {
       "opcode": "offerQrPartCount",
+      "feature": "qrCourierPairing",
       "blockType": "REPORTER",
       "text": "offer QR part count",
       "description": "Returns the number of prepared offer QR parts, or zero when none is prepared.",
@@ -24,6 +27,7 @@
     },
     {
       "opcode": "offerQrCurrentPart",
+      "feature": "qrCourierPairing",
       "blockType": "REPORTER",
       "text": "current offer QR part",
       "description": "Returns the one-based part currently selected for display, or zero when none is prepared.",
@@ -31,6 +35,7 @@
     },
     {
       "opcode": "showNextOfferQrPart",
+      "feature": "qrCourierPairing",
       "blockType": "COMMAND",
       "text": "show next offer QR part on this sprite",
       "description": "Shows the next part and wraps from the last part to the first.",
@@ -38,6 +43,7 @@
     },
     {
       "opcode": "createAndShowOfferQr",
+      "feature": "qrCourierPairing",
       "blockType": "COMMAND",
       "text": "show offer QR for peer [PEER] on this sprite",
       "description": "Creates an offer and shows its first QR courier part on this sprite.",
@@ -45,6 +51,7 @@
     },
     {
       "opcode": "endOfferQrDisplay",
+      "feature": "qrCourierPairing",
       "blockType": "COMMAND",
       "text": "end offer QR display",
       "description": "Restores original sprite skins and discards all temporary offer QR data.",
@@ -52,6 +59,7 @@
     },
     {
       "opcode": "offerQrState",
+      "feature": "qrCourierPairing",
       "blockType": "REPORTER",
       "text": "offer QR state",
       "description": "Returns idle, generating-offer, rendering, displayed, or error.",
@@ -59,9 +67,86 @@
     },
     {
       "opcode": "offerQrError",
+      "feature": "qrCourierPairing",
       "blockType": "REPORTER",
       "text": "offer QR error",
       "description": "Returns the latest QR pairing error message.",
+      "arguments": {}
+    },
+    {
+      "opcode": "startWebGpuMoveNetMultiPose",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "COMMAND",
+      "text": "start WebGPU MoveNet MultiPose camera [CAMERA_ID] peer [PEER_ID] calibration [CALIBRATION_ID]",
+      "description": "Loads MoveNet MultiPose Lightning on WebGPU and leases a named Camera Source camera.",
+      "arguments": {
+        "CAMERA_ID": { "type": "STRING", "defaultValue": "pose" },
+        "PEER_ID": { "type": "STRING", "defaultValue": "source-1" },
+        "CALIBRATION_ID": { "type": "STRING", "defaultValue": "uncalibrated" }
+      }
+    },
+    {
+      "opcode": "stopWebGpuMoveNetMultiPose",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "COMMAND",
+      "text": "stop WebGPU MoveNet MultiPose",
+      "description": "Stops inference and releases the detector and camera lease.",
+      "arguments": {}
+    },
+    {
+      "opcode": "inferNextPoseFrame",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "COMMAND",
+      "text": "infer latest pose frame",
+      "description": "Runs at most one inference and coalesces concurrent requests into that latest-frame operation.",
+      "arguments": {}
+    },
+    {
+      "opcode": "webGpuMoveNetReady",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "BOOLEAN",
+      "text": "WebGPU MoveNet ready?",
+      "description": "Reports whether the WebGPU detector and Camera Source lease are ready.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseBackend",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "REPORTER",
+      "text": "pose backend",
+      "description": "Returns the selected TensorFlow.js backend; successful startup always reports webgpu.",
+      "arguments": {}
+    },
+    {
+      "opcode": "posePipelineState",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "REPORTER",
+      "text": "pose pipeline state",
+      "description": "Returns the current WebGPU MoveNet pipeline lifecycle state.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseErrorCode",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "REPORTER",
+      "text": "pose error code",
+      "description": "Returns a stable code distinguishing WebGPU, model, camera, inference, and output errors.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseError",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "REPORTER",
+      "text": "pose error",
+      "description": "Returns the latest detailed pose pipeline error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "latestPoseFrame2D",
+      "feature": "webgpuMoveNetMultiPose",
+      "blockType": "REPORTER",
+      "text": "latest PoseFrame2D JSON",
+      "description": "Returns the latest protocol-v1 COCO-17 pose frame as JSON, or an empty string before inference.",
       "arguments": {}
     }
   ]

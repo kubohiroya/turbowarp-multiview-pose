@@ -25,6 +25,9 @@
   <h2>Enablement and safety</h2>
   <p>The startup-fixed <code>qrCourierPairing</code> flag is OFF by default. The extension requires the version 2 TurboWarp WebRTC runtime capability and must run unsandboxed.</p>
   <p>Pairing QR codes can expose local addressing and ICE credentials. Display them only inside a trusted venue and remove courier photographs after pairing.</p>
+  <h2>WebGPU MoveNet MultiPose</h2>
+  <p>The independent <code>webgpuMoveNetMultiPose</code> flag is OFF by default. When enabled, the extension leases frames from TurboWarp Camera Source, explicitly requires the TensorFlow.js <code>webgpu</code> backend, and returns up to six tracked COCO-17 poses as PoseFrame2D version 1 JSON.</p>
+  <p>No CPU, WASM, or WebGL inference fallback is provided. The first model load generally requires network access; prepare the browser cache before an offline venue run.</p>
 
   <h2>Development</h2>
   <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>

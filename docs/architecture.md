@@ -59,3 +59,21 @@ Display uses renderer-only SVG skins. The current drawable skin is retained, a g
 attached without creating a VM costume, and cleanup restores the retained skin before destroying
 the temporary resource. Project stop, extension disposal, explicit cleanup, and displayed-target
 removal all release sensitive QR data.
+
+## WebGPU MoveNet MultiPose vertical slice
+
+`webgpuMoveNetMultiPose` is an independent startup-fixed, default-OFF flag. Startup imports only the
+TensorFlow.js WebGPU backend, explicitly calls `setBackend("webgpu")`, verifies the selected backend,
+and then creates `MoveNet` with `MULTIPOSE_LIGHTNING`, tracking enabled, and bounding-box tracking.
+Any non-WebGPU result fails closed; there is no CPU, WASM, or WebGL inference fallback.
+
+The controller acquires `{cameraId: "pose"}` through Camera Source and never owns media capture.
+Concurrent inference block calls share one promise, so detector invocations do not overlap and old
+frame requests do not accumulate. Each successful call reads the latest video frame, requests no
+more than six poses, requires model tracking IDs and all 17 named COCO keypoints, and serializes the
+result to the `twmp/pose-frame-2d` version 1 contract.
+
+Stopping waits for in-flight initialization/inference, disposes the detector, releases the camera
+lease, and clears the last frame. The TensorFlow.js backend is process-global and is not reset,
+because doing so would invalidate resources owned by other extensions; disposing the detector
+releases this feature's model resources.

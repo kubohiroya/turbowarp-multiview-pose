@@ -18,6 +18,16 @@
       "arguments": []
     },
     {
+      "opcode": "inferNextPoseFrame",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "latestPoseFrame2D",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
       "opcode": "offerQrCurrentPart",
       "blockType": "REPORTER",
       "arguments": []
@@ -34,6 +44,26 @@
     },
     {
       "opcode": "offerQrState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseBackend",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseErrorCode",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "posePipelineState",
       "blockType": "REPORTER",
       "arguments": []
     },
@@ -61,6 +91,34 @@
           "type": "NUMBER"
         }
       ]
+    },
+    {
+      "opcode": "startWebGpuMoveNetMultiPose",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "CALIBRATION_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "PEER_ID",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "stopWebGpuMoveNetMultiPose",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "webGpuMoveNetReady",
+      "blockType": "BOOLEAN",
+      "arguments": []
     }
   ],
   "menus": []

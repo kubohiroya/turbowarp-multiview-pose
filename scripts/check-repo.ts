@@ -62,12 +62,15 @@ const readme = await readFile(policy.canonicalReadme, "utf8");
 const readmeJa = await readFile(policy.localizedReadmes.ja, "utf8");
 const license = await readFile("LICENSE", "utf8");
 const config = await readFile("src/config.ts", "utf8");
+const poseAdapter = await readFile("src/pose/tfjs-movenet.ts", "utf8");
+const poseController = await readFile("src/pose/controller.ts", "utf8");
 
 checkPolicy();
 checkPackageMetadata();
 checkReadmes();
 checkLicense();
 checkGeneratedArtifacts();
+checkPosePolicy();
 await checkPackContents();
 
 if (errors.length > 0) {
@@ -207,6 +210,45 @@ function checkGeneratedArtifacts() {
     errors.push("package.json files must include dist/");
   if (!readme.includes(expectedBundle))
     errors.push(`README.md must document ${expectedBundle}`);
+}
+
+function checkPosePolicy() {
+  const exactDependencies = {
+    "@tensorflow-models/pose-detection": "2.1.3",
+    "@tensorflow/tfjs-backend-webgpu": "4.22.0",
+    "@tensorflow/tfjs-converter": "4.22.0",
+    "@tensorflow/tfjs-core": "4.22.0",
+  };
+  for (const [name, version] of Object.entries(exactDependencies)) {
+    if (packageMetadata.dependencies?.[name] !== version) {
+      errors.push(`package.json must pin ${name} exactly to ${version}`);
+    }
+  }
+  if (!poseAdapter.includes('setBackend("webgpu")')) {
+    errors.push("MoveNet adapter must explicitly select the webgpu backend");
+  }
+  for (const required of [
+    "MULTIPOSE_LIGHTNING",
+    "enableTracking: true",
+    "TrackerType.BoundingBox",
+  ]) {
+    if (!poseAdapter.includes(required)) {
+      errors.push(`MoveNet adapter must configure ${required}`);
+    }
+  }
+  if (/tfjs-backend-(?:cpu|wasm|webgl)/u.test(poseAdapter)) {
+    errors.push(
+      "MoveNet adapter must not import CPU, WASM, or WebGL fallback backends",
+    );
+  }
+  if (
+    poseAdapter.includes("getUserMedia(") ||
+    poseController.includes("getUserMedia(")
+  ) {
+    errors.push(
+      "MoveNet pipeline must acquire frames only through Camera Source",
+    );
+  }
 }
 
 async function checkPackContents() {

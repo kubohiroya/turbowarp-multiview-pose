@@ -72,6 +72,40 @@ function setup(code = "offer-code") {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MultiviewPoseExtension offer QR blocks", () => {
+  it("keeps the QR and pose feature flags independent", () => {
+    setup();
+    const poseModel = {
+      initializeWebGpu: vi.fn(async () => undefined),
+      backend: vi.fn(() => "webgpu"),
+      createMultiPoseDetector: vi.fn(async () => ({
+        estimatePoses: vi.fn(async () => []),
+        dispose: vi.fn(),
+      })),
+    };
+    const qrOnly = new MultiviewPoseExtension({
+      enabled: true,
+      poseEnabled: false,
+    });
+    const qrOpcodes = (
+      qrOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(qrOpcodes).toContain("prepareOfferQr");
+    expect(qrOpcodes).not.toContain("startWebGpuMoveNetMultiPose");
+
+    const poseOnly = new MultiviewPoseExtension({
+      enabled: false,
+      poseEnabled: true,
+      poseModel,
+      clockId: "clock-1",
+    });
+    const poseOpcodes = (
+      poseOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(poseOpcodes).not.toContain("prepareOfferQr");
+    expect(poseOpcodes).toContain("startWebGpuMoveNetMultiPose");
+    expect(poseOpcodes).toContain("latestPoseFrame2D");
+  });
+
   it("keeps QR courier blocks hidden while the startup flag is off", async () => {
     setup();
     const extension = new MultiviewPoseExtension({ enabled: false });
@@ -161,6 +195,56 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(renderer.updates.at(-1)).toEqual([7, 42]);
     expect(extension.offerQrPartCount()).toBe(0);
     expect(extension.offerQrState()).toBe("idle");
+  });
+
+  it("releases pose resources when the project reloads and the extension is disposed", async () => {
+    const { runtime, listeners } = setup();
+    const release = vi.fn(async () => undefined);
+    const dispose = vi.fn();
+    runtime.ext_kubohiroyacamerasource = {
+      acquireCamera: vi.fn(async () => ({
+        getFrameSource: vi.fn(() => ({
+          kind: "video" as const,
+          element: {} as HTMLVideoElement,
+          width: 640,
+          height: 480,
+          mirrored: false,
+          deviceId: "device-1",
+        })),
+        release,
+      })),
+    };
+    const poseModel = {
+      initializeWebGpu: vi.fn(async () => undefined),
+      backend: vi.fn(() => "webgpu"),
+      createMultiPoseDetector: vi.fn(async () => ({
+        estimatePoses: vi.fn(async () => []),
+        dispose,
+      })),
+    };
+    const extension = new MultiviewPoseExtension({
+      runtime,
+      poseEnabled: true,
+      poseModel,
+      clockId: "clock-1",
+    });
+    await extension.startWebGpuMoveNetMultiPose({
+      CAMERA_ID: "pose",
+      PEER_ID: "source-1",
+      CALIBRATION_ID: "calibration-1",
+    });
+    listeners.get("PROJECT_LOADED")?.();
+    await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+    expect(dispose).toHaveBeenCalledOnce();
+
+    await extension.startWebGpuMoveNetMultiPose({
+      CAMERA_ID: "pose",
+      PEER_ID: "source-1",
+      CALIBRATION_ID: "calibration-1",
+    });
+    listeners.get("RUNTIME_DISPOSED")?.();
+    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(2));
+    expect(dispose).toHaveBeenCalledTimes(2);
   });
 
   it("cleans the old skin on re-prepare and when the displayed target is removed", async () => {
