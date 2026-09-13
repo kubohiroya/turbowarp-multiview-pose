@@ -90,7 +90,7 @@ extension neither uploads nor stores the QR image as a project costume.
 Load `dist/turbowarp-multiview-pose.js` as an unsandboxed custom extension. A version-pinned package URL is:
 
 ```text
-https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.1.0/dist/turbowarp-multiview-pose.js
+https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.2.0/dist/turbowarp-multiview-pose.js
 ```
 
 ## Quick start
