@@ -359,6 +359,162 @@
       "text": "CameraCalibration v1 JSON",
       "description": "Exports the last validated exact v1 profile, or an empty string when none exists.",
       "arguments": {}
+    },
+    {
+      "opcode": "startPoseFusion",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "start pose fusion delay [DELAY_MS] ms jitter [JITTER_MS] ms min keypoint score [MIN_SCORE]",
+      "description": "Starts the multi-camera jitter buffer that fuses one past instant behind the newest frame.",
+      "arguments": {
+        "DELAY_MS": { "type": "NUMBER", "defaultValue": 120 },
+        "JITTER_MS": { "type": "NUMBER", "defaultValue": 80 },
+        "MIN_SCORE": { "type": "NUMBER", "defaultValue": 0.3 }
+      }
+    },
+    {
+      "opcode": "stopPoseFusion",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "stop pose fusion",
+      "description": "Clears every buffered frame and fused result while keeping loaded calibration profiles.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cleanupPoseFusion",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "cleanup pose fusion",
+      "description": "Clears buffered frames, fused results, and every loaded fusion calibration profile.",
+      "arguments": {}
+    },
+    {
+      "opcode": "loadFusionCameraCalibration",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "load fusion camera calibration [JSON]",
+      "description": "Loads one CameraCalibration v1 profile and derives its world-to-camera projection.",
+      "arguments": { "JSON": { "type": "STRING", "defaultValue": "{}" } }
+    },
+    {
+      "opcode": "bufferPoseFrame2D",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "buffer PoseFrame2D JSON [JSON]",
+      "description": "Validates one PoseFrame2D v1 and inserts it into its camera ring buffer in timestamp order.",
+      "arguments": { "JSON": { "type": "STRING", "defaultValue": "{}" } }
+    },
+    {
+      "opcode": "fuseBufferedPoseFrame3D",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "fuse PoseFrame3D at buffered delay",
+      "description": "Fuses the instant one configured delay behind the newest buffered timestamp.",
+      "arguments": {}
+    },
+    {
+      "opcode": "fusePoseFrame3DAt",
+      "feature": "poseFusion3D",
+      "blockType": "COMMAND",
+      "text": "fuse PoseFrame3D at timestamp [TIMESTAMP_US] us",
+      "description": "Fuses one explicit past instant expressed in the synchronized microsecond time base.",
+      "arguments": { "TIMESTAMP_US": { "type": "NUMBER", "defaultValue": 0 } }
+    },
+    {
+      "opcode": "latestPoseFrame3D",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "latest PoseFrame3D JSON",
+      "description": "Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.",
+      "arguments": {}
+    },
+    {
+      "opcode": "synchronizedPoseSet2D",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "synchronized 2D pose set JSON",
+      "description": "Returns the last resampled per-camera 2D keypoint set used for triangulation.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionState",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "pose fusion state",
+      "description": "Returns idle, buffering, fusing, ready, or error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionReady",
+      "feature": "poseFusion3D",
+      "blockType": "BOOLEAN",
+      "text": "pose fusion ready?",
+      "description": "Returns true when fusion is started and at least two cameras are calibrated.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionCameraCount",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "fusion calibrated camera count",
+      "description": "Returns how many camera calibration profiles are loaded for fusion.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionBufferedFrameCount",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "buffered pose frame count",
+      "description": "Returns how many PoseFrame2D frames are currently retained across all ring buffers.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionDroppedFrameCount",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "dropped pose frame count",
+      "description": "Returns how many frames were rejected as duplicates or as arrivals past the jitter window.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionPersonCount",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "fused person count",
+      "description": "Returns how many people the last successful fusion produced.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionTimestampUs",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "fused timestamp us",
+      "description": "Returns the synchronized timestamp of the last successful fusion in microseconds.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionReprojectionErrorPx",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "fused mean reprojection error px",
+      "description": "Returns the mean reprojection error of the last successful fusion in pixels.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionErrorCode",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "pose fusion error code",
+      "description": "Returns the latest fusion error code, or an empty string.",
+      "arguments": {}
+    },
+    {
+      "opcode": "poseFusionError",
+      "feature": "poseFusion3D",
+      "blockType": "REPORTER",
+      "text": "pose fusion error",
+      "description": "Returns the latest fusion error message.",
+      "arguments": {}
     }
   ]
 }
