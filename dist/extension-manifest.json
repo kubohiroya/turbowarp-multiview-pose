@@ -68,6 +68,16 @@
       ]
     },
     {
+      "opcode": "calibrateFrameSyncDecoder",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "SECONDS",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
       "opcode": "cameraCalibrationBackend",
       "blockType": "REPORTER",
       "arguments": []
@@ -169,6 +179,56 @@
     },
     {
       "opcode": "endOfferQrDisplay",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncDecodeRate",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncDecoderError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncDecoderState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncFrameAgeUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncFrameTimestampUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncObservationAvailable",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncPatternShown",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncPatternTimestampUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "frameSyncPatternWrapUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "hideFrameSyncPattern",
       "blockType": "COMMAND",
       "arguments": []
     },
@@ -301,6 +361,11 @@
       "arguments": []
     },
     {
+      "opcode": "showFrameSyncPattern",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "showNextOfferQrPart",
       "blockType": "COMMAND",
       "arguments": []
@@ -351,6 +416,20 @@
       ]
     },
     {
+      "opcode": "startFrameSyncDecoder",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "SECONDS",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
       "opcode": "startWebGpuMoveNetMultiPose",
       "blockType": "COMMAND",
       "arguments": [
@@ -369,7 +448,17 @@
       ]
     },
     {
+      "opcode": "stopFrameSyncDecoder",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "stopWebGpuMoveNetMultiPose",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "takeFrameSyncObservation",
       "blockType": "COMMAND",
       "arguments": []
     },

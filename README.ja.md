@@ -18,11 +18,14 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
 - 外部PoseFrame3D v1を最大6人の宣言的A-Frame avatar rigへretargetします。
 
+- 時刻を符号化したパターンを表示し、カメラごとに復号してフレーム記録の遅延を計測します。
+
 ## 要件と安全性
 
 - unsandboxed custom extensionを利用できるTurboWarp
 - 先に読み込まれた、runtime capability v2対応の`@kubohiroya/turbowarp-webrtc` 0.3.0
 - 姿勢推定より先に読み込まれた`@kubohiroya/turbowarp-camera-source` 0.5.0
+- フレーム同期の復号にはCamera SourceとWebRTCの同期時刻reporterが必要
 - TensorFlow.js WebGPUに対応するbrowser／GPU
 - avatar利用時は先に読み込んだscene capability v1対応`turbowarp-aframe` 0.3.0
 - 起動前に明示的に有効化する`qrCourierPairing` feature flag（既定OFF）
@@ -143,6 +146,35 @@ PoseFrame3Dは別実装の3D serviceが生成する境界dataです。この機�
 recognition eventへ移すだけで、frame alignment、履歴保存／query、triangulation、3D solveを
 実装しません。Kalidokitは上流でdeprecatedとなっておりBlazePose landmark向けなので、release
 時には対象GLTF rigと実browser動作を検証する必要があります。自前solver fallbackはありません。
+
+フレーム同期の縦スライスは、投影されたパターンに対して各カメラPCがどれだけ遅れてフレームを記録し終えるかを計測します。
+
+```text
+（プロジェクタを出す側のPC）
+show frame sync pattern
+
+（各カメラPC）
+start frame sync decoder for camera [camera-1] calibrating for [6] seconds
+repeat until <計測時間が終わるまで>:
+  if <frame sync observation available?> then
+    take next frame sync observation
+    record frame sync sample for camera [camera-1]
+      capture (frame sync frame timestamp us) pattern (frame sync pattern timestamp us)
+      wrap (frame sync pattern wrap us) from peer [fusion]
+send frame sync report for camera [camera-1] to peer [fusion]
+stop frame sync decoder
+```
+
+パターンは4×4のセルです。12セルが4096msで一周するミリ秒カウンタを、4セルがチェックビットを持ちます。
+露光が画面のリフレッシュをまたいだ読み取りは、誤った時刻として報告される代わりに捨てられます。
+キャリブレーションは時間方向に変化する画素からパネル位置を求め、各セルの明暗レベルを学習し、
+信用できない数値を出す代わりに `panel-not-found`、`low-contrast`、`decode-unstable` で失敗します。
+
+`frame sync frame timestamp us` は、このPCがフレームを記録し終えた時刻で、`captureTimestampUs` と
+同じ外部の同期時刻サービスから読み取ります。センサの露光時刻が必要な場合は `frame sync frame age us`
+を引いてください。clock probe・latencyサンプル・カメラ別の集計レポートは
+`@kubohiroya/turbowarp-webrtc` 側にあります。プロジェクタのように全カメラ共通の遅延は、
+絶対値としてのlatencyには残りますが、カメラ間のoffsetでは相殺されます。
 
 ## 開発
 

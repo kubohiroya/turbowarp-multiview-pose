@@ -18,6 +18,8 @@ as a temporary sprite skin.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
 - Retargets external PoseFrame3D v1 data onto up to six declarative A-Frame avatar rigs.
 
+- Shows a time coded pattern and decodes it per camera to measure frame recording latency.
+
 ## Requirements and safety
 
 - TurboWarp with custom unsandboxed extensions enabled.
@@ -26,6 +28,7 @@ as a temporary sprite skin.
 - A browser and GPU combination supported by TensorFlow.js WebGPU.
 - WebAssembly support for the bundled OpenCV.js 4.12 calibration backend.
 - `@kubohiroya/turbowarp-aframe` 0.3.0 with scene capability v1, loaded before avatar setup.
+- The frame sync decoder needs Camera Source and the WebRTC synchronized time reporter.
 - The startup-fixed feature flags are independently OFF by default.
 
 Scene capability v1 is published in `@kubohiroya/turbowarp-aframe@0.3.0`. The consumer fails closed
@@ -158,6 +161,38 @@ PoseFrame3D is boundary data produced by a separate 3D service. This extension c
 triangulate observations, or solve 3D coordinates. Kalidokit is deprecated upstream and was designed
 for BlazePose landmarks, so release validation must include the intended GLTF rigs and real browser
 motion; no custom solver fallback is provided.
+
+The frame sync vertical slice measures how long after the projected pattern each camera computer
+finishes recording a frame:
+
+```text
+(the computer driving the projector)
+show frame sync pattern
+
+(every camera computer)
+start frame sync decoder for camera [camera-1] calibrating for [6] seconds
+repeat until <the measurement window is over>:
+  if <frame sync observation available?> then
+    take next frame sync observation
+    record frame sync sample for camera [camera-1]
+      capture (frame sync frame timestamp us) pattern (frame sync pattern timestamp us)
+      wrap (frame sync pattern wrap us) from peer [fusion]
+send frame sync report for camera [camera-1] to peer [fusion]
+stop frame sync decoder
+```
+
+The pattern is a 4 by 4 grid. Twelve cells carry a millisecond counter that wraps every 4096 ms and
+four cells carry check bits, so a reading whose exposure straddled a display refresh is discarded
+instead of being reported as a wrong time. Calibration locates the panel by watching which pixels
+change over time, learns the light and dark level of every cell, and fails with `panel-not-found`,
+`low-contrast`, or `decode-unstable` rather than producing numbers it cannot stand behind.
+
+`frame sync frame timestamp us` is the moment this computer finished recording the frame, read from
+the same external synchronized time service as `captureTimestampUs`. Subtract `frame sync frame age
+us` from it when the sensor exposure time is wanted instead. The clock probe, the latency samples,
+and the aggregated per-camera report live in `@kubohiroya/turbowarp-webrtc`; a delay that every
+camera shares, such as the projector, stays in the absolute latency and cancels out of the
+per-camera offsets.
 
 ## Block reference
 
@@ -652,6 +687,144 @@ Returns per-person errors from the latest frame while other avatars continue upd
 |---|---|
 | Type | Reporter |
 | Opcode | `avatarRetargetError` |
+
+### `show frame sync pattern`
+
+Covers the screen with the time coded pattern that cameras decode through the projector.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `showFrameSyncPattern` |
+
+### `hide frame sync pattern`
+
+Removes the frame sync pattern overlay.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `hideFrameSyncPattern` |
+
+### `frame sync pattern shown?`
+
+Reports whether the frame sync pattern overlay is on screen.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `frameSyncPatternShown` |
+
+### `frame sync pattern wrap us`
+
+Returns the period after which the encoded display time repeats, in microseconds.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncPatternWrapUs` |
+
+### `start frame sync decoder for camera [CAMERA_ID] calibrating for [SECONDS] seconds`
+
+Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `startFrameSyncDecoder` |
+| `CAMERA_ID` | String, default: `camera-1` |
+| `SECONDS` | Number, default: `6` |
+
+### `calibrate frame sync decoder for [SECONDS] seconds`
+
+Runs calibration again on the running decoder, for example after the camera or the projector moved.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `calibrateFrameSyncDecoder` |
+| `SECONDS` | Number, default: `6` |
+
+### `stop frame sync decoder`
+
+Stops decoding and releases the camera lease.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `stopFrameSyncDecoder` |
+
+### `frame sync decoder state`
+
+Returns idle, acquiring-camera, calibrating, ready, or error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncDecoderState` |
+
+### `frame sync decoder error`
+
+Returns the last decoder error code, or an empty string when there is none.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncDecoderError` |
+
+### `frame sync decode rate`
+
+Returns the share of recent camera frames the decoder could read, between 0 and 1.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncDecodeRate` |
+
+### `frame sync observation available?`
+
+Reports whether a decoded frame is waiting to be taken.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `frameSyncObservationAvailable` |
+
+### `take next frame sync observation`
+
+Removes the oldest decoded frame from the queue and exposes it to the observation reporters.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `takeFrameSyncObservation` |
+
+### `frame sync frame timestamp us`
+
+Returns when this computer finished recording the taken frame, read from the external synchronized time service.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncFrameTimestampUs` |
+
+### `frame sync frame age us`
+
+Returns how old the taken frame already was when the browser delivered it, or 0 when the browser does not report a capture time.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncFrameAgeUs` |
+
+### `frame sync pattern timestamp us`
+
+Returns the display time decoded out of the taken frame, within the current pattern wrap window.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `frameSyncPatternTimestampUs` |
 
 <!-- END GENERATED BLOCKS -->
 

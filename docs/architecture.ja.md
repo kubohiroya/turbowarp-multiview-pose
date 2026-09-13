@@ -140,3 +140,30 @@ PoseFrame3Dは別実装の3D serviceから届くexact v1境界dataです。`time
 recognition event dataへcopyするだけです。frame alignment、履歴保持／query、triangulation、
 3D solveは行いません。Kalidokitは上流でdeprecatedでありnative BlazePose landmarkを想定するため、
 このCOCO-17拡張は明示的な精度制約です。release前に対象GLTF rigを実browserで検証します。
+
+## フレーム同期パターンの縦切り
+
+`frameSyncPatternV1`は独立した起動時固定・既定OFF flagです。fusion application向けに、
+「ある出来事の後、各カメラPCがそれを写したフレームを記録し終えるまで何ms遅れるか」だけを答えます。
+
+表示側は画面全体のoverlayに、黒地の4×4パネルを描きます。12セルが4096msで一周するミリ秒
+カウンタ、4セルがそのカウンタから導くcheck bitです。露光が画面のリフレッシュをまたぐと2つの
+codeが混ざりますが、check bitがその読み取りを拒否するので、誤った時刻は通りません。1つの
+animation frameで描いた内容は次のリフレッシュで画面に出るため、符号化する時刻は現在の時計に
+実測したリフレッシュ間隔を1つ足した値です。残るプロジェクタ遅延は全カメラ共通なので、
+カメラ間のoffsetでは相殺されます。
+
+カメラ側は名前付きのCamera Source leaseを取得し、`getUserMedia`は呼びません。届いたframeは
+240×180の輝度bufferへ縮小します。bufferはdecoderが同期的に読み終えるため再利用します。
+キャリブレーションは実際のパターンに対して2段階で走ります。前半60%で画素ごとの輝度min/maxを
+記録し、高レンジ画素の最大連結領域のうちパネル形状のものをbounding boxとして採用します。
+後半でセルごとの明暗レベルを学習し、復号成功率を測ります。投影は不均一なのでレベルはセル単位で
+持ち、学習済みレベルの中間に落ちた読み取りは捨てます。信用できないlatencyを返す代わりに、
+`panel-not-found`、`low-contrast`、`decode-unstable`で失敗します。どちらの段階も共有時計で
+終了するため、カメラが止まってもcontrollerが待ち続けることはありません。
+
+復号できたframeはobservationとしてqueueに入ります。timestampは外部の同期時刻サービスから
+読み取った不透明な値で、frameがアプリケーションへ届いた時点で取得します。センサの露光時刻が
+必要な呼び出し側のために、browserが報告するframe ageは別に公開します。clock probe、latency
+サンプル、カメラ別の集計レポートはWebRTC機能拡張側の責務なので、clock・offset・ping・pongの
+ロジックはここには置きません。

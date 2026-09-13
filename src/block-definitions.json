@@ -452,6 +452,131 @@
       "text": "avatar retarget error",
       "description": "Returns per-person errors from the latest frame while other avatars continue updating.",
       "arguments": {}
+    },
+    {
+      "opcode": "showFrameSyncPattern",
+      "feature": "frameSyncPatternV1",
+      "blockType": "COMMAND",
+      "text": "show frame sync pattern",
+      "description": "Covers the screen with the time coded pattern that cameras decode through the projector.",
+      "arguments": {}
+    },
+    {
+      "opcode": "hideFrameSyncPattern",
+      "feature": "frameSyncPatternV1",
+      "blockType": "COMMAND",
+      "text": "hide frame sync pattern",
+      "description": "Removes the frame sync pattern overlay.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncPatternShown",
+      "feature": "frameSyncPatternV1",
+      "blockType": "BOOLEAN",
+      "text": "frame sync pattern shown?",
+      "description": "Reports whether the frame sync pattern overlay is on screen.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncPatternWrapUs",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync pattern wrap us",
+      "description": "Returns the period after which the encoded display time repeats, in microseconds.",
+      "arguments": {}
+    },
+    {
+      "opcode": "startFrameSyncDecoder",
+      "feature": "frameSyncPatternV1",
+      "blockType": "COMMAND",
+      "text": "start frame sync decoder for camera [CAMERA_ID] calibrating for [SECONDS] seconds",
+      "description": "Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough.",
+      "arguments": {
+        "CAMERA_ID": { "type": "STRING", "defaultValue": "camera-1" },
+        "SECONDS": { "type": "NUMBER", "defaultValue": 6 }
+      }
+    },
+    {
+      "opcode": "calibrateFrameSyncDecoder",
+      "feature": "frameSyncPatternV1",
+      "blockType": "COMMAND",
+      "text": "calibrate frame sync decoder for [SECONDS] seconds",
+      "description": "Runs calibration again on the running decoder, for example after the camera or the projector moved.",
+      "arguments": {
+        "SECONDS": { "type": "NUMBER", "defaultValue": 6 }
+      }
+    },
+    {
+      "opcode": "stopFrameSyncDecoder",
+      "feature": "frameSyncPatternV1",
+      "blockType": "COMMAND",
+      "text": "stop frame sync decoder",
+      "description": "Stops decoding and releases the camera lease.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncDecoderState",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync decoder state",
+      "description": "Returns idle, acquiring-camera, calibrating, ready, or error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncDecoderError",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync decoder error",
+      "description": "Returns the last decoder error code, or an empty string when there is none.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncDecodeRate",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync decode rate",
+      "description": "Returns the share of recent camera frames the decoder could read, between 0 and 1.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncObservationAvailable",
+      "feature": "frameSyncPatternV1",
+      "blockType": "BOOLEAN",
+      "text": "frame sync observation available?",
+      "description": "Reports whether a decoded frame is waiting to be taken.",
+      "arguments": {}
+    },
+    {
+      "opcode": "takeFrameSyncObservation",
+      "feature": "frameSyncPatternV1",
+      "blockType": "COMMAND",
+      "text": "take next frame sync observation",
+      "description": "Removes the oldest decoded frame from the queue and exposes it to the observation reporters.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncFrameTimestampUs",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync frame timestamp us",
+      "description": "Returns when this computer finished recording the taken frame, read from the external synchronized time service.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncFrameAgeUs",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync frame age us",
+      "description": "Returns how old the taken frame already was when the browser delivered it, or 0 when the browser does not report a capture time.",
+      "arguments": {}
+    },
+    {
+      "opcode": "frameSyncPatternTimestampUs",
+      "feature": "frameSyncPatternV1",
+      "blockType": "REPORTER",
+      "text": "frame sync pattern timestamp us",
+      "description": "Returns the display time decoded out of the taken frame, within the current pattern wrap window.",
+      "arguments": {}
     }
   ]
 }

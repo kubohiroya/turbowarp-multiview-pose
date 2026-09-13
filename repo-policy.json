@@ -29,8 +29,9 @@
     "Keep exact-pinned Kalidokit as the sole avatar pose solver without a custom rotation fallback.",
     "Keep OpenCV.js as the single exact-pinned production calibration backend without a reference solver.",
     "Reject schema integrity drift, unknown versions, and pairing credentials in persistent contracts.",
-    "Treat pose timestamps as opaque values from an external synchronized time service; do not add clock probe, offset, ping, or pong logic.",
+    "Treat pose and frame sync timestamps as opaque values from an external synchronized time service; do not add clock probe, offset, ping, or pong logic.",
     "Treat PoseFrame3D as external boundary data; do not add frame alignment, history queries, triangulation, or 3D solving.",
+    "Keep the frame sync pattern behind its independent startup-fixed default-OFF flag and report calibration failures instead of untrusted latencies.",
     "Do not add CPU, WASM, or WebGL inference fallback or direct getUserMedia calls.",
     "Run pnpm run check before publishing generated artifacts."
   ]
