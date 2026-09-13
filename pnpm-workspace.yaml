@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: false
+minimumReleaseAgeExclude:
+  - '@kubohiroya/turbowarp-extension-template@0.4.0'
+  - '@kubohiroya/vite-plugin-turbowarp-extension@0.4.0'
+  - '@kubohiroya/turbowarp-camera-source@0.4.0'

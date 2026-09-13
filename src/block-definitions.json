@@ -1,0 +1,68 @@
+{
+  "extensionName": "TurboWarp-Multiview-Pose",
+  "blocks": [
+    {
+      "opcode": "prepareOfferQr",
+      "blockType": "COMMAND",
+      "text": "prepare offer QR for peer [PEER]",
+      "description": "Creates a WebRTC offer and prepares one or more QR courier parts.",
+      "arguments": { "PEER": { "type": "STRING", "defaultValue": "camera-1" } }
+    },
+    {
+      "opcode": "showOfferQrPart",
+      "blockType": "COMMAND",
+      "text": "show offer QR part [INDEX] on this sprite",
+      "description": "Shows the selected one-based offer QR part using a temporary sprite skin.",
+      "arguments": { "INDEX": { "type": "NUMBER", "defaultValue": 1 } }
+    },
+    {
+      "opcode": "offerQrPartCount",
+      "blockType": "REPORTER",
+      "text": "offer QR part count",
+      "description": "Returns the number of prepared offer QR parts, or zero when none is prepared.",
+      "arguments": {}
+    },
+    {
+      "opcode": "offerQrCurrentPart",
+      "blockType": "REPORTER",
+      "text": "current offer QR part",
+      "description": "Returns the one-based part currently selected for display, or zero when none is prepared.",
+      "arguments": {}
+    },
+    {
+      "opcode": "showNextOfferQrPart",
+      "blockType": "COMMAND",
+      "text": "show next offer QR part on this sprite",
+      "description": "Shows the next part and wraps from the last part to the first.",
+      "arguments": {}
+    },
+    {
+      "opcode": "createAndShowOfferQr",
+      "blockType": "COMMAND",
+      "text": "show offer QR for peer [PEER] on this sprite",
+      "description": "Creates an offer and shows its first QR courier part on this sprite.",
+      "arguments": { "PEER": { "type": "STRING", "defaultValue": "camera-1" } }
+    },
+    {
+      "opcode": "endOfferQrDisplay",
+      "blockType": "COMMAND",
+      "text": "end offer QR display",
+      "description": "Restores original sprite skins and discards all temporary offer QR data.",
+      "arguments": {}
+    },
+    {
+      "opcode": "offerQrState",
+      "blockType": "REPORTER",
+      "text": "offer QR state",
+      "description": "Returns idle, generating-offer, rendering, displayed, or error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "offerQrError",
+      "blockType": "REPORTER",
+      "text": "offer QR error",
+      "description": "Returns the latest QR pairing error message.",
+      "arguments": {}
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "productName": "TurboWarp-Multiview-Pose",
+  "packageType": "turbowarp-extension",
+  "licensePolicy": "mpl-2.0",
+  "readmeLanguages": ["en", "ja"],
+  "canonicalReadme": "README.md",
+  "localizedReadmes": {
+    "ja": "README.ja.md"
+  },
+  "node": {
+    "minimum": "22.18.0"
+  },
+  "packageManager": "pnpm",
+  "requiredFiles": ["README.md", "README.ja.md", "THIRD_PARTY_NOTICES.md", "LICENSE"],
+  "exceptions": {
+    "upstreamFork": false,
+    "mixedContentLicenses": false,
+    "legacyPackageName": false,
+    "thirdPartyBundle": true
+  },
+  "migrationChecklist": [
+    "Keep QR encoder license notices in the distributed bundle.",
+    "Keep QR courier pairing behind the startup-fixed default-OFF flag in config/feature-flags.ts.",
+    "Run pnpm run check before publishing generated artifacts."
+  ]
+}

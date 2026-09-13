@@ -1,0 +1,67 @@
+{
+  "formatVersion": 1,
+  "id": "kubohiroyamultiviewpose",
+  "blocks": [
+    {
+      "opcode": "createAndShowOfferQr",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "PEER",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "endOfferQrDisplay",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "offerQrCurrentPart",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "offerQrError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "offerQrPartCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "offerQrState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "prepareOfferQr",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "PEER",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "showNextOfferQrPart",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "showOfferQrPart",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "INDEX",
+          "type": "NUMBER"
+        }
+      ]
+    }
+  ],
+  "menus": []
+}

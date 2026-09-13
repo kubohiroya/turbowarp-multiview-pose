@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TurboWarp-Multiview-Pose documentation</title>
+  <style>
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:900px;margin:0 auto;padding:2rem;line-height:1.6;color:#222}
+    code{background:#f3f3f3;padding:.1em .3em;border-radius:.25em}
+    pre{background:#f6f8fa;padding:1rem;overflow:auto;border-radius:.5rem}
+  </style>
+</head>
+<body>
+  <h1>TurboWarp-Multiview-Pose</h1>
+  <p>Composite blocks for the multiview-pose camera app and fusion app.</p>
+
+  <h2>Blocks</h2>
+  <h3><code>prepare offer QR for peer [PEER]</code></h3>
+  <p>Creates a named WebRTC offer and prepares one or more QR courier parts.</p>
+  <h3><code>show offer QR part [INDEX] on this sprite</code></h3>
+  <p>Displays a one-based part as a temporary, lossless SVG sprite skin.</p>
+  <h3><code>end offer QR display</code></h3>
+  <p>Restores original skins and discards sensitive temporary session data.</p>
+
+  <h2>Enablement and safety</h2>
+  <p>The startup-fixed <code>qrCourierPairing</code> flag is OFF by default. The extension requires the version 2 TurboWarp WebRTC runtime capability and must run unsandboxed.</p>
+  <p>Pairing QR codes can expose local addressing and ICE credentials. Display them only inside a trusted venue and remove courier photographs after pairing.</p>
+
+  <h2>Development</h2>
+  <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>
+</body>
+</html>
