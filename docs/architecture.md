@@ -77,3 +77,23 @@ Stopping waits for in-flight initialization/inference, disposes the detector, re
 lease, and clears the last frame. The TensorFlow.js backend is process-global and is not reset,
 because doing so would invalidate resources owned by other extensions; disposing the detector
 releases this feature's model resources.
+
+## Pinned application-contract codec
+
+`protocolV1Codec` is an independent startup-fixed, default-OFF flag. The codec parses at most 1 MiB
+of JSON, reads the root `schema` and `version`, and dispatches only the six explicitly supported v1
+TypeBox schemas. It performs no version inference or fallback. A successful decode retains one
+compact JSON value; any failed decode clears it and exposes the first diagnostic as a JSON Pointer
+path and message.
+
+The schema definitions mirror `@multiview-pose/protocol` at the commit recorded in
+`schemas/protocol-v1-integrity.json`. Canonical JSON SHA-256 values bind all six runtime definitions
+to that commit. The repository check also compares an available upstream working checkout, making
+schema edits fail until the pin, implementation, fixtures, and compatibility decision are updated
+together.
+
+TypeBox tuple and array constraints enforce COCO-17 ordering, six-person limits, matrix sizes, and
+all bounded values. A separate recursive key guard rejects WebRTC offers, answers, SDP, ICE/DTLS
+material, and credential fields before persistence, even if a later schema accidentally permits a
+nested extension point. SessionPolicy also enforces `expiresAt > issuedAt` and rejects expired
+policies at application-validation time.

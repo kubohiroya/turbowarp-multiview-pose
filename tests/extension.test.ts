@@ -72,7 +72,7 @@ function setup(code = "offer-code") {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MultiviewPoseExtension offer QR blocks", () => {
-  it("keeps the QR and pose feature flags independent", () => {
+  it("keeps the QR, pose, and protocol feature flags independent", () => {
     setup();
     const poseModel = {
       initializeWebGpu: vi.fn(async () => undefined),
@@ -91,6 +91,7 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     ).map(({ opcode }) => opcode);
     expect(qrOpcodes).toContain("prepareOfferQr");
     expect(qrOpcodes).not.toContain("startWebGpuMoveNetMultiPose");
+    expect(qrOpcodes).not.toContain("decodeProtocolJson");
 
     const poseOnly = new MultiviewPoseExtension({
       enabled: false,
@@ -104,6 +105,47 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(poseOpcodes).not.toContain("prepareOfferQr");
     expect(poseOpcodes).toContain("startWebGpuMoveNetMultiPose");
     expect(poseOpcodes).toContain("latestPoseFrame2D");
+
+    const protocolOnly = new MultiviewPoseExtension({
+      enabled: false,
+      poseEnabled: false,
+      protocolEnabled: true,
+    });
+    const protocolOpcodes = (
+      protocolOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(protocolOpcodes).not.toContain("prepareOfferQr");
+    expect(protocolOpcodes).not.toContain("startWebGpuMoveNetMultiPose");
+    expect(protocolOpcodes).toContain("decodeProtocolJson");
+    expect(protocolOpcodes).toContain("protocolErrorPath");
+  });
+
+  it("exposes protocol round-trip and diagnostic reporters", () => {
+    setup();
+    const extension = new MultiviewPoseExtension({ protocolEnabled: true });
+    const dsl = JSON.stringify({
+      schema: "twmp/performance-dsl",
+      version: 1,
+      performers: [
+        {
+          performerId: "actor-1",
+          displayName: "Actor 1",
+          glowStickColor: "#00FFAA",
+          recognitionStartEffect: "fade-in",
+          recognitionEndEffect: "fade-out",
+          avatarAsset: "avatar-1",
+        },
+      ],
+    });
+    expect(extension.protocolJsonValid({ JSON: dsl })).toBe(true);
+    extension.decodeProtocolJson({ JSON: dsl });
+    expect(extension.encodeProtocolJson({ JSON: dsl })).toBe(dsl);
+    expect(extension.decodedProtocolJson()).toBe(dsl);
+    expect(extension.protocolSchema()).toBe("twmp/performance-dsl");
+    expect(extension.protocolVersion()).toBe(1);
+    expect(extension.protocolJsonValid({ JSON: "{" })).toBe(false);
+    expect(extension.protocolErrorPath()).toBe("/");
+    expect(extension.protocolErrorMessage()).toMatch(/Invalid JSON/u);
   });
 
   it("keeps QR courier blocks hidden while the startup flag is off", async () => {

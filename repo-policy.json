@@ -20,9 +20,11 @@
     "thirdPartyBundle": true
   },
   "migrationChecklist": [
-    "Keep QR encoder, TensorFlow.js, and MoveNet license notices in the distributed bundle.",
+    "Keep QR encoder, TensorFlow.js, MoveNet, and TypeBox license notices in the distributed bundle.",
     "Keep QR courier pairing behind the startup-fixed default-OFF flag in config/feature-flags.ts.",
     "Keep WebGPU MoveNet MultiPose behind its independent startup-fixed default-OFF flag.",
+    "Keep the protocol v1 codec behind its independent startup-fixed default-OFF flag.",
+    "Reject schema integrity drift, unknown versions, and pairing credentials in persistent contracts.",
     "Do not add CPU, WASM, or WebGL inference fallback or direct getUserMedia calls.",
     "Run pnpm run check before publishing generated artifacts."
   ]

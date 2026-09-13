@@ -148,6 +148,76 @@
       "text": "latest PoseFrame2D JSON",
       "description": "Returns the latest protocol-v1 COCO-17 pose frame as JSON, or an empty string before inference.",
       "arguments": {}
+    },
+    {
+      "opcode": "protocolJsonValid",
+      "feature": "protocolV1Codec",
+      "blockType": "BOOLEAN",
+      "text": "protocol JSON [JSON] valid?",
+      "description": "Validates and dispatches one of the six pinned multiview-pose v1 contracts without retaining it.",
+      "arguments": {
+        "JSON": { "type": "STRING", "defaultValue": "{}" }
+      }
+    },
+    {
+      "opcode": "decodeProtocolJson",
+      "feature": "protocolV1Codec",
+      "blockType": "COMMAND",
+      "text": "decode protocol JSON [JSON]",
+      "description": "Parses, validates, and retains a supported v1 protocol value for later reporters.",
+      "arguments": {
+        "JSON": { "type": "STRING", "defaultValue": "{}" }
+      }
+    },
+    {
+      "opcode": "encodeProtocolJson",
+      "feature": "protocolV1Codec",
+      "blockType": "REPORTER",
+      "text": "encode protocol JSON [JSON]",
+      "description": "Validates a supported v1 value and returns its compact JSON encoding.",
+      "arguments": {
+        "JSON": { "type": "STRING", "defaultValue": "{}" }
+      }
+    },
+    {
+      "opcode": "decodedProtocolJson",
+      "feature": "protocolV1Codec",
+      "blockType": "REPORTER",
+      "text": "decoded protocol JSON",
+      "description": "Returns the last successfully decoded or encoded protocol value.",
+      "arguments": {}
+    },
+    {
+      "opcode": "protocolSchema",
+      "feature": "protocolV1Codec",
+      "blockType": "REPORTER",
+      "text": "protocol schema",
+      "description": "Returns the schema identifier dispatched by the latest validation attempt.",
+      "arguments": {}
+    },
+    {
+      "opcode": "protocolVersion",
+      "feature": "protocolV1Codec",
+      "blockType": "REPORTER",
+      "text": "protocol version",
+      "description": "Returns the numeric version dispatched by the latest validation attempt, or zero when unavailable.",
+      "arguments": {}
+    },
+    {
+      "opcode": "protocolErrorPath",
+      "feature": "protocolV1Codec",
+      "blockType": "REPORTER",
+      "text": "protocol error path",
+      "description": "Returns the JSON Pointer path for the latest parse or validation error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "protocolErrorMessage",
+      "feature": "protocolV1Codec",
+      "blockType": "REPORTER",
+      "text": "protocol error message",
+      "description": "Returns the detailed message for the latest parse or validation error.",
+      "arguments": {}
     }
   ]
 }

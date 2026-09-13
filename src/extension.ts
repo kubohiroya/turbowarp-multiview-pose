@@ -12,6 +12,7 @@ import { requireWebRtcOfferCapability } from "./webrtc-capability.js";
 import { PosePipelineController } from "./pose/controller.js";
 import { TfjsWebGpuMoveNet } from "./pose/tfjs-movenet.js";
 import type { PoseModelPort } from "./pose/types.js";
+import { ProtocolV1Codec } from "./protocol/codec.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -25,7 +26,7 @@ interface DefinitionArgument {
 
 interface BlockDefinition {
   opcode: string;
-  feature: "qrCourierPairing" | "webgpuMoveNetMultiPose";
+  feature: "qrCourierPairing" | "webgpuMoveNetMultiPose" | "protocolV1Codec";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -42,6 +43,7 @@ interface OfferQrSession {
 export interface MultiviewPoseExtensionOptions {
   enabled?: boolean;
   poseEnabled?: boolean;
+  protocolEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
@@ -54,10 +56,12 @@ const blockDefinitions = definitions.blocks as readonly BlockDefinition[];
 export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly enabled: boolean;
   private readonly poseEnabled: boolean;
+  private readonly protocolEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
   private readonly pose: PosePipelineController;
+  private readonly protocol: ProtocolV1Codec;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
@@ -76,6 +80,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.enabled = options.enabled ?? featureFlags.qrCourierPairing;
     this.poseEnabled =
       options.poseEnabled ?? featureFlags.webgpuMoveNetMultiPose;
+    this.protocolEnabled =
+      options.protocolEnabled ?? featureFlags.protocolV1Codec;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -88,6 +94,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
         : {}),
       ...(options.clockId ? { clockId: options.clockId } : {}),
     });
+    this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -264,6 +271,41 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.pose.latestFrameJson();
   }
 
+  public protocolJsonValid(args: { JSON: unknown }): boolean {
+    this.requireProtocolEnabled();
+    return this.protocol.validate(Scratch.Cast.toString(args.JSON));
+  }
+
+  public decodeProtocolJson(args: { JSON: unknown }): void {
+    this.requireProtocolEnabled();
+    this.protocol.decode(Scratch.Cast.toString(args.JSON));
+  }
+
+  public encodeProtocolJson(args: { JSON: unknown }): string {
+    this.requireProtocolEnabled();
+    return this.protocol.encode(Scratch.Cast.toString(args.JSON));
+  }
+
+  public decodedProtocolJson(): string {
+    return this.protocolEnabled ? this.protocol.decodedJson() : "";
+  }
+
+  public protocolSchema(): string {
+    return this.protocolEnabled ? this.protocol.schema() : "disabled";
+  }
+
+  public protocolVersion(): number {
+    return this.protocolEnabled ? this.protocol.version() : 0;
+  }
+
+  public protocolErrorPath(): string {
+    return this.protocol.errorPath();
+  }
+
+  public protocolErrorMessage(): string {
+    return this.protocol.errorMessage();
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
@@ -290,8 +332,18 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     }
   }
 
+  private requireProtocolEnabled(): void {
+    if (!this.protocolEnabled) {
+      throw new Error(
+        "Protocol v1 codec is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
   private blockEnabled(feature: BlockDefinition["feature"]): boolean {
-    return feature === "qrCourierPairing" ? this.enabled : this.poseEnabled;
+    if (feature === "qrCourierPairing") return this.enabled;
+    if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
+    return this.protocolEnabled;
   }
 
   private requireSession(): OfferQrSession {

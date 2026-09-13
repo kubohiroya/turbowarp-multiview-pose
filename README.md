@@ -14,6 +14,7 @@ as a temporary sprite skin.
 - Restores the sprite's original skin and discards sensitive temporary data on cleanup.
 - Runs MoveNet MultiPose Lightning for up to six tracked people through TensorFlow.js WebGPU only.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
+- Validates and round-trips all six pinned multiview-pose v1 application contracts.
 
 ## Requirements and safety
 
@@ -21,7 +22,7 @@ as a temporary sprite skin.
 - `@kubohiroya/turbowarp-webrtc` with runtime capability v2, loaded first.
 - `@kubohiroya/turbowarp-camera-source` 0.4 or later, loaded before pose startup.
 - A browser and GPU combination supported by TensorFlow.js WebGPU.
-- The startup-fixed `qrCourierPairing` feature flag is OFF by default.
+- The startup-fixed feature flags are independently OFF by default.
 
 Set the flag before loading the extension:
 
@@ -34,6 +35,12 @@ Enable pose inference independently when needed:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {webgpuMoveNetMultiPose: true};
+```
+
+Enable the six-contract codec independently:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {protocolV1Codec: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -78,6 +85,12 @@ stop WebGPU MoveNet MultiPose
 
 Concurrent inference requests share one in-flight operation. Calls do not build a frame backlog;
 the next call after completion reads the latest frame from the shared Camera Source video.
+
+The protocol codec dispatches by the payload's `schema` and `version`, and only accepts the pinned
+v1 SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, ClockProbe, and Performance DSL
+contracts. Use `protocol error path` and `protocol error message` after a failed validation. Unknown
+fields and versions fail closed; WebRTC offer, answer, SDP, ICE, DTLS, and credential keys are
+forbidden recursively because pairing secrets must not enter persistent application contracts.
 
 ## Block reference
 
@@ -253,6 +266,81 @@ Returns the latest protocol-v1 COCO-17 pose frame as JSON, or an empty string be
 | Type | Reporter |
 | Opcode | `latestPoseFrame2D` |
 
+### `protocol JSON [JSON] valid?`
+
+Validates and dispatches one of the six pinned multiview-pose v1 contracts without retaining it.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `protocolJsonValid` |
+| `JSON` | String, default: `{}` |
+
+### `decode protocol JSON [JSON]`
+
+Parses, validates, and retains a supported v1 protocol value for later reporters.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `decodeProtocolJson` |
+| `JSON` | String, default: `{}` |
+
+### `encode protocol JSON [JSON]`
+
+Validates a supported v1 value and returns its compact JSON encoding.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `encodeProtocolJson` |
+| `JSON` | String, default: `{}` |
+
+### `decoded protocol JSON`
+
+Returns the last successfully decoded or encoded protocol value.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `decodedProtocolJson` |
+
+### `protocol schema`
+
+Returns the schema identifier dispatched by the latest validation attempt.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `protocolSchema` |
+
+### `protocol version`
+
+Returns the numeric version dispatched by the latest validation attempt, or zero when unavailable.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `protocolVersion` |
+
+### `protocol error path`
+
+Returns the JSON Pointer path for the latest parse or validation error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `protocolErrorPath` |
+
+### `protocol error message`
+
+Returns the detailed message for the latest parse or validation error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `protocolErrorMessage` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -268,6 +356,9 @@ Returns the latest protocol-v1 COCO-17 pose frame as JSON, or an empty string be
 | Non-WebGPU backend | Startup fails with `webgpu-unavailable`; no fallback is attempted. |
 | Camera or model failure | `pose error code` distinguishes startup, ended-camera, inference, and invalid-output failures. |
 | Pose stop/reload/disposal | In-flight work settles, then the detector and named camera lease are released. |
+| Protocol feature flag OFF | Codec blocks are hidden; pose, camera preview, and pairing remain independent. |
+| Unknown contract/version | Validation fails at `/schema` or `/version`; no fallback parser is selected. |
+| Pairing credential key | Validation fails at its JSON Pointer path and no decoded value is retained. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.
@@ -299,6 +390,12 @@ tracking IDs, non-overlap behavior, fail-closed backend checks, and cleanup. The
 real WebGPU adapter or download the production model; browser/GPU compatibility and throughput
 must be verified separately on deployment hardware.
 
+`schemas/protocol-v1-integrity.json` pins the source repository commit and canonical SHA-256 for all
+six schemas. Repository checks always compare the runtime TypeBox definitions to those digests and,
+when a sibling multiview-pose checkout (or `MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`) is available, also
+fail on upstream working-copy drift. Contract fixtures are copied from that pinned package and
+cross-checked against both the schema and block-facing codec.
+
 ## Rollback
 
 Set `qrCourierPairing` to `false` before extension startup, stop the project to release temporary
@@ -306,6 +403,8 @@ skins, and use TurboWarp WebRTC's manual offer/answer copy-and-paste blocks. QR 
 change the WebRTC pairing code or protocol.
 To roll back pose inference only, set `webgpuMoveNetMultiPose` to `false` before startup and reload
 the project. Camera preview and pairing blocks remain independently available.
+Set `protocolV1Codec` to `false` to remove the high-level codec blocks; unsupported versions remain
+rejected rather than falling back to v1.
 
 ## License
 

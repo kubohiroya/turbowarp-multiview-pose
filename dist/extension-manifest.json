@@ -13,6 +13,31 @@
       ]
     },
     {
+      "opcode": "decodeProtocolJson",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "decodedProtocolJson",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "encodeProtocolJson",
+      "blockType": "REPORTER",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "endOfferQrDisplay",
       "blockType": "COMMAND",
       "arguments": []
@@ -76,6 +101,36 @@
           "type": "STRING"
         }
       ]
+    },
+    {
+      "opcode": "protocolErrorMessage",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "protocolErrorPath",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "protocolJsonValid",
+      "blockType": "BOOLEAN",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "protocolSchema",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "protocolVersion",
+      "blockType": "REPORTER",
+      "arguments": []
     },
     {
       "opcode": "showNextOfferQrPart",

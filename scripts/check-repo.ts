@@ -1,6 +1,9 @@
 import { access, readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { resolve } from "node:path";
 import { promisify } from "node:util";
+import { protocolSchemas } from "../src/protocol/schemas.ts";
 
 interface PackageMetadata {
   name: string;
@@ -49,6 +52,16 @@ interface PackResult {
   files: { path: string }[];
 }
 
+interface ProtocolIntegrityManifest {
+  formatVersion: number;
+  sourceRepository: string;
+  sourceCommit: string;
+  sourcePackage: string;
+  canonicalization: string;
+  digest: string;
+  schemas: Record<string, string>;
+}
+
 const execFileAsync = promisify(execFile);
 const errors: string[] = [];
 
@@ -64,6 +77,9 @@ const license = await readFile("LICENSE", "utf8");
 const config = await readFile("src/config.ts", "utf8");
 const poseAdapter = await readFile("src/pose/tfjs-movenet.ts", "utf8");
 const poseController = await readFile("src/pose/controller.ts", "utf8");
+const protocolIntegrity = JSON.parse(
+  await readFile("schemas/protocol-v1-integrity.json", "utf8"),
+) as ProtocolIntegrityManifest;
 
 checkPolicy();
 checkPackageMetadata();
@@ -71,6 +87,7 @@ checkReadmes();
 checkLicense();
 checkGeneratedArtifacts();
 checkPosePolicy();
+await checkProtocolSchemaIntegrity();
 await checkPackContents();
 
 if (errors.length > 0) {
@@ -249,6 +266,74 @@ function checkPosePolicy() {
       "MoveNet pipeline must acquire frames only through Camera Source",
     );
   }
+}
+
+async function checkProtocolSchemaIntegrity() {
+  if (packageMetadata.dependencies?.["@sinclair/typebox"] !== "0.34.52") {
+    errors.push("package.json must pin @sinclair/typebox exactly to 0.34.52");
+  }
+  if (
+    protocolIntegrity.formatVersion !== 1 ||
+    protocolIntegrity.sourceRepository !==
+      "https://github.com/kubohiroya/multiview-pose.git" ||
+    protocolIntegrity.sourcePackage !== "packages/protocol" ||
+    !/^[0-9a-f]{40}$/u.test(protocolIntegrity.sourceCommit) ||
+    protocolIntegrity.digest !== "sha256" ||
+    protocolIntegrity.canonicalization !== "JSON.stringify(JSON.parse(source))"
+  ) {
+    errors.push("protocol-v1-integrity.json metadata is invalid");
+  }
+
+  const schemaIdsByFile = {
+    "camera-calibration-v1.json": "twmp/camera-calibration",
+    "clock-probe-v1.json": "twmp/clock-probe",
+    "performance-dsl-v1.json": "twmp/performance-dsl",
+    "pose-frame-2d-v1.json": "twmp/pose-frame-2d",
+    "pose-frame-3d-v1.json": "twmp/pose-frame-3d",
+    "session-policy-v1.json": "twmp/session-policy",
+  } as const;
+  if (
+    Object.keys(protocolIntegrity.schemas).sort().join("\n") !==
+    Object.keys(schemaIdsByFile).sort().join("\n")
+  ) {
+    errors.push("protocol integrity manifest must list exactly six v1 schemas");
+    return;
+  }
+  for (const [filename, schemaId] of Object.entries(schemaIdsByFile)) {
+    const expected = protocolIntegrity.schemas[filename];
+    const actual = canonicalJsonHash(protocolSchemas[schemaId]);
+    if (actual !== expected) {
+      errors.push(
+        `runtime schema ${filename} hash ${actual} does not match pinned ${expected}`,
+      );
+    }
+  }
+
+  const sourceDirectory =
+    process.env.MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR ??
+    resolve(process.cwd(), "../multiview-pose/packages/protocol/schemas");
+  try {
+    await access(sourceDirectory);
+  } catch {
+    return;
+  }
+  for (const [filename, expected] of Object.entries(
+    protocolIntegrity.schemas,
+  )) {
+    const source = JSON.parse(
+      await readFile(resolve(sourceDirectory, filename), "utf8"),
+    ) as unknown;
+    const actual = canonicalJsonHash(source);
+    if (actual !== expected) {
+      errors.push(
+        `upstream protocol schema drift for ${filename}: ${actual} != ${expected}`,
+      );
+    }
+  }
+}
+
+function canonicalJsonHash(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
 async function checkPackContents() {

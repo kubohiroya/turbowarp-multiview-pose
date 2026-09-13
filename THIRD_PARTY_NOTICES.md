@@ -15,3 +15,8 @@ MultiPose inference. They are distributed under the Apache License 2.0:
 
 - <https://github.com/tensorflow/tfjs>
 - <https://github.com/tensorflow/tfjs-models/tree/master/pose-detection>
+
+TypeBox is bundled for JSON Schema-compatible protocol validation and is distributed under the MIT
+License:
+
+- <https://github.com/sinclairzx81/typebox>

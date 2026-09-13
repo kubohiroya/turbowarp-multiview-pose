@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "sourceRepository": "https://github.com/kubohiroya/multiview-pose.git",
+  "sourceCommit": "45690b2cf7c625b318ac42eca5681a188a5a97ae",
+  "sourcePackage": "packages/protocol",
+  "canonicalization": "JSON.stringify(JSON.parse(source))",
+  "digest": "sha256",
+  "schemas": {
+    "camera-calibration-v1.json": "1f26e6a44fdfdd361f43250b59ce72f96eb6e415f6116186cc83a16fc0e3f334",
+    "clock-probe-v1.json": "1d267759d676b49439b4ad5b170fe77d0ccd4430f9751263609062c656e48165",
+    "performance-dsl-v1.json": "5c41207d5a6b5f2995cfbc2a9b4179f228c92dc3161f05fe7aadf40df11163a4",
+    "pose-frame-2d-v1.json": "dd4fd6e74b10748198573bd8bdcb50a59255f3edc5f96f8514e4e9b00cc359ca",
+    "pose-frame-3d-v1.json": "90217c22478f1a94d00a178526e9a004d0e89b3fc2d15cd5122fc6d196e9da71",
+    "session-policy-v1.json": "16ccc831cd1c5a47c1c6d74cb042997a3ce0857e829224c0adbbe9fd5f444a8e"
+  }
+}

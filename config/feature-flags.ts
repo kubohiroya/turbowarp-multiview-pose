@@ -1,6 +1,7 @@
 export interface MultiviewPoseFeatureFlags {
   readonly qrCourierPairing: boolean;
   readonly webgpuMoveNetMultiPose: boolean;
+  readonly protocolV1Codec: boolean;
 }
 
 interface FeatureFlagGlobal {
@@ -13,4 +14,5 @@ const overrides = (globalThis as FeatureFlagGlobal).__TWMP_FEATURE_FLAGS__;
 export const featureFlags: MultiviewPoseFeatureFlags = Object.freeze({
   qrCourierPairing: overrides?.qrCourierPairing === true,
   webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
+  protocolV1Codec: overrides?.protocolV1Codec === true,
 });

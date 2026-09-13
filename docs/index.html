@@ -29,6 +29,10 @@
   <p>The independent <code>webgpuMoveNetMultiPose</code> flag is OFF by default. When enabled, the extension leases frames from TurboWarp Camera Source, explicitly requires the TensorFlow.js <code>webgpu</code> backend, and returns up to six tracked COCO-17 poses as PoseFrame2D version 1 JSON.</p>
   <p>No CPU, WASM, or WebGL inference fallback is provided. The first model load generally requires network access; prepare the browser cache before an offline venue run.</p>
 
+  <h2>Pinned protocol v1 codec</h2>
+  <p>The independent <code>protocolV1Codec</code> flag is OFF by default. When enabled, blocks validate and round-trip SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, ClockProbe, and Performance DSL JSON using schemas pinned by source commit and SHA-256.</p>
+  <p>Unknown schemas, versions, fields, malformed COCO-17 tuples, and pairing credential keys fail closed. Diagnostic reporters expose the JSON Pointer path and message.</p>
+
   <h2>Development</h2>
   <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>
 </body>
