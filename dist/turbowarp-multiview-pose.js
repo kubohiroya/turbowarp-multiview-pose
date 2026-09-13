@@ -463,6 +463,180 @@
   			"text": "CameraCalibration v1 JSON",
   			"description": "Exports the last validated exact v1 profile, or an empty string when none exists.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "startPoseFusion",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "start pose fusion delay [DELAY_MS] ms jitter [JITTER_MS] ms min keypoint score [MIN_SCORE]",
+  			"description": "Starts the multi-camera jitter buffer that fuses one past instant behind the newest frame.",
+  			"arguments": {
+  				"DELAY_MS": {
+  					"type": "NUMBER",
+  					"defaultValue": 120
+  				},
+  				"JITTER_MS": {
+  					"type": "NUMBER",
+  					"defaultValue": 80
+  				},
+  				"MIN_SCORE": {
+  					"type": "NUMBER",
+  					"defaultValue": .3
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "stopPoseFusion",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "stop pose fusion",
+  			"description": "Clears every buffered frame and fused result while keeping loaded calibration profiles.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "cleanupPoseFusion",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "cleanup pose fusion",
+  			"description": "Clears buffered frames, fused results, and every loaded fusion calibration profile.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "loadFusionCameraCalibration",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "load fusion camera calibration [JSON]",
+  			"description": "Loads one CameraCalibration v1 profile and derives its world-to-camera projection.",
+  			"arguments": { "JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "bufferPoseFrame2D",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "buffer PoseFrame2D JSON [JSON]",
+  			"description": "Validates one PoseFrame2D v1 and inserts it into its camera ring buffer in timestamp order.",
+  			"arguments": { "JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "fuseBufferedPoseFrame3D",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "fuse PoseFrame3D at buffered delay",
+  			"description": "Fuses the instant one configured delay behind the newest buffered timestamp.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "fusePoseFrame3DAt",
+  			"feature": "poseFusion3D",
+  			"blockType": "COMMAND",
+  			"text": "fuse PoseFrame3D at timestamp [TIMESTAMP_US] us",
+  			"description": "Fuses one explicit past instant expressed in the synchronized microsecond time base.",
+  			"arguments": { "TIMESTAMP_US": {
+  				"type": "NUMBER",
+  				"defaultValue": 0
+  			} }
+  		},
+  		{
+  			"opcode": "latestPoseFrame3D",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "latest PoseFrame3D JSON",
+  			"description": "Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "synchronizedPoseSet2D",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "synchronized 2D pose set JSON",
+  			"description": "Returns the last resampled per-camera 2D keypoint set used for triangulation.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionState",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "pose fusion state",
+  			"description": "Returns idle, buffering, fusing, ready, or error.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionReady",
+  			"feature": "poseFusion3D",
+  			"blockType": "BOOLEAN",
+  			"text": "pose fusion ready?",
+  			"description": "Returns true when fusion is started and at least two cameras are calibrated.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionCameraCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fusion calibrated camera count",
+  			"description": "Returns how many camera calibration profiles are loaded for fusion.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionBufferedFrameCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "buffered pose frame count",
+  			"description": "Returns how many PoseFrame2D frames are currently retained across all ring buffers.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionDroppedFrameCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "dropped pose frame count",
+  			"description": "Returns how many frames were rejected as duplicates or as arrivals past the jitter window.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionPersonCount",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fused person count",
+  			"description": "Returns how many people the last successful fusion produced.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionTimestampUs",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fused timestamp us",
+  			"description": "Returns the synchronized timestamp of the last successful fusion in microseconds.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionReprojectionErrorPx",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "fused mean reprojection error px",
+  			"description": "Returns the mean reprojection error of the last successful fusion in pixels.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionErrorCode",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "pose fusion error code",
+  			"description": "Returns the latest fusion error code, or an empty string.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "poseFusionError",
+  			"feature": "poseFusion3D",
+  			"blockType": "REPORTER",
+  			"text": "pose fusion error",
+  			"description": "Returns the latest fusion error message.",
+  			"arguments": {}
   		}
   	]
   };
@@ -474,7 +648,8 @@
   	qrCourierPairing: overrides?.qrCourierPairing === true,
   	webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
   	protocolV1Codec: overrides?.protocolV1Codec === true,
-  	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true
+  	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
+  	poseFusion3D: overrides?.poseFusion3D === true
   });
   //#endregion
   //#region config/qr-config.ts
@@ -11644,7 +11819,7 @@
   	if (zeroPad == null) zeroPad = computeDefaultPad(inShape, fieldSize, stride);
   	const inputRows = inShape[0];
   	const inputCols = inShape[1];
-  	return [round$2((inputRows - fieldSize + 2 * zeroPad) / stride + 1, roundingMode), round$2((inputCols - fieldSize + 2 * zeroPad) / stride + 1, roundingMode)];
+  	return [round$3((inputRows - fieldSize + 2 * zeroPad) / stride + 1, roundingMode), round$3((inputCols - fieldSize + 2 * zeroPad) / stride + 1, roundingMode)];
   }
   function computeOutputShape4D(inShape, filterShape, outChannels, strides, zeroPad, roundingMode) {
   	if (zeroPad == null) zeroPad = computeDefaultPad(inShape, filterShape[0], strides[0]);
@@ -11654,7 +11829,7 @@
   		0,
   		outChannels
   	];
-  	for (let index = 0; index < 3; index++) if (inShape[index] + 2 * zeroPad >= filterShape[index]) outShape[index] = round$2((inShape[index] - filterShape[index] + 2 * zeroPad) / strides[index] + 1, roundingMode);
+  	for (let index = 0; index < 3; index++) if (inShape[index] + 2 * zeroPad >= filterShape[index]) outShape[index] = round$3((inShape[index] - filterShape[index] + 2 * zeroPad) / strides[index] + 1, roundingMode);
   	return outShape;
   }
   function computeDefaultPad(inputShape, fieldSize, stride, dilation = 1) {
@@ -11737,8 +11912,8 @@
   			right,
   			type: top === 0 && bottom === 0 && left === 0 && right === 0 ? "VALID" : "EXPLICIT"
   		};
-  		outHeight = round$2((inHeight - filterHeight + top + bottom) / strideHeight + 1, roundingMode);
-  		outWidth = round$2((inWidth - filterWidth + left + right) / strideWidth + 1, roundingMode);
+  		outHeight = round$3((inHeight - filterHeight + top + bottom) / strideHeight + 1, roundingMode);
+  		outWidth = round$3((inWidth - filterWidth + left + right) / strideWidth + 1, roundingMode);
   	} else throw Error(`Unknown padding parameter: ${pad}`);
   	return {
   		padInfo,
@@ -11814,7 +11989,7 @@
   * @param roundingMode A string from: 'ceil', 'round', 'floor'. If none is
   *     provided, it will default to truncate.
   */
-  function round$2(value, roundingMode) {
+  function round$3(value, roundingMode) {
   	if (!roundingMode) return Math.trunc(value);
   	switch (roundingMode) {
   		case "round": return Math.round(value);
@@ -20997,13 +21172,13 @@
   	const inputs = { x: convertToTensor(x, "x", "round") };
   	return ENGINE.runKernel(Round, inputs);
   }
-  var round$1;
+  var round$2;
   var init_round = __esmMin((() => {
   	init_engine();
   	init_kernel_names();
   	init_tensor_util_env();
   	init_operation();
-  	round$1 = /* @__PURE__ */ op({ round_ });
+  	round$2 = /* @__PURE__ */ op({ round_ });
   }));
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-core/dist/ops/rsqrt.js
@@ -25994,7 +26169,7 @@
   		const $b = mul(b, BLUE_INTENCITY_COEF);
   		grayscale = add$1(add$1($r, $g), $b);
   	} else grayscale = image;
-  	if (method === "otsu") $threshold = otsu(bincount$1(cast$2(round$1(grayscale), "int32"), tensor([]), 256), totalPixelsInImage);
+  	if (method === "otsu") $threshold = otsu(bincount$1(cast$2(round$2(grayscale), "int32"), tensor([]), 256), totalPixelsInImage);
   	const invCondition = inverted ? lessEqual$2(grayscale, $threshold) : greater$2(grayscale, $threshold);
   	return cast$2(mul(invCondition, 255), "int32");
   }
@@ -32587,7 +32762,7 @@
   	reverse3d: () => reverse3d,
   	reverse4d: () => reverse4d,
   	rfft: () => rfft,
-  	round: () => round$1,
+  	round: () => round$2,
   	rsqrt: () => rsqrt$2,
   	scalar: () => scalar,
   	scatterND: () => scatterND,
@@ -39411,7 +39586,7 @@
   	reverse3d: () => reverse3d,
   	reverse4d: () => reverse4d,
   	rfft: () => rfft,
-  	round: () => round$1,
+  	round: () => round$2,
   	rsqrt: () => rsqrt$2,
   	scalar: () => scalar,
   	scatterND: () => scatterND,
@@ -62623,11 +62798,11 @@
   * limitations under the License.
   * =============================================================================
   */
-  var round = unaryKernelFunc$1({ opType: UnaryOpType.ROUND });
+  var round$1 = unaryKernelFunc$1({ opType: UnaryOpType.ROUND });
   var roundConfig = {
   	kernelName: Round,
   	backendName: "webgpu",
-  	kernelFunc: round
+  	kernelFunc: round$1
   };
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-backend-webgpu@4.22.0_@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-backend-webgpu/dist/kernels/Rsqrt.js
@@ -69116,6 +69291,64 @@
   	"offer",
   	"sdp"
   ]);
+  /**
+  * Parses one pinned v1 contract without retaining state. The result carries the
+  * schema and version recognized so far even when validation fails.
+  */
+  function decodeProtocolJson(json, nowMilliseconds) {
+  	let schemaId = "";
+  	let schemaVersion;
+  	const failure = (path, message) => ({
+  		ok: false,
+  		json: "",
+  		schema: schemaId,
+  		version: schemaVersion,
+  		diagnostic: {
+  			path,
+  			message
+  		},
+  		value: void 0
+  	});
+  	if (new TextEncoder().encode(json).byteLength > MAX_JSON_BYTES) return failure("/", `JSON exceeds ${MAX_JSON_BYTES} bytes.`);
+  	let value;
+  	try {
+  		value = JSON.parse(json);
+  	} catch (error) {
+  		return failure("/", `Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  	}
+  	if (!isRecord(value)) return failure("/", "Protocol value must be a JSON object.");
+  	if (typeof value.schema !== "string") return failure("/schema", "Schema identifier must be a string.");
+  	schemaId = value.schema;
+  	if (!isProtocolSchemaId(value.schema)) return failure("/schema", `Unsupported schema identifier: ${value.schema}`);
+  	if (value.version !== 1) {
+  		schemaVersion = typeof value.version === "number" ? value.version : void 0;
+  		return failure("/version", `Unsupported ${value.schema} version: ${String(value.version)}`);
+  	}
+  	schemaVersion = 1;
+  	const credential = findForbiddenPairingKey(value);
+  	if (credential) return failure(credential, "WebRTC pairing credentials are forbidden in persistent protocol contracts.");
+  	const schema = protocolSchemas[value.schema];
+  	if (!Check(schema, value)) {
+  		const first = Errors(schema, value).First();
+  		return failure(first?.path || "/", first?.message ?? "Protocol value does not match its v1 schema.");
+  	}
+  	if (value.schema === "twmp/session-policy") {
+  		const timeError = validateSessionPolicyWindow(value, nowMilliseconds);
+  		if (timeError) return failure(timeError.path, timeError.message);
+  	}
+  	return {
+  		ok: true,
+  		json: JSON.stringify(value),
+  		schema: schemaId,
+  		version: schemaVersion,
+  		diagnostic: void 0,
+  		value
+  	};
+  }
+  function formatProtocolDiagnostic(diagnostic) {
+  	if (!diagnostic) return "Protocol validation failed.";
+  	return `${diagnostic.path || "/"}: ${diagnostic.message}`;
+  }
   var ProtocolV1Codec = class {
   	constructor(nowMilliseconds = Date.now) {
   		this.encoded = "";
@@ -69127,11 +69360,11 @@
   	}
   	decode(json) {
   		const result = this.process(json, true);
-  		if (!result.ok) throw new Error(formatDiagnostic(result.diagnostic));
+  		if (!result.ok) throw new Error(formatProtocolDiagnostic(result.diagnostic));
   	}
   	encode(json) {
   		const result = this.process(json, true);
-  		if (!result.ok) throw new Error(formatDiagnostic(result.diagnostic));
+  		if (!result.ok) throw new Error(formatProtocolDiagnostic(result.diagnostic));
   		return result.json;
   	}
   	decodedJson() {
@@ -69150,69 +69383,25 @@
   		return this.diagnostic?.message ?? "";
   	}
   	process(json, retain) {
-  		this.resetAttempt();
   		if (retain) {
   			this.decoded = void 0;
   			this.encoded = "";
   		}
-  		if (new TextEncoder().encode(json).byteLength > MAX_JSON_BYTES) return this.failure("/", `JSON exceeds ${MAX_JSON_BYTES} bytes.`);
-  		let value;
-  		try {
-  			value = JSON.parse(json);
-  		} catch (error) {
-  			const message = error instanceof Error ? error.message : String(error);
-  			return this.failure("/", `Invalid JSON: ${message}`);
-  		}
-  		if (!isRecord(value)) return this.failure("/", "Protocol value must be a JSON object.");
-  		if (typeof value.schema !== "string") return this.failure("/schema", "Schema identifier must be a string.");
-  		this.schemaId = value.schema;
-  		if (!isProtocolSchemaId(value.schema)) return this.failure("/schema", `Unsupported schema identifier: ${value.schema}`);
-  		if (value.version !== 1) {
-  			this.schemaVersion = typeof value.version === "number" ? value.version : void 0;
-  			return this.failure("/version", `Unsupported ${value.schema} version: ${String(value.version)}`);
-  		}
-  		this.schemaVersion = 1;
-  		const credential = findForbiddenPairingKey(value);
-  		if (credential) return this.failure(credential, "WebRTC pairing credentials are forbidden in persistent protocol contracts.");
-  		const schema = protocolSchemas[value.schema];
-  		if (!Check(schema, value)) {
-  			const first = Errors(schema, value).First();
-  			return this.failure(first?.path || "/", first?.message ?? "Protocol value does not match its v1 schema.");
-  		}
-  		if (value.schema === "twmp/session-policy") {
-  			const timeError = validateSessionPolicyWindow(value, this.nowMilliseconds());
-  			if (timeError) return this.failure(timeError.path, timeError.message);
-  		}
-  		const encoded = JSON.stringify(value);
-  		if (retain) {
-  			this.decoded = value;
-  			this.encoded = encoded;
+  		const result = decodeProtocolJson(json, this.nowMilliseconds());
+  		this.schemaId = result.schema;
+  		this.schemaVersion = result.version;
+  		this.diagnostic = result.diagnostic;
+  		if (result.ok && retain) {
+  			this.decoded = result.value;
+  			this.encoded = result.json;
   		}
   		return {
-  			ok: true,
-  			json: encoded,
-  			schema: this.schemaId,
-  			version: this.schemaVersion,
-  			diagnostic: void 0
+  			ok: result.ok,
+  			json: result.json,
+  			schema: result.schema,
+  			version: result.version,
+  			diagnostic: result.diagnostic
   		};
-  	}
-  	failure(path, message) {
-  		this.diagnostic = {
-  			path,
-  			message
-  		};
-  		return {
-  			ok: false,
-  			json: "",
-  			schema: this.schemaId,
-  			version: this.schemaVersion,
-  			diagnostic: this.diagnostic
-  		};
-  	}
-  	resetAttempt() {
-  		this.schemaId = "";
-  		this.schemaVersion = void 0;
-  		this.diagnostic = void 0;
   	}
   };
   function isProtocolSchemaId(value) {
@@ -69252,10 +69441,6 @@
   }
   function isRecord(value) {
   	return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-  function formatDiagnostic(diagnostic) {
-  	if (!diagnostic) return "Protocol validation failed.";
-  	return `${diagnostic.path || "/"}: ${diagnostic.message}`;
   }
   //#endregion
   //#region src/calibration/controller.ts
@@ -77142,6 +77327,1108 @@
   	return Math.min(1, Math.max(0, value));
   }
   //#endregion
+  //#region src/fusion/geometry.ts
+  var SUPPORTED_DISTORTION_LENGTHS = /* @__PURE__ */ new Set([
+  	0,
+  	4,
+  	5,
+  	8
+  ]);
+  var ORTHONORMAL_TOLERANCE = .001;
+  var UNDISTORT_ITERATIONS = 20;
+  var MINIMUM_DEPTH = 1e-6;
+  /**
+  * Derives the world-to-camera projection model from one CameraCalibration v1
+  * profile. The profile stores `worldFromCameraMatrix`, so the rigid transform is
+  * inverted here instead of during triangulation.
+  */
+  function createCameraModel(calibration) {
+  	const intrinsic = calibration.intrinsicMatrix;
+  	if (intrinsic.length !== 9 || !intrinsic.every(isFiniteNumber)) throw new Error("Intrinsic matrix must contain nine finite numbers.");
+  	const fx = element(intrinsic, 0);
+  	const skew = element(intrinsic, 1);
+  	const cx = element(intrinsic, 2);
+  	const fy = element(intrinsic, 4);
+  	const cy = element(intrinsic, 5);
+  	if (fx <= 0 || fy <= 0) throw new Error("Intrinsic focal lengths must be positive.");
+  	for (const [index, expected] of [
+  		[3, 0],
+  		[6, 0],
+  		[7, 0],
+  		[8, 1]
+  	]) if (Math.abs(element(intrinsic, index) - expected) > 1e-6) throw new Error("Intrinsic matrix must be an upper triangular 3 by 3.");
+  	if (!SUPPORTED_DISTORTION_LENGTHS.has(calibration.distortionCoefficients.length)) throw new Error("Only 0, 4, 5, or 8 OpenCV distortion coefficients are supported.");
+  	const distortion = Array.from({ length: 8 }, (_, index) => calibration.distortionCoefficients[index] ?? 0);
+  	if (!distortion.every(isFiniteNumber)) throw new Error("Distortion coefficients must be finite numbers.");
+  	const worldFromCamera = calibration.worldFromCameraMatrix;
+  	if (worldFromCamera.length !== 16 || !worldFromCamera.every(isFiniteNumber)) throw new Error("worldFromCameraMatrix must contain 16 finite numbers.");
+  	for (const [index, expected] of [
+  		[12, 0],
+  		[13, 0],
+  		[14, 0],
+  		[15, 1]
+  	]) if (Math.abs(element(worldFromCamera, index) - expected) > 1e-6) throw new Error("worldFromCameraMatrix must be an affine transform.");
+  	const worldRotation = [
+  		0,
+  		1,
+  		2,
+  		4,
+  		5,
+  		6,
+  		8,
+  		9,
+  		10
+  	].map((index) => element(worldFromCamera, index));
+  	const worldTranslation = [
+  		3,
+  		7,
+  		11
+  	].map((index) => element(worldFromCamera, index));
+  	requireOrthonormal(worldRotation);
+  	const rotation = [
+  		0,
+  		3,
+  		6,
+  		1,
+  		4,
+  		7,
+  		2,
+  		5,
+  		8
+  	].map((index) => element(worldRotation, index));
+  	const translation = multiplyRotation(rotation, worldTranslation).map((value) => -value);
+  	return {
+  		cameraId: calibration.cameraId,
+  		calibrationId: calibration.calibrationId,
+  		imageWidth: calibration.imageWidth,
+  		imageHeight: calibration.imageHeight,
+  		fx,
+  		fy,
+  		cx,
+  		cy,
+  		skew,
+  		distortion,
+  		rotation,
+  		translation
+  	};
+  }
+  /** Applies the OpenCV rational distortion model to normalized coordinates. */
+  function distortNormalized(model, x, y) {
+  	const [k1, k2, p1, p2, k3, k4, k5, k6] = distortionCoefficients(model);
+  	const r2 = x * x + y * y;
+  	const r4 = r2 * r2;
+  	const r6 = r4 * r2;
+  	const denominator = 1 + k4 * r2 + k5 * r4 + k6 * r6;
+  	const radial = denominator === 0 ? 1 : (1 + k1 * r2 + k2 * r4 + k3 * r6) / denominator;
+  	return {
+  		x: x * radial + 2 * p1 * x * y + p2 * (r2 + 2 * x * x),
+  		y: y * radial + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y
+  	};
+  }
+  function pixelFromNormalized(model, x, y) {
+  	const distorted = distortNormalized(model, x, y);
+  	return {
+  		x: model.fx * distorted.x + model.skew * distorted.y + model.cx,
+  		y: model.fy * distorted.y + model.cy
+  	};
+  }
+  /** Removes intrinsics and distortion from one observed pixel. */
+  function normalizedFromPixel(model, pixelX, pixelY) {
+  	const [k1, k2, p1, p2, k3, k4, k5, k6] = distortionCoefficients(model);
+  	const observedY = (pixelY - model.cy) / model.fy;
+  	const observedX = (pixelX - model.cx - model.skew * observedY) / model.fx;
+  	let x = observedX;
+  	let y = observedY;
+  	for (let iteration = 0; iteration < UNDISTORT_ITERATIONS; iteration += 1) {
+  		const r2 = x * x + y * y;
+  		const r4 = r2 * r2;
+  		const r6 = r4 * r2;
+  		const numerator = 1 + k1 * r2 + k2 * r4 + k3 * r6;
+  		if (numerator === 0) break;
+  		const inverseRadial = (1 + k4 * r2 + k5 * r4 + k6 * r6) / numerator;
+  		const tangentialX = 2 * p1 * x * y + p2 * (r2 + 2 * x * x);
+  		const tangentialY = p1 * (r2 + 2 * y * y) + 2 * p2 * x * y;
+  		x = (observedX - tangentialX) * inverseRadial;
+  		y = (observedY - tangentialY) * inverseRadial;
+  	}
+  	return {
+  		x,
+  		y
+  	};
+  }
+  /** Projects a world point into one camera, or returns undefined behind it. */
+  function projectPoint(model, point) {
+  	const camera = multiplyRotation(model.rotation, [
+  		point.x,
+  		point.y,
+  		point.z
+  	]);
+  	const x = element(camera, 0) + element(model.translation, 0);
+  	const y = element(camera, 1) + element(model.translation, 1);
+  	const z = element(camera, 2) + element(model.translation, 2);
+  	if (!(z > MINIMUM_DEPTH)) return void 0;
+  	return pixelFromNormalized(model, x / z, y / z);
+  }
+  function depthOf(model, point) {
+  	return element(multiplyRotation(model.rotation, [
+  		point.x,
+  		point.y,
+  		point.z
+  	]), 2) + element(model.translation, 2);
+  }
+  /**
+  * Score-weighted linear triangulation. Observations are undistorted normalized
+  * coordinates, so the projection rows are the pure rigid transform.
+  */
+  function triangulate(observations) {
+  	if (observations.length < 2) return void 0;
+  	const normal = new Array(16).fill(0);
+  	for (const observation of observations) {
+  		const rotation = observation.model.rotation;
+  		const translation = observation.model.translation;
+  		const rows = [];
+  		for (const axis of [0, 1]) {
+  			const image = axis === 0 ? observation.x : observation.y;
+  			rows.push([
+  				image * element(rotation, 6) - element(rotation, axis * 3),
+  				image * element(rotation, 7) - element(rotation, axis * 3 + 1),
+  				image * element(rotation, 8) - element(rotation, axis * 3 + 2),
+  				image * element(translation, 2) - element(translation, axis)
+  			]);
+  		}
+  		const weight = Math.max(observation.score, .001);
+  		for (const row of rows) for (let i = 0; i < 4; i += 1) for (let j = 0; j < 4; j += 1) normal[i * 4 + j] = element(normal, i * 4 + j) + weight * weight * element(row, i) * element(row, j);
+  	}
+  	const solution = smallestEigenvector4(normal);
+  	const w = element(solution, 3);
+  	if (Math.abs(w) < 1e-12) return void 0;
+  	const point = {
+  		x: element(solution, 0) / w,
+  		y: element(solution, 1) / w,
+  		z: element(solution, 2) / w
+  	};
+  	if (!isFiniteNumber(point.x) || !isFiniteNumber(point.y) || !isFiniteNumber(point.z)) return;
+  	return point;
+  }
+  /** Mean pixel distance between the reprojected point and every observation. */
+  function meanReprojectionError(point, observations) {
+  	let total = 0;
+  	for (const observation of observations) {
+  		const projected = projectPoint(observation.model, point);
+  		if (!projected) return void 0;
+  		total += Math.hypot(projected.x - observation.pixelX, projected.y - observation.pixelY);
+  	}
+  	return observations.length === 0 ? void 0 : total / observations.length;
+  }
+  /** Cyclic Jacobi eigenvalue decomposition of a symmetric 4 by 4 matrix. */
+  function smallestEigenvector4(matrix) {
+  	const a = matrix.slice();
+  	const v = [
+  		1,
+  		0,
+  		0,
+  		0,
+  		0,
+  		1,
+  		0,
+  		0,
+  		0,
+  		0,
+  		1,
+  		0,
+  		0,
+  		0,
+  		0,
+  		1
+  	];
+  	for (let sweep = 0; sweep < 32; sweep += 1) {
+  		let off = 0;
+  		for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 4; q += 1) off += element(a, p * 4 + q) ** 2;
+  		if (off < 1e-30) break;
+  		for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 4; q += 1) {
+  			const apq = element(a, p * 4 + q);
+  			if (Math.abs(apq) < 1e-18) continue;
+  			const theta = (element(a, q * 4 + q) - element(a, p * 4 + p)) / (2 * apq);
+  			const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+  			const c = 1 / Math.sqrt(t * t + 1);
+  			const s = t * c;
+  			for (let k = 0; k < 4; k += 1) {
+  				const akp = element(a, k * 4 + p);
+  				const akq = element(a, k * 4 + q);
+  				a[k * 4 + p] = c * akp - s * akq;
+  				a[k * 4 + q] = s * akp + c * akq;
+  			}
+  			for (let k = 0; k < 4; k += 1) {
+  				const apk = element(a, p * 4 + k);
+  				const aqk = element(a, q * 4 + k);
+  				a[p * 4 + k] = c * apk - s * aqk;
+  				a[q * 4 + k] = s * apk + c * aqk;
+  			}
+  			for (let k = 0; k < 4; k += 1) {
+  				const vkp = element(v, k * 4 + p);
+  				const vkq = element(v, k * 4 + q);
+  				v[k * 4 + p] = c * vkp - s * vkq;
+  				v[k * 4 + q] = s * vkp + c * vkq;
+  			}
+  		}
+  	}
+  	let best = 0;
+  	for (let index = 1; index < 4; index += 1) if (element(a, index * 4 + index) < element(a, best * 4 + best)) best = index;
+  	return [
+  		0,
+  		1,
+  		2,
+  		3
+  	].map((row) => element(v, row * 4 + best));
+  }
+  function requireOrthonormal(rotation) {
+  	for (let i = 0; i < 3; i += 1) for (let j = 0; j < 3; j += 1) {
+  		let dot = 0;
+  		for (let k = 0; k < 3; k += 1) dot += element(rotation, k * 3 + i) * element(rotation, k * 3 + j);
+  		if (Math.abs(dot - (i === j ? 1 : 0)) > ORTHONORMAL_TOLERANCE) throw new Error("worldFromCameraMatrix rotation must be orthonormal within 1e-3.");
+  	}
+  	const determinant = element(rotation, 0) * (element(rotation, 4) * element(rotation, 8) - element(rotation, 5) * element(rotation, 7)) - element(rotation, 1) * (element(rotation, 3) * element(rotation, 8) - element(rotation, 5) * element(rotation, 6)) + element(rotation, 2) * (element(rotation, 3) * element(rotation, 7) - element(rotation, 4) * element(rotation, 6));
+  	if (Math.abs(determinant - 1) > ORTHONORMAL_TOLERANCE) throw new Error("worldFromCameraMatrix rotation must be a right-handed rotation.");
+  }
+  function multiplyRotation(rotation, vector) {
+  	return [
+  		0,
+  		1,
+  		2
+  	].map((row) => element(rotation, row * 3) * element(vector, 0) + element(rotation, row * 3 + 1) * element(vector, 1) + element(rotation, row * 3 + 2) * element(vector, 2));
+  }
+  function distortionCoefficients(model) {
+  	const d = model.distortion;
+  	return [
+  		d[0] ?? 0,
+  		d[1] ?? 0,
+  		d[2] ?? 0,
+  		d[3] ?? 0,
+  		d[4] ?? 0,
+  		d[5] ?? 0,
+  		d[6] ?? 0,
+  		d[7] ?? 0
+  	];
+  }
+  function element(values, index) {
+  	return values[index] ?? 0;
+  }
+  function isFiniteNumber(value) {
+  	return typeof value === "number" && Number.isFinite(value);
+  }
+  //#endregion
+  //#region src/fusion/fuse.ts
+  var DEFAULT_FUSION_GEOMETRY_OPTIONS = {
+  	minKeypointScore: .3,
+  	minSharedKeypoints: 4,
+  	maxReprojectionErrorPx: 25,
+  	minCamerasPerPerson: 2,
+  	maxPersons: 6
+  };
+  var COORDINATE_LIMIT = 1e6;
+  /**
+  * Associates the tracked persons of a synchronized instant across cameras and
+  * triangulates every COCO-17 keypoint of each multi-camera cluster.
+  */
+  function fuseSynchronizedSample(sample, models, options) {
+  	const views = collectViews(sample, models, options.minKeypointScore);
+  	const clusters = associateViews(views, options);
+  	const persons = [];
+  	for (const cluster of clusters) {
+  		const cameraIds = [...new Set(cluster.map((index) => views[index]?.cameraId ?? ""))].filter((cameraId) => cameraId.length > 0).sort();
+  		if (cameraIds.length < options.minCamerasPerPerson) continue;
+  		const clusterViews = cluster.map((index) => views[index]).filter((view) => view !== void 0);
+  		persons.push(fuseCluster(clusterViews, cameraIds, options));
+  	}
+  	return persons.sort((left, right) => right.score - left.score).slice(0, options.maxPersons);
+  }
+  function collectViews(sample, models, minKeypointScore) {
+  	const views = [];
+  	for (const camera of sample.cameras) {
+  		const model = models.get(camera.cameraId);
+  		if (!model) continue;
+  		for (const person of camera.persons) {
+  			const observations = /* @__PURE__ */ new Map();
+  			for (const keypoint of person.keypoints) {
+  				if (keypoint.score < minKeypointScore) continue;
+  				const normalized = normalizedFromPixel(model, keypoint.x, keypoint.y);
+  				observations.set(keypoint.id, {
+  					model,
+  					x: normalized.x,
+  					y: normalized.y,
+  					pixelX: keypoint.x,
+  					pixelY: keypoint.y,
+  					score: keypoint.score
+  				});
+  			}
+  			views.push({
+  				cameraId: camera.cameraId,
+  				trackingId: person.trackingId,
+  				model,
+  				observations
+  			});
+  		}
+  	}
+  	return views;
+  }
+  /** Greedy lowest-cost clustering with at most one view per camera per person. */
+  function associateViews(views, options) {
+  	const pairs = [];
+  	for (let left = 0; left < views.length; left += 1) for (let right = left + 1; right < views.length; right += 1) {
+  		const first = views[left];
+  		const second = views[right];
+  		if (!first || !second || first.cameraId === second.cameraId) continue;
+  		const cost = pairCost(first, second, options);
+  		if (cost === void 0) continue;
+  		pairs.push({
+  			left,
+  			right,
+  			cost
+  		});
+  	}
+  	pairs.sort((first, second) => first.cost - second.cost);
+  	const parent = views.map((_, index) => index);
+  	const cameras = views.map((view) => /* @__PURE__ */ new Set([view.cameraId]));
+  	const find = (index) => {
+  		let root = index;
+  		while (parent[root] !== root) root = parent[root] ?? root;
+  		return root;
+  	};
+  	for (const pair of pairs) {
+  		const leftRoot = find(pair.left);
+  		const rightRoot = find(pair.right);
+  		if (leftRoot === rightRoot) continue;
+  		const leftCameras = cameras[leftRoot];
+  		const rightCameras = cameras[rightRoot];
+  		if (!leftCameras || !rightCameras) continue;
+  		let conflict = false;
+  		for (const cameraId of rightCameras) if (leftCameras.has(cameraId)) conflict = true;
+  		if (conflict) continue;
+  		parent[rightRoot] = leftRoot;
+  		for (const cameraId of rightCameras) leftCameras.add(cameraId);
+  	}
+  	const clusters = /* @__PURE__ */ new Map();
+  	for (let index = 0; index < views.length; index += 1) {
+  		const root = find(index);
+  		const cluster = clusters.get(root) ?? [];
+  		cluster.push(index);
+  		clusters.set(root, cluster);
+  	}
+  	return [...clusters.values()];
+  }
+  /** Mean two-view reprojection error over the shared visible keypoints. */
+  function pairCost(left, right, options) {
+  	let total = 0;
+  	let shared = 0;
+  	for (const keypointId of COCO_17_KEYPOINT_IDS) {
+  		const first = left.observations.get(keypointId);
+  		const second = right.observations.get(keypointId);
+  		if (!first || !second) continue;
+  		const point = triangulate([first, second]);
+  		if (!point || !inFrontOfAll(point, [first, second])) continue;
+  		const error = meanReprojectionError(point, [first, second]);
+  		if (error === void 0) continue;
+  		total += error;
+  		shared += 1;
+  	}
+  	if (shared < options.minSharedKeypoints) return void 0;
+  	const cost = total / shared;
+  	return cost <= options.maxReprojectionErrorPx ? cost : void 0;
+  }
+  function fuseCluster(views, cameraIds, options) {
+  	const members = views.map((view) => ({
+  		cameraId: view.cameraId,
+  		trackingId: view.trackingId
+  	})).sort((left, right) => left.cameraId.localeCompare(right.cameraId));
+  	const keypoints = COCO_17_KEYPOINT_IDS.map((keypointId) => {
+  		const fused = fuseKeypoint(views.map((view) => view.observations.get(keypointId)).filter((observation) => observation !== void 0), options);
+  		return {
+  			id: keypointId,
+  			point: fused?.point,
+  			score: fused?.score ?? 0,
+  			meanReprojectionErrorPx: fused?.error ?? 0
+  		};
+  	});
+  	const fusedKeypoints = keypoints.filter((keypoint) => keypoint.point);
+  	const meanError = fusedKeypoints.length === 0 ? 0 : fusedKeypoints.reduce((total, keypoint) => total + keypoint.meanReprojectionErrorPx, 0) / fusedKeypoints.length;
+  	const score = keypoints.reduce((total, keypoint) => total + keypoint.score, 0) / COCO_17_KEYPOINT_IDS.length;
+  	return {
+  		members,
+  		cameraIds: [...cameraIds],
+  		score: clampScore(score),
+  		meanReprojectionErrorPx: meanError,
+  		keypoints
+  	};
+  }
+  function fuseKeypoint(observations, options) {
+  	let candidates = [...observations];
+  	for (let attempt = 0; attempt < 2; attempt += 1) {
+  		if (candidates.length < 2) return void 0;
+  		const point = triangulate(candidates);
+  		if (!point || !withinBounds(point)) return void 0;
+  		const visible = candidates.filter((observation) => depthOf(observation.model, point) > 0);
+  		if (visible.length < 2) return void 0;
+  		if (visible.length !== candidates.length) {
+  			candidates = visible;
+  			continue;
+  		}
+  		const error = meanReprojectionError(point, candidates);
+  		if (error === void 0) return void 0;
+  		if (error <= options.maxReprojectionErrorPx) return {
+  			point,
+  			score: clampScore(candidates.reduce((total, observation) => total + observation.score, 0) / candidates.length),
+  			error
+  		};
+  		if (candidates.length <= 2) return void 0;
+  		candidates = dropWorstObservation(point, candidates);
+  	}
+  }
+  function dropWorstObservation(point, observations) {
+  	let worstIndex = 0;
+  	let worstError = -1;
+  	observations.forEach((observation, index) => {
+  		const error = meanReprojectionError(point, [observation]) ?? Infinity;
+  		if (error > worstError) {
+  			worstError = error;
+  			worstIndex = index;
+  		}
+  	});
+  	return observations.filter((_, index) => index !== worstIndex);
+  }
+  function inFrontOfAll(point, observations) {
+  	return observations.every((observation) => depthOf(observation.model, point) > 0);
+  }
+  function withinBounds(point) {
+  	return Math.abs(point.x) <= COORDINATE_LIMIT && Math.abs(point.y) <= COORDINATE_LIMIT && Math.abs(point.z) <= COORDINATE_LIMIT;
+  }
+  function clampScore(value) {
+  	if (!Number.isFinite(value)) return 0;
+  	return Math.min(Math.max(value, 0), 1);
+  }
+  //#endregion
+  //#region src/fusion/identity.ts
+  var MAX_TRACKS = 32;
+  /**
+  * Assigns stable `person-N` identifiers to camera/tracking-ID clusters and keeps
+  * the last triangulated position of every keypoint so a momentarily unfused
+  * keypoint can hold its previous value with a zero score.
+  */
+  var PersonIdentityRegistry = class {
+  	constructor(maxUnseenSequences = 30) {
+  		this.maxUnseenSequences = maxUnseenSequences;
+  		this.tracks = /* @__PURE__ */ new Map();
+  		this.nextId = 1;
+  	}
+  	resolve(members, sequence) {
+  		const keys = members.map(memberKey);
+  		let bestId;
+  		let bestOverlap = 0;
+  		for (const [personId, track] of this.tracks) {
+  			if (track.lastSequence === sequence) continue;
+  			let overlap = 0;
+  			for (const key of keys) if (track.members.has(key)) overlap += 1;
+  			if (overlap > bestOverlap) {
+  				bestOverlap = overlap;
+  				bestId = personId;
+  			}
+  		}
+  		const personId = bestId ?? this.createId();
+  		const track = this.tracks.get(personId) ?? {
+  			members: /* @__PURE__ */ new Set(),
+  			lastSequence: sequence,
+  			keypoints: /* @__PURE__ */ new Map()
+  		};
+  		track.members = new Set(keys);
+  		track.lastSequence = sequence;
+  		this.tracks.set(personId, track);
+  		return personId;
+  	}
+  	remember(personId, keypointId, point) {
+  		this.tracks.get(personId)?.keypoints.set(keypointId, point);
+  	}
+  	lastPoint(personId, keypointId) {
+  		return this.tracks.get(personId)?.keypoints.get(keypointId);
+  	}
+  	prune(sequence) {
+  		for (const [personId, track] of this.tracks) if (sequence - track.lastSequence > this.maxUnseenSequences) this.tracks.delete(personId);
+  		while (this.tracks.size > MAX_TRACKS) {
+  			const oldest = [...this.tracks.entries()].sort((left, right) => left[1].lastSequence - right[1].lastSequence)[0];
+  			if (!oldest) break;
+  			this.tracks.delete(oldest[0]);
+  		}
+  	}
+  	clear() {
+  		this.tracks.clear();
+  		this.nextId = 1;
+  	}
+  	createId() {
+  		const personId = `person-${this.nextId}`;
+  		this.nextId += 1;
+  		return personId;
+  	}
+  };
+  function memberKey(member) {
+  	return `${member.cameraId}/${member.trackingId}`;
+  }
+  //#endregion
+  //#region src/fusion/jitter-buffer.ts
+  var DEFAULT_JITTER_BUFFER_OPTIONS = {
+  	capacityPerCamera: 120,
+  	jitterWindowUs: 2e5,
+  	maxHoldUs: 1e5,
+  	maxGapUs: 25e4,
+  	minKeypointScore: .3
+  };
+  /**
+  * Timestamp-ordered ring buffer for one camera. Frames may arrive out of order
+  * inside the jitter window; anything older than that window, older than the
+  * retained window when the ring is full, or already buffered is rejected.
+  */
+  var PoseFrameRingBuffer = class {
+  	constructor(capacity) {
+  		this.capacity = capacity;
+  		this.head = 0;
+  		this.count = 0;
+  		if (!Number.isInteger(capacity) || capacity < 2) throw new Error("Ring buffer capacity must be an integer of at least 2.");
+  		this.slots = new Array(capacity).fill(void 0);
+  	}
+  	size() {
+  		return this.count;
+  	}
+  	at(index) {
+  		if (index < 0 || index >= this.count) return void 0;
+  		return this.slots[this.slot(index)];
+  	}
+  	oldestTimestampUs() {
+  		return this.at(0)?.captureTimestampUs;
+  	}
+  	newestTimestampUs() {
+  		return this.at(this.count - 1)?.captureTimestampUs;
+  	}
+  	clear() {
+  		this.slots.fill(void 0);
+  		this.head = 0;
+  		this.count = 0;
+  	}
+  	insert(frame, jitterWindowUs) {
+  		const timestamp = frame.captureTimestampUs;
+  		const newest = this.newestTimestampUs();
+  		if (newest !== void 0 && timestamp < newest - jitterWindowUs) return "late";
+  		let index = this.count;
+  		while (index > 0) {
+  			const candidate = this.at(index - 1);
+  			if (!candidate) break;
+  			if (candidate.captureTimestampUs === timestamp) return "duplicate";
+  			if (candidate.captureTimestampUs < timestamp) break;
+  			index -= 1;
+  		}
+  		if (this.count < this.capacity) {
+  			for (let position = this.count; position > index; position -= 1) this.slots[this.slot(position)] = this.slots[this.slot(position - 1)];
+  			this.slots[this.slot(index)] = frame;
+  			this.count += 1;
+  			return "accepted";
+  		}
+  		if (index === 0) return "late";
+  		if (index === this.count) {
+  			this.head = (this.head + 1) % this.capacity;
+  			this.slots[this.slot(this.count - 1)] = frame;
+  			return "accepted";
+  		}
+  		for (let position = 1; position < index; position += 1) this.slots[this.slot(position - 1)] = this.slots[this.slot(position)];
+  		this.slots[this.slot(index - 1)] = frame;
+  		return "accepted";
+  	}
+  	/** Resamples this camera at one past instant, or returns undefined. */
+  	sampleAt(timestampUs, options) {
+  		const { previous, next } = this.bracket(timestampUs);
+  		if (previous && next) {
+  			if (previous === next) return createSample(previous, previous, 0, false, options);
+  			const gap = next.captureTimestampUs - previous.captureTimestampUs;
+  			if (gap <= options.maxGapUs) return createSample(previous, next, (timestampUs - previous.captureTimestampUs) / (gap === 0 ? 1 : gap), true, options);
+  			const beforeAge = timestampUs - previous.captureTimestampUs;
+  			const afterAge = next.captureTimestampUs - timestampUs;
+  			const nearer = beforeAge <= afterAge ? previous : next;
+  			if (Math.min(beforeAge, afterAge) > options.maxHoldUs) return void 0;
+  			return createSample(nearer, nearer, 0, true, options);
+  		}
+  		if (previous) {
+  			if (timestampUs - previous.captureTimestampUs > options.maxHoldUs) return;
+  			return createSample(previous, previous, 0, true, options);
+  		}
+  		if (next) {
+  			if (next.captureTimestampUs - timestampUs > options.maxHoldUs) return;
+  			return createSample(next, next, 0, true, options);
+  		}
+  	}
+  	bracket(timestampUs) {
+  		let low = 0;
+  		let high = this.count - 1;
+  		let previousIndex = -1;
+  		while (low <= high) {
+  			const middle = low + high >> 1;
+  			const candidate = this.at(middle);
+  			if (!candidate) break;
+  			if (candidate.captureTimestampUs <= timestampUs) {
+  				previousIndex = middle;
+  				low = middle + 1;
+  			} else high = middle - 1;
+  		}
+  		const previous = previousIndex >= 0 ? this.at(previousIndex) : void 0;
+  		if (previous?.captureTimestampUs === timestampUs) return {
+  			previous,
+  			next: previous
+  		};
+  		return {
+  			previous,
+  			next: this.at(previousIndex + 1)
+  		};
+  	}
+  	slot(index) {
+  		return (this.head + index) % this.capacity;
+  	}
+  };
+  /**
+  * Holds one ring buffer per camera and resamples every camera at a shared past
+  * instant. Timestamps stay opaque values from the external synchronized time
+  * service; no clock offset is estimated here.
+  */
+  var MultiCameraJitterBuffer = class {
+  	constructor(options) {
+  		this.options = options;
+  		this.buffers = /* @__PURE__ */ new Map();
+  		this.acceptedFrames = 0;
+  		this.droppedFrames = 0;
+  	}
+  	configure(options) {
+  		this.options = options;
+  		this.clear();
+  	}
+  	ingest(frame) {
+  		let buffer = this.buffers.get(frame.cameraId);
+  		if (!buffer) {
+  			buffer = new PoseFrameRingBuffer(this.options.capacityPerCamera);
+  			this.buffers.set(frame.cameraId, buffer);
+  		}
+  		const outcome = buffer.insert(frame, this.options.jitterWindowUs);
+  		if (outcome === "accepted") this.acceptedFrames += 1;
+  		else this.droppedFrames += 1;
+  		return outcome;
+  	}
+  	cameraIds() {
+  		return [...this.buffers.keys()].sort();
+  	}
+  	bufferedFrameCount() {
+  		let total = 0;
+  		for (const buffer of this.buffers.values()) total += buffer.size();
+  		return total;
+  	}
+  	acceptedFrameCount() {
+  		return this.acceptedFrames;
+  	}
+  	droppedFrameCount() {
+  		return this.droppedFrames;
+  	}
+  	/** Newest buffered timestamp across every camera. */
+  	newestTimestampUs() {
+  		let newest;
+  		for (const buffer of this.buffers.values()) {
+  			const candidate = buffer.newestTimestampUs();
+  			if (candidate === void 0) continue;
+  			if (newest === void 0 || candidate > newest) newest = candidate;
+  		}
+  		return newest;
+  	}
+  	/** Oldest buffered timestamp across every camera. */
+  	oldestTimestampUs() {
+  		let oldest;
+  		for (const buffer of this.buffers.values()) {
+  			const candidate = buffer.oldestTimestampUs();
+  			if (candidate === void 0) continue;
+  			if (oldest === void 0 || candidate < oldest) oldest = candidate;
+  		}
+  		return oldest;
+  	}
+  	sampleAt(timestampUs) {
+  		const cameras = [];
+  		for (const cameraId of this.cameraIds()) {
+  			const sample = this.buffers.get(cameraId)?.sampleAt(timestampUs, this.options);
+  			if (sample) cameras.push(sample);
+  		}
+  		return {
+  			timestampUs,
+  			cameras
+  		};
+  	}
+  	clear() {
+  		for (const buffer of this.buffers.values()) buffer.clear();
+  		this.buffers.clear();
+  		this.acceptedFrames = 0;
+  		this.droppedFrames = 0;
+  	}
+  };
+  function createSample(previous, next, alpha, interpolated, options) {
+  	const clamped = Math.min(Math.max(alpha, 0), 1);
+  	return {
+  		cameraId: previous.cameraId,
+  		calibrationId: previous.calibrationId,
+  		frameWidth: previous.frameWidth,
+  		frameHeight: previous.frameHeight,
+  		previousTimestampUs: previous.captureTimestampUs,
+  		nextTimestampUs: next.captureTimestampUs,
+  		alpha: clamped,
+  		interpolated,
+  		persons: mergePersons(previous, next, clamped, interpolated, options)
+  	};
+  }
+  function mergePersons(previous, next, alpha, interpolated, options) {
+  	const previousPersons = new Map(previous.persons.map((person) => [person.trackingId, person]));
+  	const nextPersons = previous === next ? previousPersons : new Map(next.persons.map((person) => [person.trackingId, person]));
+  	const trackingIds = [.../* @__PURE__ */ new Set([...previousPersons.keys(), ...nextPersons.keys()])];
+  	const persons = [];
+  	for (const trackingId of trackingIds) {
+  		const before = previousPersons.get(trackingId);
+  		const after = nextPersons.get(trackingId);
+  		if (before && after && before !== after) {
+  			persons.push({
+  				trackingId,
+  				score: lerp(before.score, after.score, alpha),
+  				keypoints: mergeKeypoints(before, after, alpha, options)
+  			});
+  			continue;
+  		}
+  		const single = before ?? after;
+  		if (!single) continue;
+  		persons.push({
+  			trackingId,
+  			score: single.score,
+  			keypoints: singleKeypoints(single, interpolated)
+  		});
+  	}
+  	return persons;
+  }
+  function mergeKeypoints(before, after, alpha, options) {
+  	const beforeById = keypointsById(before);
+  	const afterById = keypointsById(after);
+  	return COCO_17_KEYPOINT_IDS.map((id) => {
+  		const start = beforeById.get(id);
+  		const end = afterById.get(id);
+  		const startValid = isVisible(start, options.minKeypointScore);
+  		const endValid = isVisible(end, options.minKeypointScore);
+  		if (start && end && startValid && endValid) return {
+  			id,
+  			x: lerp(start.x, end.x, alpha),
+  			y: lerp(start.y, end.y, alpha),
+  			score: lerp(start.score, end.score, alpha),
+  			filled: true
+  		};
+  		if (start && startValid) return {
+  			id,
+  			x: start.x,
+  			y: start.y,
+  			score: start.score,
+  			filled: true
+  		};
+  		if (end && endValid) return {
+  			id,
+  			x: end.x,
+  			y: end.y,
+  			score: end.score,
+  			filled: true
+  		};
+  		if (start && end) return {
+  			id,
+  			x: lerp(start.x, end.x, alpha),
+  			y: lerp(start.y, end.y, alpha),
+  			score: lerp(start.score, end.score, alpha),
+  			filled: true
+  		};
+  		const single = start ?? end;
+  		return {
+  			id,
+  			x: single?.x ?? 0,
+  			y: single?.y ?? 0,
+  			score: single?.score ?? 0,
+  			filled: true
+  		};
+  	});
+  }
+  function singleKeypoints(person, interpolated) {
+  	const byId = keypointsById(person);
+  	return COCO_17_KEYPOINT_IDS.map((id) => {
+  		const keypoint = byId.get(id);
+  		return {
+  			id,
+  			x: keypoint?.x ?? 0,
+  			y: keypoint?.y ?? 0,
+  			score: keypoint?.score ?? 0,
+  			filled: interpolated || !keypoint
+  		};
+  	});
+  }
+  function keypointsById(person) {
+  	return new Map(person.keypoints.map((keypoint) => [keypoint.id, keypoint]));
+  }
+  function isVisible(keypoint, minimumScore) {
+  	return keypoint !== void 0 && keypoint.score >= minimumScore;
+  }
+  function lerp(start, end, alpha) {
+  	return start + (end - start) * alpha;
+  }
+  var MAX_DELAY_MS = 5e3;
+  var MAX_JITTER_MS = 2e3;
+  var MIN_RING_SLOTS = 16;
+  var MAX_RING_SLOTS = 600;
+  var ASSUMED_MINIMUM_FRAME_INTERVAL_US = 8e3;
+  var PoseFusionController = class {
+  	constructor() {
+  		this.buffer = new MultiCameraJitterBuffer(DEFAULT_JITTER_BUFFER_OPTIONS);
+  		this.identities = new PersonIdentityRegistry();
+  		this.models = /* @__PURE__ */ new Map();
+  		this.jitterOptions = DEFAULT_JITTER_BUFFER_OPTIONS;
+  		this.geometryOptions = DEFAULT_FUSION_GEOMETRY_OPTIONS;
+  		this.delayUs = 0;
+  		this.started = false;
+  		this.sequence = 0;
+  		this.fusionState = "idle";
+  		this.fusionErrorCode = "";
+  		this.fusionErrorMessage = "";
+  		this.latestFrameJsonValue = "";
+  	}
+  	start(options) {
+  		const delayMs = requireRange(options.delayMilliseconds, 0, MAX_DELAY_MS, "fusion delay");
+  		const jitterMs = requireRange(options.jitterMilliseconds, 1, MAX_JITTER_MS, "jitter window");
+  		const minKeypointScore = requireRange(options.minKeypointScore, 0, 1, "minimum keypoint score");
+  		this.delayUs = Math.round(delayMs * 1e3);
+  		const jitterWindowUs = Math.round(jitterMs * 1e3);
+  		this.jitterOptions = {
+  			capacityPerCamera: ringSlots(this.delayUs, jitterWindowUs),
+  			jitterWindowUs,
+  			maxHoldUs: jitterWindowUs,
+  			maxGapUs: jitterWindowUs * 2,
+  			minKeypointScore
+  		};
+  		this.geometryOptions = {
+  			...DEFAULT_FUSION_GEOMETRY_OPTIONS,
+  			minKeypointScore
+  		};
+  		this.buffer.configure(this.jitterOptions);
+  		this.identities.clear();
+  		this.sequence = 0;
+  		this.latestFrame = void 0;
+  		this.latestFrameJsonValue = "";
+  		this.latestSample = void 0;
+  		this.started = true;
+  		this.fusionState = "buffering";
+  		this.clearError();
+  	}
+  	stop() {
+  		this.buffer.clear();
+  		this.identities.clear();
+  		this.sequence = 0;
+  		this.latestFrame = void 0;
+  		this.latestFrameJsonValue = "";
+  		this.latestSample = void 0;
+  		this.started = false;
+  		this.fusionState = "idle";
+  		this.clearError();
+  	}
+  	/** Releases buffers and every loaded calibration profile. */
+  	cleanup() {
+  		this.stop();
+  		this.models.clear();
+  	}
+  	loadCalibration(json) {
+  		const decoded = decodeProtocolJson(json, Date.now());
+  		if (!decoded.ok || decoded.schema !== "twmp/camera-calibration") {
+  			const message = decoded.ok ? `Expected twmp/camera-calibration, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  			this.fail("calibration-invalid", message);
+  		}
+  		const calibration = decoded.value;
+  		if (!this.models.has(calibration.cameraId) && this.models.size >= 16) this.fail("calibration-invalid", `At most 16 calibrated cameras can be fused.`);
+  		let model;
+  		try {
+  			model = createCameraModel(calibration);
+  		} catch (error) {
+  			this.fail("calibration-invalid", errorMessage$1(error));
+  		}
+  		this.models.set(calibration.cameraId, model);
+  		this.clearError();
+  	}
+  	/** Buffers one PoseFrame2D. Duplicate and late frames are counted, not thrown. */
+  	ingestFrame(json) {
+  		this.requireStarted();
+  		const decoded = decodeProtocolJson(json, Date.now());
+  		if (!decoded.ok || decoded.schema !== "twmp/pose-frame-2d") {
+  			const message = decoded.ok ? `Expected twmp/pose-frame-2d, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  			this.fail("frame-invalid", message);
+  		}
+  		const frame = decoded.value;
+  		if (!this.buffer.cameraIds().includes(frame.cameraId) && this.buffer.cameraIds().length >= 16) this.fail("frame-invalid", `At most 16 cameras can be buffered.`);
+  		const outcome = this.buffer.ingest(frame);
+  		if (outcome === "accepted") {
+  			this.clearError();
+  			if (this.fusionState === "idle") this.fusionState = "buffering";
+  			return;
+  		}
+  		this.fusionErrorCode = "frame-dropped";
+  		this.fusionErrorMessage = `${outcome}: camera ${frame.cameraId} frame at ${frame.captureTimestampUs} us was not buffered.`;
+  	}
+  	/** Fuses the instant that sits one configured delay behind the newest frame. */
+  	fuseBufferedInstant() {
+  		this.requireStarted();
+  		const newest = this.buffer.newestTimestampUs();
+  		if (newest === void 0) {
+  			this.reject("empty-buffer", "No PoseFrame2D has been buffered.");
+  			return false;
+  		}
+  		return this.fuseAt(Math.max(newest - this.delayUs, 0));
+  	}
+  	/** Fuses one explicit past instant expressed in the synchronized time base. */
+  	fuseAt(timestampUs) {
+  		this.requireStarted();
+  		if (!Number.isSafeInteger(timestampUs) || timestampUs < 0) this.fail("invalid-output", "Fusion timestamp must be a non-negative integer in microseconds.");
+  		this.fusionState = "fusing";
+  		const sample = this.buffer.sampleAt(timestampUs);
+  		this.latestSample = sample;
+  		const calibrated = sample.cameras.filter((camera) => this.models.has(camera.cameraId));
+  		if (calibrated.length < this.geometryOptions.minCamerasPerPerson) {
+  			this.reject("insufficient-cameras", `Only ${calibrated.length} calibrated camera(s) covered ${timestampUs} us.`);
+  			return false;
+  		}
+  		const persons = fuseSynchronizedSample(sample, this.models, this.geometryOptions);
+  		if (persons.length === 0) {
+  			this.reject("no-fused-person", `No person was observed by ${this.geometryOptions.minCamerasPerPerson} or more cameras.`);
+  			return false;
+  		}
+  		const frame = {
+  			schema: "twmp/pose-frame-3d",
+  			version: 1,
+  			sequence: this.sequence,
+  			timestampUs,
+  			persons: persons.map((person) => {
+  				const personId = this.identities.resolve(person.members, this.sequence);
+  				return {
+  					personId,
+  					score: round(person.score),
+  					cameraIds: person.cameraIds,
+  					meanReprojectionErrorPx: round(person.meanReprojectionErrorPx),
+  					keypoints: person.keypoints.map((keypoint) => {
+  						if (keypoint.point) {
+  							this.identities.remember(personId, keypoint.id, keypoint.point);
+  							return {
+  								id: keypoint.id,
+  								x: round(keypoint.point.x),
+  								y: round(keypoint.point.y),
+  								z: round(keypoint.point.z),
+  								score: round(keypoint.score)
+  							};
+  						}
+  						const held = this.identities.lastPoint(personId, keypoint.id);
+  						return {
+  							id: keypoint.id,
+  							x: round(held?.x ?? 0),
+  							y: round(held?.y ?? 0),
+  							z: round(held?.z ?? 0),
+  							score: 0
+  						};
+  					})
+  				};
+  			})
+  		};
+  		if (!Check(PoseFrame3DSchema, frame)) {
+  			const first = Errors(PoseFrame3DSchema, frame).First();
+  			this.latestSample = sample;
+  			this.fail("invalid-output", `${first?.path || "/"}: ${first?.message ?? "Fused frame does not match PoseFrame3D v1."}`);
+  		}
+  		this.identities.prune(this.sequence);
+  		this.sequence += 1;
+  		this.latestFrame = frame;
+  		this.latestFrameJsonValue = JSON.stringify(frame);
+  		this.fusionState = "ready";
+  		this.clearError();
+  		return true;
+  	}
+  	state() {
+  		return this.fusionState;
+  	}
+  	ready() {
+  		return this.started && this.models.size >= this.geometryOptions.minCamerasPerPerson;
+  	}
+  	cameraCount() {
+  		return this.models.size;
+  	}
+  	bufferedFrameCount() {
+  		return this.buffer.bufferedFrameCount();
+  	}
+  	droppedFrameCount() {
+  		return this.buffer.droppedFrameCount();
+  	}
+  	personCount() {
+  		const persons = this.latestFrame?.persons;
+  		return Array.isArray(persons) ? persons.length : 0;
+  	}
+  	fusedTimestampUs() {
+  		const timestamp = this.latestFrame?.timestampUs;
+  		return typeof timestamp === "number" ? timestamp : 0;
+  	}
+  	meanReprojectionErrorPx() {
+  		const persons = this.latestFrame?.persons;
+  		if (!Array.isArray(persons) || persons.length === 0) return 0;
+  		let total = 0;
+  		for (const person of persons) {
+  			const error = person.meanReprojectionErrorPx;
+  			total += typeof error === "number" ? error : 0;
+  		}
+  		return round(total / persons.length);
+  	}
+  	latestFrameJson() {
+  		return this.latestFrameJsonValue;
+  	}
+  	synchronizedSampleJson() {
+  		return this.latestSample ? JSON.stringify(this.latestSample) : "";
+  	}
+  	errorCode() {
+  		return this.fusionErrorCode;
+  	}
+  	errorMessage() {
+  		return this.fusionErrorMessage;
+  	}
+  	requireStarted() {
+  		if (!this.started) throw new Error("Pose fusion has not been started.");
+  	}
+  	/** Expected transient shortage: no throw, no replacement of the last frame. */
+  	reject(code, message) {
+  		this.fusionState = "buffering";
+  		this.fusionErrorCode = code;
+  		this.fusionErrorMessage = `${code}: ${message}`;
+  	}
+  	fail(code, message) {
+  		this.fusionState = "error";
+  		this.fusionErrorCode = code;
+  		this.fusionErrorMessage = `${code}: ${message}`;
+  		throw new Error(this.fusionErrorMessage);
+  	}
+  	clearError() {
+  		this.fusionErrorCode = "";
+  		this.fusionErrorMessage = "";
+  	}
+  };
+  function ringSlots(delayUs, jitterWindowUs) {
+  	const span = delayUs + jitterWindowUs * 2;
+  	const slots = Math.ceil(span / ASSUMED_MINIMUM_FRAME_INTERVAL_US) + 8;
+  	return Math.min(Math.max(slots, MIN_RING_SLOTS), MAX_RING_SLOTS);
+  }
+  function requireRange(value, minimum, maximum, label) {
+  	if (!Number.isFinite(value) || value < minimum || value > maximum) throw new Error(`Invalid ${label}: expected ${minimum} to ${maximum}, received ${value}.`);
+  	return value;
+  }
+  function round(value) {
+  	return Math.round(value * 1e6) / 1e6;
+  }
+  function errorMessage$1(error) {
+  	return error instanceof Error ? error.message : String(error);
+  }
+  //#endregion
   //#region src/extension.ts
   var blockDefinitions = block_definitions_default.blocks;
   var MultiviewPoseExtension = class {
@@ -77153,6 +78440,7 @@
   			this.endOfferQrDisplay();
   			this.pose.stop();
   			this.calibration.cancel();
+  			this.fusion.stop();
   		};
   		this.disposeListener = () => this.dispose();
   		this.targetRemovedListener = (target) => {
@@ -77162,6 +78450,7 @@
   		this.poseEnabled = options.poseEnabled ?? featureFlags.webgpuMoveNetMultiPose;
   		this.protocolEnabled = options.protocolEnabled ?? featureFlags.protocolV1Codec;
   		this.calibrationEnabled = options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
+  		this.fusionEnabled = options.fusionEnabled ?? featureFlags.poseFusion3D;
   		this.errorCorrectionLevel = options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.skins = new TemporarySpriteSkinManager(this.runtime);
@@ -77175,6 +78464,7 @@
   			backend: options.calibrationBackend ?? new OpenCvChessboardCalibrationBackend(),
   			...options.nowMilliseconds ? { nowMilliseconds: options.nowMilliseconds } : {}
   		});
+  		this.fusion = new PoseFusionController();
   		this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
   		this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
   		this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -77392,10 +78682,77 @@
   	cameraCalibrationJson() {
   		return this.calibration.profileJson();
   	}
+  	startPoseFusion(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.start({
+  			delayMilliseconds: Scratch.Cast.toNumber(args.DELAY_MS),
+  			jitterMilliseconds: Scratch.Cast.toNumber(args.JITTER_MS),
+  			minKeypointScore: Scratch.Cast.toNumber(args.MIN_SCORE)
+  		});
+  	}
+  	stopPoseFusion() {
+  		this.fusion.stop();
+  	}
+  	cleanupPoseFusion() {
+  		this.fusion.cleanup();
+  	}
+  	loadFusionCameraCalibration(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.loadCalibration(Scratch.Cast.toString(args.JSON));
+  	}
+  	bufferPoseFrame2D(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.ingestFrame(Scratch.Cast.toString(args.JSON));
+  	}
+  	fuseBufferedPoseFrame3D() {
+  		this.requireFusionEnabled();
+  		this.fusion.fuseBufferedInstant();
+  	}
+  	fusePoseFrame3DAt(args) {
+  		this.requireFusionEnabled();
+  		this.fusion.fuseAt(Scratch.Cast.toNumber(args.TIMESTAMP_US));
+  	}
+  	latestPoseFrame3D() {
+  		return this.fusionEnabled ? this.fusion.latestFrameJson() : "";
+  	}
+  	synchronizedPoseSet2D() {
+  		return this.fusionEnabled ? this.fusion.synchronizedSampleJson() : "";
+  	}
+  	poseFusionState() {
+  		return this.fusionEnabled ? this.fusion.state() : "disabled";
+  	}
+  	poseFusionReady() {
+  		return this.fusionEnabled && this.fusion.ready();
+  	}
+  	poseFusionCameraCount() {
+  		return this.fusion.cameraCount();
+  	}
+  	poseFusionBufferedFrameCount() {
+  		return this.fusion.bufferedFrameCount();
+  	}
+  	poseFusionDroppedFrameCount() {
+  		return this.fusion.droppedFrameCount();
+  	}
+  	poseFusionPersonCount() {
+  		return this.fusion.personCount();
+  	}
+  	poseFusionTimestampUs() {
+  		return this.fusion.fusedTimestampUs();
+  	}
+  	poseFusionReprojectionErrorPx() {
+  		return this.fusion.meanReprojectionErrorPx();
+  	}
+  	poseFusionErrorCode() {
+  		return this.fusion.errorCode();
+  	}
+  	poseFusionError() {
+  		return this.fusion.errorMessage();
+  	}
   	dispose() {
   		this.endOfferQrDisplay();
   		this.pose.stop();
   		this.calibration.cancel();
+  		this.fusion.stop();
   		this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
   		this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
   		this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -77411,6 +78768,9 @@
   	requireProtocolEnabled() {
   		if (!this.protocolEnabled) throw new Error("Protocol v1 codec is disabled. Enable it before the project starts.");
   	}
+  	requireFusionEnabled() {
+  		if (!this.fusionEnabled) throw new Error("Pose fusion 3D is disabled. Enable it before the project starts.");
+  	}
   	requireCalibrationEnabled() {
   		if (!this.calibrationEnabled) throw new Error("Camera calibration v1 is disabled. Enable it before the project starts.");
   	}
@@ -77418,7 +78778,8 @@
   		if (feature === "qrCourierPairing") return this.enabled;
   		if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
   		if (feature === "protocolV1Codec") return this.protocolEnabled;
-  		return this.calibrationEnabled;
+  		if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
+  		return this.fusionEnabled;
   	}
   	requireSession() {
   		if (!this.session) throw new Error("Prepare an offer QR before displaying a part.");

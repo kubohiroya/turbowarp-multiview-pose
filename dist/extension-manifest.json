@@ -8,6 +8,16 @@
       "arguments": []
     },
     {
+      "opcode": "bufferPoseFrame2D",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "cameraCalibrationBackend",
       "blockType": "REPORTER",
       "arguments": []
@@ -73,6 +83,11 @@
       "arguments": []
     },
     {
+      "opcode": "cleanupPoseFusion",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "createAndShowOfferQr",
       "blockType": "COMMAND",
       "arguments": [
@@ -113,6 +128,21 @@
       "arguments": []
     },
     {
+      "opcode": "fuseBufferedPoseFrame3D",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "fusePoseFrame3DAt",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "TIMESTAMP_US",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
       "opcode": "importCameraCalibration",
       "blockType": "COMMAND",
       "arguments": [
@@ -136,6 +166,21 @@
       "opcode": "latestPoseFrame2D",
       "blockType": "REPORTER",
       "arguments": []
+    },
+    {
+      "opcode": "latestPoseFrame3D",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "loadFusionCameraCalibration",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
     },
     {
       "opcode": "offerQrCurrentPart",
@@ -169,6 +214,56 @@
     },
     {
       "opcode": "poseErrorCode",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionBufferedFrameCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionCameraCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionDroppedFrameCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionErrorCode",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionPersonCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionReady",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionReprojectionErrorPx",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "poseFusionTimestampUs",
       "blockType": "REPORTER",
       "arguments": []
     },
@@ -268,6 +363,24 @@
       ]
     },
     {
+      "opcode": "startPoseFusion",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "DELAY_MS",
+          "type": "NUMBER"
+        },
+        {
+          "id": "JITTER_MS",
+          "type": "NUMBER"
+        },
+        {
+          "id": "MIN_SCORE",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
       "opcode": "startWebGpuMoveNetMultiPose",
       "blockType": "COMMAND",
       "arguments": [
@@ -286,8 +399,18 @@
       ]
     },
     {
+      "opcode": "stopPoseFusion",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "stopWebGpuMoveNetMultiPose",
       "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "synchronizedPoseSet2D",
+      "blockType": "REPORTER",
       "arguments": []
     },
     {
