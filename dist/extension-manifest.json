@@ -113,6 +113,21 @@
       "arguments": []
     },
     {
+      "opcode": "disableGlowStickMarkers",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "enableGlowStickMarkers",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "KEYPOINTS",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "encodeProtocolJson",
       "blockType": "REPORTER",
       "arguments": [
@@ -141,6 +156,21 @@
           "type": "NUMBER"
         }
       ]
+    },
+    {
+      "opcode": "glowStickMarkerCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "glowStickPaletteSize",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "identifiedPerformerCount",
+      "blockType": "REPORTER",
+      "arguments": []
     },
     {
       "opcode": "importCameraCalibration",
@@ -181,6 +211,21 @@
           "type": "STRING"
         }
       ]
+    },
+    {
+      "opcode": "loadGlowStickPalette",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "mirrorCorrectedViewCount",
+      "blockType": "REPORTER",
+      "arguments": []
     },
     {
       "opcode": "offerQrCurrentPart",
@@ -311,6 +356,20 @@
       "opcode": "protocolVersion",
       "blockType": "REPORTER",
       "arguments": []
+    },
+    {
+      "opcode": "setPerformerGlowStick",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "KEYPOINT",
+          "type": "STRING"
+        },
+        {
+          "id": "PERFORMER_ID",
+          "type": "STRING"
+        }
+      ]
     },
     {
       "opcode": "showNextOfferQrPart",

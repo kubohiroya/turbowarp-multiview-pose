@@ -637,6 +637,85 @@
   			"text": "pose fusion error",
   			"description": "Returns the latest fusion error message.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "enableGlowStickMarkers",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "sample glow stick colors at [KEYPOINTS]",
+  			"description": "Samples the named COCO-17 keypoints for a uniquely colored glow stick and reports PoseFrame2D v2.",
+  			"arguments": { "KEYPOINTS": {
+  				"type": "STRING",
+  				"defaultValue": "right_wrist,left_wrist"
+  			} }
+  		},
+  		{
+  			"opcode": "disableGlowStickMarkers",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "stop sampling glow stick colors",
+  			"description": "Returns pose reporting to PoseFrame2D v1 without glow stick markers.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "glowStickMarkerCount",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "glow stick marker count",
+  			"description": "Returns how many glow stick markers the latest pose frame carries.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "loadGlowStickPalette",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "load glow stick palette from PerformanceDSL [JSON]",
+  			"description": "Loads the performer colors from a Performance DSL v1 payload for fusion identity.",
+  			"arguments": { "JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "setPerformerGlowStick",
+  			"feature": "glowStickMarkers",
+  			"blockType": "COMMAND",
+  			"text": "set performer [PERFORMER_ID] glow stick at [KEYPOINT]",
+  			"description": "Chooses which COCO-17 keypoint one performer carries the glow stick at.",
+  			"arguments": {
+  				"PERFORMER_ID": {
+  					"type": "STRING",
+  					"defaultValue": "actor-1"
+  				},
+  				"KEYPOINT": {
+  					"type": "STRING",
+  					"defaultValue": "right_wrist"
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "glowStickPaletteSize",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "glow stick palette size",
+  			"description": "Returns how many performers the loaded palette describes.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "identifiedPerformerCount",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "identified performer count",
+  			"description": "Returns how many fused people the last fusion identified by glow stick color.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "mirrorCorrectedViewCount",
+  			"feature": "glowStickMarkers",
+  			"blockType": "REPORTER",
+  			"text": "mirror-corrected view count",
+  			"description": "Returns how many camera views the last fusion corrected for swapped left and right labels.",
+  			"arguments": {}
   		}
   	]
   };
@@ -649,7 +728,8 @@
   	webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
   	protocolV1Codec: overrides?.protocolV1Codec === true,
   	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
-  	poseFusion3D: overrides?.poseFusion3D === true
+  	poseFusion3D: overrides?.poseFusion3D === true,
+  	glowStickMarkers: overrides?.glowStickMarkers === true
   });
   //#endregion
   //#region config/qr-config.ts
@@ -3296,19 +3376,40 @@
   ];
   //#endregion
   //#region src/pose/pose-frame.ts
-  function createPoseFrame2D(poses, context) {
-  	return {
+  /**
+  * Builds a v1 frame, or a v2 frame when glow stick markers were sampled for the
+  * same video frame. Markers are keyed by the index of the pose they belong to.
+  */
+  function createPoseFrame2D(poses, context, markersByPose) {
+  	const header = {
   		schema: "twmp/pose-frame-2d",
-  		version: 1,
   		cameraId: identifier$3(context.cameraId, "camera ID"),
   		peerId: identifier$3(context.peerId, "peer ID"),
   		sequence: safeInteger(context.sequence, "sequence"),
   		captureTimestampUs: safeInteger(context.captureTimestampUs, "capture timestamp"),
   		frameWidth: dimension(context.frameWidth, "frame width"),
   		frameHeight: dimension(context.frameHeight, "frame height"),
-  		calibrationId: identifier$3(context.calibrationId, "calibration ID"),
-  		persons: poses.slice(0, 6).map(toPerson)
+  		calibrationId: identifier$3(context.calibrationId, "calibration ID")
   	};
+  	const retained = poses.slice(0, 6);
+  	if (!markersByPose) return {
+  		...header,
+  		version: 1,
+  		persons: retained.map(toPerson)
+  	};
+  	return {
+  		...header,
+  		version: 2,
+  		persons: retained.map((pose, index) => ({
+  			...toPerson(pose),
+  			markers: (markersByPose.get(index) ?? []).map(marker)
+  		}))
+  	};
+  }
+  function marker(value) {
+  	if (!/^#[0-9A-Fa-f]{6}$/u.test(value.colorHex)) throw new Error(`Invalid glow stick color: ${value.colorHex}`);
+  	if (!isScore(value.coverage)) throw new Error("Glow stick coverage must be between 0 and 1.");
+  	return value;
   }
   function toPerson(pose) {
   	if (!Number.isSafeInteger(pose.id) || Number(pose.id) < 0) throw new Error("MoveNet tracking did not provide a valid person ID.");
@@ -3348,6 +3449,201 @@
   	return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
   }
   //#endregion
+  //#region src/markers/color.ts
+  /** Parses `#RRGGBB`, rejecting every other spelling. */
+  function parseHexColor(value) {
+  	if (!/^#[0-9A-Fa-f]{6}$/u.test(value)) return void 0;
+  	return {
+  		r: Number.parseInt(value.slice(1, 3), 16),
+  		g: Number.parseInt(value.slice(3, 5), 16),
+  		b: Number.parseInt(value.slice(5, 7), 16)
+  	};
+  }
+  function hexFromRgb(r, g, b) {
+  	return `#${[
+  		r,
+  		g,
+  		b
+  	].map(toHexByte).join("")}`;
+  }
+  function rgbToHsv(r, g, b) {
+  	const red = r / 255;
+  	const green = g / 255;
+  	const blue = b / 255;
+  	const max = Math.max(red, green, blue);
+  	const delta = max - Math.min(red, green, blue);
+  	let hue = 0;
+  	if (delta > 0) {
+  		if (max === red) hue = 60 * (((green - blue) / delta + 6) % 6);
+  		else if (max === green) hue = 60 * ((blue - red) / delta + 2);
+  		else hue = 60 * ((red - green) / delta + 4);
+  	}
+  	return {
+  		hue,
+  		saturation: max === 0 ? 0 : delta / max,
+  		value: max
+  	};
+  }
+  function hsvFromHex(value) {
+  	const rgb = parseHexColor(value);
+  	return rgb ? rgbToHsv(rgb.r, rgb.g, rgb.b) : void 0;
+  }
+  /** Shortest distance between two hues in degrees. */
+  function hueDistance(first, second) {
+  	const difference = Math.abs(first - second) % 360;
+  	return difference > 180 ? 360 - difference : difference;
+  }
+  function toHexByte(value) {
+  	return Math.min(Math.max(Math.round(value), 0), 255).toString(16).padStart(2, "0");
+  }
+  //#endregion
+  //#region src/markers/sampler.ts
+  var MIN_PATCH_RADIUS = 6;
+  var MAX_PATCH_RADIUS = 64;
+  var PATCH_SCALE = .28;
+  /**
+  * Dominant saturated color of one RGBA patch. Unsaturated pixels are skipped so
+  * a glow stick wins over skin, clothing, and the venue background; the hue is a
+  * circular mean, which keeps a wrapping red cluster near red.
+  */
+  function dominantSaturatedColor(pixels, options) {
+  	const total = Math.floor(pixels.length / 4);
+  	if (total === 0) return void 0;
+  	let qualifying = 0;
+  	let hueX = 0;
+  	let hueY = 0;
+  	let saturation = 0;
+  	let value = 0;
+  	for (let index = 0; index < total; index += 1) {
+  		const hsv = rgbToHsv(pixels[index * 4] ?? 0, pixels[index * 4 + 1] ?? 0, pixels[index * 4 + 2] ?? 0);
+  		if (hsv.saturation < options.minSaturation) continue;
+  		if (hsv.value < options.minValue) continue;
+  		const radians = hsv.hue * Math.PI / 180;
+  		hueX += Math.cos(radians);
+  		hueY += Math.sin(radians);
+  		saturation += hsv.saturation;
+  		value += hsv.value;
+  		qualifying += 1;
+  	}
+  	const coverage = qualifying / total;
+  	if (qualifying === 0 || coverage < options.minCoverage) return void 0;
+  	return {
+  		colorHex: hexFromHsv((Math.atan2(hueY / qualifying, hueX / qualifying) * 180 / Math.PI + 360) % 360, saturation / qualifying, value / qualifying),
+  		coverage: Math.min(coverage, 1)
+  	};
+  }
+  /** Patch to sample for one keypoint, scaled by the person's own size. */
+  function markerPatchesFor(pose, options) {
+  	const byName = new Map(pose.keypoints.map((keypoint) => [keypoint.name, keypoint]));
+  	const radius = patchRadius(pose);
+  	const patches = [];
+  	for (const keypointId of options.keypointIds) {
+  		const keypoint = byName.get(keypointId);
+  		if (!keypoint || (keypoint.score ?? 0) < options.minKeypointScore) continue;
+  		if (!Number.isFinite(keypoint.x) || !Number.isFinite(keypoint.y)) continue;
+  		patches.push({
+  			keypointId,
+  			patch: {
+  				x: keypoint.x,
+  				y: keypoint.y,
+  				radius
+  			}
+  		});
+  	}
+  	return patches;
+  }
+  /** Keeps the strongest observation per keypoint, bounded by the v2 contract. */
+  function toMarkers(samples) {
+  	const strongest = /* @__PURE__ */ new Map();
+  	for (const { keypointId, color } of samples) {
+  		if (!color) continue;
+  		const existing = strongest.get(keypointId);
+  		if (existing && existing.coverage >= color.coverage) continue;
+  		strongest.set(keypointId, {
+  			keypointId,
+  			colorHex: color.colorHex,
+  			coverage: round$4(color.coverage)
+  		});
+  	}
+  	return [...strongest.values()].sort((left, right) => right.coverage - left.coverage || COCO_17_KEYPOINT_IDS.indexOf(left.keypointId) - COCO_17_KEYPOINT_IDS.indexOf(right.keypointId)).slice(0, 4);
+  }
+  function parseKeypointIds(value) {
+  	const requested = value.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  	if (requested.length === 0) throw new Error("Name at least one COCO-17 keypoint to sample.");
+  	const keypointIds = [];
+  	for (const entry of requested) {
+  		const keypointId = COCO_17_KEYPOINT_IDS.find((id) => id === entry);
+  		if (!keypointId) throw new Error(`Unknown COCO-17 keypoint: ${entry}`);
+  		if (!keypointIds.includes(keypointId)) keypointIds.push(keypointId);
+  	}
+  	return keypointIds;
+  }
+  function patchRadius(pose) {
+  	const byName = new Map(pose.keypoints.map((keypoint) => [keypoint.name, keypoint]));
+  	const leftShoulder = byName.get("left_shoulder");
+  	const rightShoulder = byName.get("right_shoulder");
+  	let scale = 0;
+  	if (leftShoulder && rightShoulder) scale = Math.hypot(leftShoulder.x - rightShoulder.x, leftShoulder.y - rightShoulder.y);
+  	if (scale === 0) {
+  		const xs = pose.keypoints.map((keypoint) => keypoint.x);
+  		const ys = pose.keypoints.map((keypoint) => keypoint.y);
+  		scale = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  	}
+  	const radius = Math.round(scale * PATCH_SCALE);
+  	return Math.min(Math.max(radius, MIN_PATCH_RADIUS), MAX_PATCH_RADIUS);
+  }
+  function hexFromHsv(hue, saturation, value) {
+  	const chroma = value * saturation;
+  	const secondary = chroma * (1 - Math.abs(hue / 60 % 2 - 1));
+  	const match = value - chroma;
+  	const [red, green, blue] = rgbFromSector(hue, chroma, secondary);
+  	return hexFromRgb((red + match) * 255, (green + match) * 255, (blue + match) * 255);
+  }
+  function rgbFromSector(hue, chroma, secondary) {
+  	if (hue < 60) return [
+  		chroma,
+  		secondary,
+  		0
+  	];
+  	if (hue < 120) return [
+  		secondary,
+  		chroma,
+  		0
+  	];
+  	if (hue < 180) return [
+  		0,
+  		chroma,
+  		secondary
+  	];
+  	if (hue < 240) return [
+  		0,
+  		secondary,
+  		chroma
+  	];
+  	if (hue < 300) return [
+  		secondary,
+  		0,
+  		chroma
+  	];
+  	return [
+  		chroma,
+  		0,
+  		secondary
+  	];
+  }
+  function round$4(value) {
+  	return Math.round(value * 1e3) / 1e3;
+  }
+  //#endregion
+  //#region src/markers/types.ts
+  var DEFAULT_MARKER_SAMPLING_OPTIONS = {
+  	keypointIds: ["right_wrist", "left_wrist"],
+  	minKeypointScore: .3,
+  	minSaturation: .45,
+  	minValue: .3,
+  	minCoverage: .08
+  };
+  //#endregion
   //#region src/pose/controller.ts
   var PosePipelineController = class {
   	constructor(options) {
@@ -3358,6 +3654,30 @@
   		this.pipelineErrorMessage = "";
   		this.runtime = options.runtime;
   		this.model = options.model;
+  		this.markerSampler = options.markerSampler;
+  	}
+  	/**
+  	* Turns PoseFrame2D v2 output on: every inference also samples the named
+  	* keypoints for a uniquely colored glow stick.
+  	*/
+  	enableMarkers(keypointIds) {
+  		if (!this.markerSampler) throw new Error("No glow stick image sampler is available.");
+  		this.markerOptions = {
+  			...DEFAULT_MARKER_SAMPLING_OPTIONS,
+  			keypointIds
+  		};
+  	}
+  	disableMarkers() {
+  		this.markerOptions = void 0;
+  	}
+  	markersEnabled() {
+  		return this.markerOptions !== void 0;
+  	}
+  	/** Glow stick markers carried by the latest frame. */
+  	markerCount() {
+  		const frame = this.latestFrame;
+  		if (!frame || frame.version !== 2) return 0;
+  		return frame.persons.reduce((total, person) => total + person.markers.length, 0);
   	}
   	async start(options) {
   		const normalized = normalizeStartOptions$1(options);
@@ -3486,6 +3806,12 @@
   			this.fail("inference-failed", error);
   		}
   		if (operation !== this.operation) return;
+  		let markersByPose;
+  		try {
+  			markersByPose = this.sampleMarkers(poses, frame);
+  		} catch (error) {
+  			this.fail("marker-sampling-failed", error);
+  		}
   		try {
   			this.latestFrame = createPoseFrame2D(poses, {
   				cameraId: options.cameraId,
@@ -3495,13 +3821,49 @@
   				captureTimestampUs,
   				frameWidth: frame.width,
   				frameHeight: frame.height
-  			});
+  			}, markersByPose);
   			this.sequence += 1;
   			this.pipelineState = "ready";
   			this.clearError();
   		} catch (error) {
   			this.fail("invalid-output", error);
   		}
+  	}
+  	/** Samples one patch per configured keypoint of every tracked person. */
+  	sampleMarkers(poses, frame) {
+  		const options = this.markerOptions;
+  		const sampler = this.markerSampler;
+  		if (!options || !sampler) return void 0;
+  		const patches = [];
+  		const owners = [];
+  		poses.slice(0, 6).forEach((pose, index) => {
+  			for (const { keypointId, patch } of markerPatchesFor(pose, options)) {
+  				owners.push({
+  					pose: index,
+  					keypointId
+  				});
+  				patches.push(patch);
+  			}
+  		});
+  		const colors = sampler.sample({
+  			element: frame.element,
+  			width: frame.width,
+  			height: frame.height
+  		}, patches);
+  		const byPose = /* @__PURE__ */ new Map();
+  		owners.forEach((owner, index) => {
+  			const entries = byPose.get(owner.pose) ?? [];
+  			entries.push({
+  				keypointId: owner.keypointId,
+  				color: colors[index]
+  			});
+  			byPose.set(owner.pose, entries);
+  		});
+  		const markers = /* @__PURE__ */ new Map();
+  		poses.slice(0, 6).forEach((_, index) => {
+  			markers.set(index, toMarkers(byPose.get(index) ?? []));
+  		});
+  		return markers;
   	}
   	fail(code, cause) {
   		const detail = cause instanceof Error ? cause.message : String(cause);
@@ -69232,6 +69594,40 @@
   		keypoints: keypoints2d
   	}), { maxItems: 6 })
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v1.json" });
+  var coco17KeypointId = Type.Union(coco17KeypointIds.map((id) => Type.Literal(id)));
+  /**
+  * Glow stick observed on the same video frame as the keypoints: a performer
+  * carries a uniquely colored light at a chosen keypoint, which identifies the
+  * performer and resolves the left/right labelling of a person seen from behind.
+  */
+  var glowStickMarkers = Type.Array(object({
+  	keypointId: coco17KeypointId,
+  	colorHex: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
+  	coverage: score
+  }), { maxItems: 4 });
+  var PoseFrame2DV2Schema = object({
+  	schema: Type.Literal("twmp/pose-frame-2d"),
+  	version: Type.Literal(2),
+  	cameraId: identifier$1,
+  	peerId: identifier$1,
+  	sequence: timestampUs,
+  	captureTimestampUs: timestampUs,
+  	frameWidth: Type.Integer({
+  		minimum: 1,
+  		maximum: 16384
+  	}),
+  	frameHeight: Type.Integer({
+  		minimum: 1,
+  		maximum: 16384
+  	}),
+  	calibrationId: identifier$1,
+  	persons: Type.Array(object({
+  		trackingId: identifier$1,
+  		score,
+  		keypoints: keypoints2d,
+  		markers: glowStickMarkers
+  	}), { maxItems: 6 })
+  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v2.json" });
   var PoseFrame3DSchema = object({
   	schema: Type.Literal("twmp/pose-frame-3d"),
   	version: Type.Literal(1),
@@ -69252,30 +69648,49 @@
   		keypoints: keypoints3d
   	}), { maxItems: 6 })
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-3d-v1.json" });
+  var PerformanceDslSchema = object({
+  	schema: Type.Literal("twmp/performance-dsl"),
+  	version: Type.Literal(1),
+  	performers: Type.Array(object({
+  		performerId: identifier$1,
+  		displayName: Type.String({
+  			minLength: 1,
+  			maxLength: 80
+  		}),
+  		glowStickColor: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
+  		recognitionStartEffect: identifier$1,
+  		recognitionEndEffect: identifier$1,
+  		avatarAsset: identifier$1
+  	}), {
+  		minItems: 1,
+  		maxItems: 6
+  	})
+  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/performance-dsl-v1.json" });
+  /**
+  * Every application contract this package owns, dispatched by schema identifier
+  * and then by explicit version. Applications consume these definitions; they are
+  * not mirrored from another repository.
+  */
   var protocolSchemas = {
-  	"twmp/camera-calibration": CameraCalibrationSchema,
-  	"twmp/performance-dsl": object({
-  		schema: Type.Literal("twmp/performance-dsl"),
-  		version: Type.Literal(1),
-  		performers: Type.Array(object({
-  			performerId: identifier$1,
-  			displayName: Type.String({
-  				minLength: 1,
-  				maxLength: 80
-  			}),
-  			glowStickColor: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
-  			recognitionStartEffect: identifier$1,
-  			recognitionEndEffect: identifier$1,
-  			avatarAsset: identifier$1
-  		}), {
-  			minItems: 1,
-  			maxItems: 6
-  		})
-  	}, { $id: "https://kubohiroya.github.io/multiview-pose/schema/performance-dsl-v1.json" }),
-  	"twmp/pose-frame-2d": PoseFrame2DSchema,
-  	"twmp/pose-frame-3d": PoseFrame3DSchema,
-  	"twmp/session-policy": SessionPolicySchema
+  	"twmp/camera-calibration": { 1: CameraCalibrationSchema },
+  	"twmp/performance-dsl": { 1: PerformanceDslSchema },
+  	"twmp/pose-frame-2d": {
+  		1: PoseFrame2DSchema,
+  		2: PoseFrame2DV2Schema
+  	},
+  	"twmp/pose-frame-3d": { 1: PoseFrame3DSchema },
+  	"twmp/session-policy": { 1: SessionPolicySchema }
   };
+  /** Returns the pinned schema for one contract version, or undefined. */
+  function protocolSchemaFor(schemaId, version) {
+  	if (typeof version !== "number") return void 0;
+  	const versions = protocolSchemas[schemaId];
+  	return Object.prototype.hasOwnProperty.call(versions, version) ? versions[version] : void 0;
+  }
+  /** Versions this package accepts for one contract, ascending. */
+  function protocolVersionsFor(schemaId) {
+  	return Object.keys(protocolSchemas[schemaId]).map(Number).sort((left, right) => left - right);
+  }
   //#endregion
   //#region src/protocol/codec.ts
   var MAX_JSON_BYTES = 1048576;
@@ -69320,14 +69735,14 @@
   	if (typeof value.schema !== "string") return failure("/schema", "Schema identifier must be a string.");
   	schemaId = value.schema;
   	if (!isProtocolSchemaId(value.schema)) return failure("/schema", `Unsupported schema identifier: ${value.schema}`);
-  	if (value.version !== 1) {
+  	const schema = protocolSchemaFor(value.schema, value.version);
+  	if (!schema) {
   		schemaVersion = typeof value.version === "number" ? value.version : void 0;
-  		return failure("/version", `Unsupported ${value.schema} version: ${String(value.version)}`);
+  		return failure("/version", `Unsupported ${value.schema} version: ${String(value.version)}. Supported: ${protocolVersionsFor(value.schema).join(", ")}.`);
   	}
-  	schemaVersion = 1;
+  	schemaVersion = value.version;
   	const credential = findForbiddenPairingKey(value);
   	if (credential) return failure(credential, "WebRTC pairing credentials are forbidden in persistent protocol contracts.");
-  	const schema = protocolSchemas[value.schema];
   	if (!Check(schema, value)) {
   		const first = Errors(schema, value).First();
   		return failure(first?.path || "/", first?.message ?? "Protocol value does not match its v1 schema.");
@@ -77683,6 +78098,115 @@
   	return typeof value === "number" && Number.isFinite(value);
   }
   //#endregion
+  //#region src/fusion/glow-stick.ts
+  /** Left/right pairs whose labels MoveNet swaps when a person faces away. */
+  var MIRROR_PAIRS = [
+  	["left_eye", "right_eye"],
+  	["left_ear", "right_ear"],
+  	["left_shoulder", "right_shoulder"],
+  	["left_elbow", "right_elbow"],
+  	["left_wrist", "right_wrist"],
+  	["left_hip", "right_hip"],
+  	["left_knee", "right_knee"],
+  	["left_ankle", "right_ankle"]
+  ];
+  var MIRROR_BY_ID = new Map([...MIRROR_PAIRS.map(([left, right]) => [left, right]), ...MIRROR_PAIRS.map(([left, right]) => [right, left])]);
+  var DEFAULT_GLOW_STICK_MATCH_OPTIONS = {
+  	maxHueDistance: 25,
+  	minCoverage: .08
+  };
+  function mirrorKeypointId(id) {
+  	return MIRROR_BY_ID.get(id) ?? id;
+  }
+  /**
+  * Performer palette taken from the Performance DSL, plus the keypoint each
+  * performer carries the glow stick at. The DSL owns the colors; the carrying
+  * hand is a fusion-side setting because it is not part of that contract.
+  */
+  var GlowStickPalette = class {
+  	constructor() {
+  		this.colors = /* @__PURE__ */ new Map();
+  		this.keypoints = /* @__PURE__ */ new Map();
+  	}
+  	loadPerformers(performers) {
+  		this.colors.clear();
+  		for (const performer of performers) {
+  			if (!hsvFromHex(performer.glowStickColor)) throw new Error(`Performer ${performer.performerId} has an invalid glow stick color.`);
+  			this.colors.set(performer.performerId, performer.glowStickColor);
+  		}
+  		for (const performerId of [...this.keypoints.keys()]) if (!this.colors.has(performerId)) this.keypoints.delete(performerId);
+  	}
+  	setKeypoint(performerId, keypointId) {
+  		if (!this.colors.has(performerId)) throw new Error(`Performer ${performerId} is not in the loaded palette.`);
+  		this.keypoints.set(performerId, keypointId);
+  	}
+  	keypointOf(performerId) {
+  		return this.keypoints.get(performerId) ?? "right_wrist";
+  	}
+  	size() {
+  		return this.colors.size;
+  	}
+  	clear() {
+  		this.colors.clear();
+  		this.keypoints.clear();
+  	}
+  	/** Performer whose color is closest to one observation, if any matches. */
+  	match(colorHex, options) {
+  		const observed = hsvFromHex(colorHex);
+  		if (!observed) return void 0;
+  		let best;
+  		for (const [performerId, performerColor] of this.colors) {
+  			const expected = hsvFromHex(performerColor);
+  			if (!expected) continue;
+  			const distance = hueDistance(observed.hue, expected.hue);
+  			if (distance > options.maxHueDistance) continue;
+  			if (!best || distance < best.distance) best = {
+  				performerId,
+  				distance
+  			};
+  		}
+  		return best;
+  	}
+  	/**
+  	* Assigns performers to the tracked persons of one camera sample. Each
+  	* performer takes at most one person per camera, strongest observation first,
+  	* and a color seen on the mirror of the performer's keypoint marks that view
+  	* as left/right swapped.
+  	*/
+  	assign(sample, options) {
+  		const candidates = [];
+  		for (const person of sample.persons) for (const marker of person.markers) {
+  			if (marker.coverage < options.minCoverage) continue;
+  			const matched = this.match(marker.colorHex, options);
+  			if (!matched) continue;
+  			candidates.push({
+  				trackingId: person.trackingId,
+  				performerId: matched.performerId,
+  				keypointId: marker.keypointId,
+  				coverage: marker.coverage,
+  				distance: matched.distance
+  			});
+  		}
+  		candidates.sort((left, right) => right.coverage - left.coverage || left.distance - right.distance);
+  		const assignments = /* @__PURE__ */ new Map();
+  		const takenPerformers = /* @__PURE__ */ new Set();
+  		for (const candidate of candidates) {
+  			if (assignments.has(candidate.trackingId)) continue;
+  			if (takenPerformers.has(candidate.performerId)) continue;
+  			const expected = this.keypointOf(candidate.performerId);
+  			const mirrored = candidate.keypointId !== expected && candidate.keypointId === mirrorKeypointId(expected);
+  			assignments.set(candidate.trackingId, {
+  				performerId: candidate.performerId,
+  				mirrored,
+  				colorHex: this.colors.get(candidate.performerId) ?? "",
+  				coverage: candidate.coverage
+  			});
+  			takenPerformers.add(candidate.performerId);
+  		}
+  		return assignments;
+  	}
+  };
+  //#endregion
   //#region src/fusion/fuse.ts
   var DEFAULT_FUSION_GEOMETRY_OPTIONS = {
   	minKeypointScore: .3,
@@ -77698,8 +78222,8 @@
   * Associates the tracked persons of a synchronized instant across cameras and
   * triangulates every COCO-17 keypoint of each multi-camera cluster.
   */
-  function fuseSynchronizedSample(sample, models, options) {
-  	const views = collectViews(sample, models, options.minKeypointScore);
+  function fuseSynchronizedSample(sample, models, options, assignments = /* @__PURE__ */ new Map()) {
+  	const views = collectViews(sample, models, options.minKeypointScore, assignments);
   	const clusters = associateViews(views, options);
   	const persons = [];
   	for (const cluster of clusters) {
@@ -77710,17 +78234,20 @@
   	}
   	return persons.sort((left, right) => right.score - left.score).slice(0, options.maxPersons);
   }
-  function collectViews(sample, models, minKeypointScore) {
+  function collectViews(sample, models, minKeypointScore, assignments) {
   	const views = [];
   	for (const camera of sample.cameras) {
   		const model = models.get(camera.cameraId);
   		if (!model) continue;
+  		const cameraAssignments = assignments.get(camera.cameraId);
   		for (const person of camera.persons) {
+  			const assignment = cameraAssignments?.get(person.trackingId);
   			const observations = /* @__PURE__ */ new Map();
   			for (const keypoint of person.keypoints) {
   				if (keypoint.score < minKeypointScore) continue;
   				const normalized = normalizedFromPixel(model, keypoint.x, keypoint.y);
-  				observations.set(keypoint.id, {
+  				const keypointId = assignment?.mirrored ? mirrorKeypointId(keypoint.id) : keypoint.id;
+  				observations.set(keypointId, {
   					model,
   					x: normalized.x,
   					y: normalized.y,
@@ -77733,7 +78260,8 @@
   				cameraId: camera.cameraId,
   				trackingId: person.trackingId,
   				model,
-  				observations
+  				observations,
+  				performerId: assignment?.performerId
   			});
   		}
   	}
@@ -77746,6 +78274,7 @@
   		const first = views[left];
   		const second = views[right];
   		if (!first || !second || first.cameraId === second.cameraId) continue;
+  		if (first.performerId && second.performerId && first.performerId !== second.performerId) continue;
   		const cost = pairCost(first, second, options);
   		if (cost === void 0) continue;
   		pairs.push({
@@ -77757,24 +78286,34 @@
   	pairs.sort((first, second) => first.cost - second.cost);
   	const parent = views.map((_, index) => index);
   	const cameras = views.map((view) => /* @__PURE__ */ new Set([view.cameraId]));
+  	const performers = views.map((view) => view.performerId ? /* @__PURE__ */ new Set([view.performerId]) : /* @__PURE__ */ new Set());
+  	const byPerformer = /* @__PURE__ */ new Map();
+  	views.forEach((view, index) => {
+  		if (!view.performerId) return;
+  		byPerformer.set(view.performerId, [...byPerformer.get(view.performerId) ?? [], index]);
+  	});
   	const find = (index) => {
   		let root = index;
   		while (parent[root] !== root) root = parent[root] ?? root;
   		return root;
   	};
-  	for (const pair of pairs) {
-  		const leftRoot = find(pair.left);
-  		const rightRoot = find(pair.right);
-  		if (leftRoot === rightRoot) continue;
+  	const merge = (left, right) => {
+  		const leftRoot = find(left);
+  		const rightRoot = find(right);
+  		if (leftRoot === rightRoot) return;
   		const leftCameras = cameras[leftRoot];
   		const rightCameras = cameras[rightRoot];
-  		if (!leftCameras || !rightCameras) continue;
-  		let conflict = false;
-  		for (const cameraId of rightCameras) if (leftCameras.has(cameraId)) conflict = true;
-  		if (conflict) continue;
+  		const leftPerformers = performers[leftRoot];
+  		const rightPerformers = performers[rightRoot];
+  		if (!leftCameras || !rightCameras || !leftPerformers || !rightPerformers) return;
+  		for (const cameraId of rightCameras) if (leftCameras.has(cameraId)) return;
+  		if ((/* @__PURE__ */ new Set([...leftPerformers, ...rightPerformers])).size > 1) return;
   		parent[rightRoot] = leftRoot;
   		for (const cameraId of rightCameras) leftCameras.add(cameraId);
-  	}
+  		for (const performerId of rightPerformers) leftPerformers.add(performerId);
+  	};
+  	for (const indexes of byPerformer.values()) for (let index = 1; index < indexes.length; index += 1) merge(indexes[0] ?? 0, indexes[index] ?? 0);
+  	for (const pair of pairs) merge(pair.left, pair.right);
   	const clusters = /* @__PURE__ */ new Map();
   	for (let index = 0; index < views.length; index += 1) {
   		const root = find(index);
@@ -77827,8 +78366,10 @@
   	const fusedKeypoints = keypoints.filter((keypoint) => keypoint.point);
   	const meanError = fusedKeypoints.length === 0 ? 0 : fusedKeypoints.reduce((total, keypoint) => total + keypoint.meanReprojectionErrorPx, 0) / fusedKeypoints.length;
   	const score = keypoints.reduce((total, keypoint) => total + keypoint.score, 0) / COCO_17_KEYPOINT_IDS.length;
+  	const performerIds = new Set(views.map((view) => view.performerId).filter((performerId) => performerId !== void 0));
   	return {
   		members,
+  		performerId: performerIds.size === 1 ? [...performerIds][0] : void 0,
   		cameraIds: [...cameraIds],
   		score: clampScore(score),
   		meanReprojectionErrorPx: meanError,
@@ -77924,6 +78465,18 @@
   			keypoints: /* @__PURE__ */ new Map()
   		};
   		track.members = new Set(keys);
+  		track.lastSequence = sequence;
+  		this.tracks.set(personId, track);
+  		return personId;
+  	}
+  	/** Tracks a cluster under an identifier the caller already resolved. */
+  	adopt(personId, members, sequence) {
+  		const track = this.tracks.get(personId) ?? {
+  			members: /* @__PURE__ */ new Set(),
+  			lastSequence: sequence,
+  			keypoints: /* @__PURE__ */ new Map()
+  		};
+  		track.members = new Set(members.map(memberKey));
   		track.lastSequence = sequence;
   		this.tracks.set(personId, track);
   		return personId;
@@ -78177,7 +78730,8 @@
   			persons.push({
   				trackingId,
   				score: lerp(before.score, after.score, alpha),
-  				keypoints: mergeKeypoints(before, after, alpha, options)
+  				keypoints: mergeKeypoints(before, after, alpha, options),
+  				markers: mergeMarkers(before, after)
   			});
   			continue;
   		}
@@ -78186,7 +78740,8 @@
   		persons.push({
   			trackingId,
   			score: single.score,
-  			keypoints: singleKeypoints(single, interpolated)
+  			keypoints: singleKeypoints(single, interpolated),
+  			markers: mergeMarkers(single, void 0)
   		});
   	}
   	return persons;
@@ -78250,6 +78805,19 @@
   		};
   	});
   }
+  /** Keeps the strongest glow stick observation per keypoint of one person. */
+  function mergeMarkers(before, after) {
+  	const strongest = /* @__PURE__ */ new Map();
+  	for (const marker of [...markersOf(before), ...markersOf(after)]) {
+  		const existing = strongest.get(marker.keypointId);
+  		if (existing && existing.coverage >= marker.coverage) continue;
+  		strongest.set(marker.keypointId, marker);
+  	}
+  	return [...strongest.values()];
+  }
+  function markersOf(person) {
+  	return person?.markers ?? [];
+  }
   function keypointsById(person) {
   	return new Map(person.keypoints.map((keypoint) => [keypoint.id, keypoint]));
   }
@@ -78269,6 +78837,9 @@
   		this.buffer = new MultiCameraJitterBuffer(DEFAULT_JITTER_BUFFER_OPTIONS);
   		this.identities = new PersonIdentityRegistry();
   		this.models = /* @__PURE__ */ new Map();
+  		this.palette = new GlowStickPalette();
+  		this.identifiedPerformers = 0;
+  		this.mirroredViews = 0;
   		this.jitterOptions = DEFAULT_JITTER_BUFFER_OPTIONS;
   		this.geometryOptions = DEFAULT_FUSION_GEOMETRY_OPTIONS;
   		this.delayUs = 0;
@@ -78316,14 +78887,57 @@
   		this.latestFrame = void 0;
   		this.latestFrameJsonValue = "";
   		this.latestSample = void 0;
+  		this.identifiedPerformers = 0;
+  		this.mirroredViews = 0;
   		this.started = false;
   		this.fusionState = "idle";
   		this.clearError();
   	}
-  	/** Releases buffers and every loaded calibration profile. */
+  	/** Releases buffers, calibration profiles, and the glow stick palette. */
   	cleanup() {
   		this.stop();
   		this.models.clear();
+  		this.palette.clear();
+  	}
+  	/**
+  	* Loads the performer palette from a Performance DSL v1 payload. The DSL owns
+  	* the colors; the keypoint each performer carries the light at is a
+  	* fusion-side setting because that contract does not describe it.
+  	*/
+  	loadPerformanceDsl(json) {
+  		const decoded = decodeProtocolJson(json, Date.now());
+  		if (!decoded.ok || decoded.schema !== "twmp/performance-dsl") {
+  			const message = decoded.ok ? `Expected twmp/performance-dsl, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  			this.fail("performance-dsl-invalid", message);
+  		}
+  		const performers = decoded.value.performers;
+  		try {
+  			this.palette.loadPerformers(performers);
+  		} catch (error) {
+  			this.fail("performance-dsl-invalid", errorMessage$1(error));
+  		}
+  		this.clearError();
+  	}
+  	setPerformerKeypoint(performerId, keypointId) {
+  		const resolved = COCO_17_KEYPOINT_IDS.find((id) => id === keypointId);
+  		if (!resolved) this.fail("performance-dsl-invalid", `Unknown COCO-17 keypoint: ${keypointId}`);
+  		try {
+  			this.palette.setKeypoint(performerId, resolved);
+  		} catch (error) {
+  			this.fail("performance-dsl-invalid", errorMessage$1(error));
+  		}
+  		this.clearError();
+  	}
+  	paletteSize() {
+  		return this.palette.size();
+  	}
+  	/** Performers identified by glow stick color in the last fusion. */
+  	identifiedPerformerCount() {
+  		return this.identifiedPerformers;
+  	}
+  	/** Camera views whose left/right labels the last fusion corrected. */
+  	mirrorCorrectedViewCount() {
+  		return this.mirroredViews;
   	}
   	loadCalibration(json) {
   		const decoded = decodeProtocolJson(json, Date.now());
@@ -78401,7 +79015,14 @@
   			this.reject("insufficient-cameras", `Only ${sample.cameras.length} calibrated camera(s) covered ${timestampUs} us.`);
   			return false;
   		}
-  		const persons = fuseSynchronizedSample(sample, this.models, this.geometryOptions);
+  		const assignments = /* @__PURE__ */ new Map();
+  		let mirrored = 0;
+  		if (this.palette.size() > 0) for (const camera of sample.cameras) {
+  			const assigned = this.palette.assign(camera, DEFAULT_GLOW_STICK_MATCH_OPTIONS);
+  			assignments.set(camera.cameraId, assigned);
+  			for (const assignment of assigned.values()) if (assignment.mirrored) mirrored += 1;
+  		}
+  		const persons = fuseSynchronizedSample(sample, this.models, this.geometryOptions, assignments);
   		if (persons.length === 0) {
   			this.reject("no-fused-person", `No person was observed by ${this.geometryOptions.minCamerasPerPerson} or more cameras.`);
   			return false;
@@ -78412,7 +79033,7 @@
   			sequence: this.sequence,
   			timestampUs,
   			persons: persons.map((person) => {
-  				const personId = this.identities.resolve(person.members, this.sequence);
+  				const personId = person.performerId ? this.identities.adopt(person.performerId, person.members, this.sequence) : this.identities.resolve(person.members, this.sequence);
   				return {
   					personId,
   					score: round(person.score),
@@ -78448,6 +79069,8 @@
   		}
   		this.identities.prune(this.sequence);
   		this.sequence += 1;
+  		this.identifiedPerformers = new Set(persons.map((person) => person.performerId).filter((performerId) => performerId !== void 0)).size;
+  		this.mirroredViews = mirrored;
   		this.latestFrame = frame;
   		this.latestFrameJsonValue = JSON.stringify(frame);
   		this.fusionState = "ready";
@@ -78546,6 +79169,41 @@
   	return error instanceof Error ? error.message : String(error);
   }
   //#endregion
+  //#region src/markers/canvas-sampler.ts
+  /**
+  * Copies the current video frame into one temporary canvas and reads each patch
+  * from it. The canvas is released after every call, like the calibration
+  * backend does, so no frame data outlives the sampling request.
+  */
+  var CanvasGlowStickSampler = class {
+  	constructor(options) {
+  		this.options = options;
+  		this.name = "canvas-2d";
+  	}
+  	sample(frame, patches) {
+  		if (patches.length === 0) return [];
+  		const canvas = document.createElement("canvas");
+  		canvas.width = frame.width;
+  		canvas.height = frame.height;
+  		const context = canvas.getContext("2d", { willReadFrequently: true });
+  		if (!context) throw new Error("A 2D canvas context is unavailable.");
+  		try {
+  			context.drawImage(frame.element, 0, 0, frame.width, frame.height);
+  			return patches.map((patch) => {
+  				const left = Math.max(Math.round(patch.x - patch.radius), 0);
+  				const top = Math.max(Math.round(patch.y - patch.radius), 0);
+  				const right = Math.min(Math.round(patch.x + patch.radius), frame.width);
+  				const bottom = Math.min(Math.round(patch.y + patch.radius), frame.height);
+  				if (right - left < 1 || bottom - top < 1) return void 0;
+  				return dominantSaturatedColor(context.getImageData(left, top, right - left, bottom - top).data, this.options);
+  			});
+  		} finally {
+  			canvas.width = 0;
+  			canvas.height = 0;
+  		}
+  	}
+  };
+  //#endregion
   //#region src/extension.ts
   var blockDefinitions = block_definitions_default.blocks;
   var MultiviewPoseExtension = class {
@@ -78571,12 +79229,14 @@
   		this.protocolEnabled = options.protocolEnabled ?? featureFlags.protocolV1Codec;
   		this.calibrationEnabled = options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
   		this.fusionEnabled = options.fusionEnabled ?? featureFlags.poseFusion3D;
+  		this.markersEnabled = options.markersEnabled ?? featureFlags.glowStickMarkers;
   		this.errorCorrectionLevel = options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.skins = new TemporarySpriteSkinManager(this.runtime);
   		this.pose = new PosePipelineController({
   			runtime: this.runtime,
-  			model: options.poseModel ?? new TfjsWebGpuMoveNet()
+  			model: options.poseModel ?? new TfjsWebGpuMoveNet(),
+  			markerSampler: options.markerSampler ?? new CanvasGlowStickSampler(DEFAULT_MARKER_SAMPLING_OPTIONS)
   		});
   		this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
   		this.calibration = new CameraCalibrationController({
@@ -78868,6 +79528,36 @@
   	poseFusionError() {
   		return this.fusion.errorMessage();
   	}
+  	enableGlowStickMarkers(args) {
+  		this.requireMarkersEnabled();
+  		this.requirePoseEnabled();
+  		this.pose.enableMarkers(parseKeypointIds(Scratch.Cast.toString(args.KEYPOINTS)));
+  	}
+  	disableGlowStickMarkers() {
+  		this.pose.disableMarkers();
+  	}
+  	glowStickMarkerCount() {
+  		return this.markersEnabled ? this.pose.markerCount() : 0;
+  	}
+  	loadGlowStickPalette(args) {
+  		this.requireMarkersEnabled();
+  		this.requireFusionEnabled();
+  		this.fusion.loadPerformanceDsl(Scratch.Cast.toString(args.JSON));
+  	}
+  	setPerformerGlowStick(args) {
+  		this.requireMarkersEnabled();
+  		this.requireFusionEnabled();
+  		this.fusion.setPerformerKeypoint(Scratch.Cast.toString(args.PERFORMER_ID).trim(), Scratch.Cast.toString(args.KEYPOINT).trim());
+  	}
+  	glowStickPaletteSize() {
+  		return this.markersEnabled ? this.fusion.paletteSize() : 0;
+  	}
+  	identifiedPerformerCount() {
+  		return this.markersEnabled ? this.fusion.identifiedPerformerCount() : 0;
+  	}
+  	mirrorCorrectedViewCount() {
+  		return this.markersEnabled ? this.fusion.mirrorCorrectedViewCount() : 0;
+  	}
   	dispose() {
   		this.endOfferQrDisplay();
   		this.pose.stop();
@@ -78888,6 +79578,9 @@
   	requireProtocolEnabled() {
   		if (!this.protocolEnabled) throw new Error("Protocol v1 codec is disabled. Enable it before the project starts.");
   	}
+  	requireMarkersEnabled() {
+  		if (!this.markersEnabled) throw new Error("Glow stick markers are disabled. Enable them before the project starts.");
+  	}
   	requireFusionEnabled() {
   		if (!this.fusionEnabled) throw new Error("Pose fusion 3D is disabled. Enable it before the project starts.");
   	}
@@ -78899,7 +79592,8 @@
   		if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
   		if (feature === "protocolV1Codec") return this.protocolEnabled;
   		if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
-  		return this.fusionEnabled;
+  		if (feature === "poseFusion3D") return this.fusionEnabled;
+  		return this.markersEnabled;
   	}
   	requireSession() {
   		if (!this.session) throw new Error("Prepare an offer QR before displaying a part.");
