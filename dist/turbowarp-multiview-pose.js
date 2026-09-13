@@ -14962,14 +14962,14 @@
   		return matMul$1($t1, t22D);
   	}
   }
-  var dot;
+  var dot$1;
   var init_dot = __esmMin((() => {
   	init_tensor_util_env();
   	init_util();
   	init_mat_mul$1();
   	init_operation();
   	init_reshape();
-  	dot = /* @__PURE__ */ op({ dot_ });
+  	dot$1 = /* @__PURE__ */ op({ dot_ });
   }));
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-core/dist/ops/einsum.js
@@ -32634,7 +32634,7 @@
   	disposeVariables: () => disposeVariables,
   	div: () => div,
   	divNoNan: () => divNoNan,
-  	dot: () => dot,
+  	dot: () => dot$1,
   	dropout: () => dropout,
   	einsum: () => einsum$1,
   	elu: () => elu$1,
@@ -39483,7 +39483,7 @@
   	dilation2d: () => dilation2d,
   	div: () => div,
   	divNoNan: () => divNoNan,
-  	dot: () => dot,
+  	dot: () => dot$1,
   	dropout: () => dropout,
   	einsum: () => einsum$1,
   	elu: () => elu$1,
@@ -77482,6 +77482,10 @@
   */
   function triangulate(observations) {
   	if (observations.length < 2) return void 0;
+  	if (observations.length === 2) {
+  		const [first, second] = observations;
+  		if (first && second) return triangulateTwoViews(first, second);
+  	}
   	const normal = new Array(16).fill(0);
   	for (const observation of observations) {
   		const rotation = observation.model.rotation;
@@ -77509,6 +77513,65 @@
   	};
   	if (!isFiniteNumber(point.x) || !isFiniteNumber(point.y) || !isFiniteNumber(point.z)) return;
   	return point;
+  }
+  /**
+  * Closed-form two-view triangulation: the midpoint of the shortest segment
+  * between both viewing rays. Two rays carry no redundancy to weight, so this
+  * replaces the iterative solver on the hot association path.
+  */
+  function triangulateTwoViews(first, second) {
+  	const firstCenter = cameraCenter(first.model);
+  	const secondCenter = cameraCenter(second.model);
+  	const firstRay = rayDirection(first.model, first.x, first.y);
+  	const secondRay = rayDirection(second.model, second.x, second.y);
+  	const between = [
+  		element(firstCenter, 0) - element(secondCenter, 0),
+  		element(firstCenter, 1) - element(secondCenter, 1),
+  		element(firstCenter, 2) - element(secondCenter, 2)
+  	];
+  	const rayDot = dot(firstRay, secondRay);
+  	const denominator = 1 - rayDot * rayDot;
+  	if (Math.abs(denominator) < 1e-12) return void 0;
+  	const firstOffset = dot(firstRay, between);
+  	const secondOffset = dot(secondRay, between);
+  	const firstDepth = (rayDot * secondOffset - firstOffset) / denominator;
+  	const secondDepth = (secondOffset - rayDot * firstOffset) / denominator;
+  	const point = {
+  		x: (element(firstCenter, 0) + firstDepth * element(firstRay, 0) + element(secondCenter, 0) + secondDepth * element(secondRay, 0)) / 2,
+  		y: (element(firstCenter, 1) + firstDepth * element(firstRay, 1) + element(secondCenter, 1) + secondDepth * element(secondRay, 1)) / 2,
+  		z: (element(firstCenter, 2) + firstDepth * element(firstRay, 2) + element(secondCenter, 2) + secondDepth * element(secondRay, 2)) / 2
+  	};
+  	if (!isFiniteNumber(point.x) || !isFiniteNumber(point.y) || !isFiniteNumber(point.z)) return;
+  	return point;
+  }
+  /** Camera position in world coordinates. */
+  function cameraCenter(model) {
+  	return transposedRotationTimes(model.rotation, model.translation).map((value) => -value);
+  }
+  /** Unit viewing ray of one normalized observation in world coordinates. */
+  function rayDirection(model, x, y) {
+  	const direction = transposedRotationTimes(model.rotation, [
+  		x,
+  		y,
+  		1
+  	]);
+  	const length = Math.hypot(element(direction, 0), element(direction, 1), element(direction, 2));
+  	if (length === 0) return [
+  		0,
+  		0,
+  		1
+  	];
+  	return direction.map((value) => value / length);
+  }
+  function transposedRotationTimes(rotation, vector) {
+  	return [
+  		0,
+  		1,
+  		2
+  	].map((row) => element(rotation, row) * element(vector, 0) + element(rotation, row + 3) * element(vector, 1) + element(rotation, row + 6) * element(vector, 2));
+  }
+  function dot(left, right) {
+  	return element(left, 0) * element(right, 0) + element(left, 1) * element(right, 1) + element(left, 2) * element(right, 2);
   }
   /** Mean pixel distance between the reprojected point and every observation. */
   function meanReprojectionError(point, observations) {
@@ -77541,10 +77604,13 @@
   		0,
   		1
   	];
+  	let scale = 0;
+  	for (let index = 0; index < 4; index += 1) scale += element(a, index * 4 + index) ** 2;
+  	const converged = Math.max(scale, 1e-300) * 1e-24;
   	for (let sweep = 0; sweep < 32; sweep += 1) {
   		let off = 0;
   		for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 4; q += 1) off += element(a, p * 4 + q) ** 2;
-  		if (off < 1e-30) break;
+  		if (off < converged) break;
   		for (let p = 0; p < 3; p += 1) for (let q = p + 1; q < 4; q += 1) {
   			const apq = element(a, p * 4 + q);
   			if (Math.abs(apq) < 1e-18) continue;
@@ -77626,6 +77692,8 @@
   	maxPersons: 6
   };
   var COORDINATE_LIMIT = 1e6;
+  /** Shared keypoints that already decide one person-pair cost. */
+  var MAX_PAIR_KEYPOINTS = 12;
   /**
   * Associates the tracked persons of a synchronized instant across cameras and
   * triangulates every COCO-17 keypoint of each multi-camera cluster.
@@ -77716,11 +77784,18 @@
   	}
   	return [...clusters.values()];
   }
-  /** Mean two-view reprojection error over the shared visible keypoints. */
+  /**
+  * Mean two-view reprojection error over the shared visible keypoints. The scan
+  * stops once enough evidence is collected and gives up as soon as too few
+  * keypoints remain, because this runs for every cross-camera person pair.
+  */
   function pairCost(left, right, options) {
   	let total = 0;
   	let shared = 0;
-  	for (const keypointId of COCO_17_KEYPOINT_IDS) {
+  	for (const [index, keypointId] of COCO_17_KEYPOINT_IDS.entries()) {
+  		if (shared >= MAX_PAIR_KEYPOINTS) break;
+  		const remaining = COCO_17_KEYPOINT_IDS.length - index;
+  		if (shared + remaining < options.minSharedKeypoints) return void 0;
   		const first = left.observations.get(keypointId);
   		const second = right.observations.get(keypointId);
   		if (!first || !second) continue;
@@ -77760,40 +77835,50 @@
   		keypoints
   	};
   }
+  /**
+  * Triangulates one keypoint from every confident view. When the full set does
+  * not agree, the largest two-view consensus set wins, so a minority of wrong
+  * detections is discarded instead of dragging the point away from the truth.
+  */
   function fuseKeypoint(observations, options) {
-  	let candidates = [...observations];
-  	for (let attempt = 0; attempt < 2; attempt += 1) {
-  		if (candidates.length < 2) return void 0;
-  		const point = triangulate(candidates);
-  		if (!point || !withinBounds(point)) return void 0;
-  		const visible = candidates.filter((observation) => depthOf(observation.model, point) > 0);
-  		if (visible.length < 2) return void 0;
-  		if (visible.length !== candidates.length) {
-  			candidates = visible;
-  			continue;
-  		}
-  		const error = meanReprojectionError(point, candidates);
-  		if (error === void 0) return void 0;
-  		if (error <= options.maxReprojectionErrorPx) return {
-  			point,
-  			score: clampScore(candidates.reduce((total, observation) => total + observation.score, 0) / candidates.length),
-  			error
+  	if (observations.length < 2) return void 0;
+  	const agreed = evaluateViews(observations, options);
+  	if (agreed) return agreed;
+  	if (observations.length === 2) return void 0;
+  	let best;
+  	for (let left = 0; left < observations.length; left += 1) for (let right = left + 1; right < observations.length; right += 1) {
+  		const first = observations[left];
+  		const second = observations[right];
+  		if (!first || !second) continue;
+  		const seed = triangulate([first, second]);
+  		if (!seed || !withinBounds(seed)) continue;
+  		const inliers = observations.filter((observation) => {
+  			if (depthOf(observation.model, seed) <= 0) return false;
+  			const error = meanReprojectionError(seed, [observation]);
+  			return error !== void 0 && error <= options.maxReprojectionErrorPx;
+  		});
+  		if (inliers.length < 2) continue;
+  		const result = evaluateViews(inliers, options);
+  		if (!result) continue;
+  		if (!best || inliers.length > best.inliers || inliers.length === best.inliers && result.error < best.result.error) best = {
+  			result,
+  			inliers: inliers.length
   		};
-  		if (candidates.length <= 2) return void 0;
-  		candidates = dropWorstObservation(point, candidates);
   	}
+  	return best?.result;
   }
-  function dropWorstObservation(point, observations) {
-  	let worstIndex = 0;
-  	let worstError = -1;
-  	observations.forEach((observation, index) => {
-  		const error = meanReprojectionError(point, [observation]) ?? Infinity;
-  		if (error > worstError) {
-  			worstError = error;
-  			worstIndex = index;
-  		}
-  	});
-  	return observations.filter((_, index) => index !== worstIndex);
+  /** Triangulates one view set and rejects it unless every view agrees. */
+  function evaluateViews(views, options) {
+  	const point = triangulate(views);
+  	if (!point || !withinBounds(point)) return void 0;
+  	if (!inFrontOfAll(point, views)) return void 0;
+  	const error = meanReprojectionError(point, views);
+  	if (error === void 0 || error > options.maxReprojectionErrorPx) return;
+  	return {
+  		point,
+  		score: clampScore(views.reduce((total, observation) => total + observation.score, 0) / views.length),
+  		error
+  	};
   }
   function inFrontOfAll(point, observations) {
   	return observations.every((observation) => depthOf(observation.model, point) > 0);
@@ -78187,6 +78272,7 @@
   		this.jitterOptions = DEFAULT_JITTER_BUFFER_OPTIONS;
   		this.geometryOptions = DEFAULT_FUSION_GEOMETRY_OPTIONS;
   		this.delayUs = 0;
+  		this.rejectedFrames = 0;
   		this.started = false;
   		this.sequence = 0;
   		this.fusionState = "idle";
@@ -78213,6 +78299,7 @@
   		};
   		this.buffer.configure(this.jitterOptions);
   		this.identities.clear();
+  		this.rejectedFrames = 0;
   		this.sequence = 0;
   		this.latestFrame = void 0;
   		this.latestFrameJsonValue = "";
@@ -78224,6 +78311,7 @@
   	stop() {
   		this.buffer.clear();
   		this.identities.clear();
+  		this.rejectedFrames = 0;
   		this.sequence = 0;
   		this.latestFrame = void 0;
   		this.latestFrameJsonValue = "";
@@ -78254,7 +78342,11 @@
   		this.models.set(calibration.cameraId, model);
   		this.clearError();
   	}
-  	/** Buffers one PoseFrame2D. Duplicate and late frames are counted, not thrown. */
+  	/**
+  	* Buffers one PoseFrame2D. Malformed or foreign JSON throws; a frame without a
+  	* matching calibration profile, a duplicate, and a late arrival are counted as
+  	* dropped so a misconfigured peer cannot break a running project script.
+  	*/
   	ingestFrame(json) {
   		this.requireStarted();
   		const decoded = decodeProtocolJson(json, Date.now());
@@ -78263,7 +78355,16 @@
   			this.fail("frame-invalid", message);
   		}
   		const frame = decoded.value;
-  		if (!this.buffer.cameraIds().includes(frame.cameraId) && this.buffer.cameraIds().length >= 16) this.fail("frame-invalid", `At most 16 cameras can be buffered.`);
+  		const model = this.models.get(frame.cameraId);
+  		if (!model) {
+  			this.drop("unknown-camera", `No calibration profile is loaded for camera ${frame.cameraId}.`);
+  			return;
+  		}
+  		const mismatch = describeCalibrationMismatch(frame, model);
+  		if (mismatch) {
+  			this.drop("calibration-mismatch", mismatch);
+  			return;
+  		}
   		const outcome = this.buffer.ingest(frame);
   		if (outcome === "accepted") {
   			this.clearError();
@@ -78288,11 +78389,16 @@
   		this.requireStarted();
   		if (!Number.isSafeInteger(timestampUs) || timestampUs < 0) this.fail("invalid-output", "Fusion timestamp must be a non-negative integer in microseconds.");
   		this.fusionState = "fusing";
-  		const sample = this.buffer.sampleAt(timestampUs);
+  		const sample = {
+  			timestampUs,
+  			cameras: this.buffer.sampleAt(timestampUs).cameras.filter((camera) => {
+  				const model = this.models.get(camera.cameraId);
+  				return model !== void 0 && !describeCalibrationMismatch(camera, model);
+  			})
+  		};
   		this.latestSample = sample;
-  		const calibrated = sample.cameras.filter((camera) => this.models.has(camera.cameraId));
-  		if (calibrated.length < this.geometryOptions.minCamerasPerPerson) {
-  			this.reject("insufficient-cameras", `Only ${calibrated.length} calibrated camera(s) covered ${timestampUs} us.`);
+  		if (sample.cameras.length < this.geometryOptions.minCamerasPerPerson) {
+  			this.reject("insufficient-cameras", `Only ${sample.cameras.length} calibrated camera(s) covered ${timestampUs} us.`);
   			return false;
   		}
   		const persons = fuseSynchronizedSample(sample, this.models, this.geometryOptions);
@@ -78361,7 +78467,7 @@
   		return this.buffer.bufferedFrameCount();
   	}
   	droppedFrameCount() {
-  		return this.buffer.droppedFrameCount();
+  		return this.buffer.droppedFrameCount() + this.rejectedFrames;
   	}
   	personCount() {
   		const persons = this.latestFrame?.persons;
@@ -78396,6 +78502,12 @@
   	requireStarted() {
   		if (!this.started) throw new Error("Pose fusion has not been started.");
   	}
+  	/** Rejected before buffering: counted as dropped instead of thrown. */
+  	drop(code, message) {
+  		this.rejectedFrames += 1;
+  		this.fusionErrorCode = code;
+  		this.fusionErrorMessage = `${code}: ${message}`;
+  	}
   	/** Expected transient shortage: no throw, no replacement of the last frame. */
   	reject(code, message) {
   		this.fusionState = "buffering";
@@ -78413,6 +78525,11 @@
   		this.fusionErrorMessage = "";
   	}
   };
+  /** Rejects frames that a profile cannot describe, instead of fusing them. */
+  function describeCalibrationMismatch(frame, model) {
+  	if (frame.calibrationId !== model.calibrationId) return `Camera ${frame.cameraId} reports calibration ${frame.calibrationId} but profile ${model.calibrationId} is loaded.`;
+  	if (frame.frameWidth !== model.imageWidth || frame.frameHeight !== model.imageHeight) return `Camera ${frame.cameraId} reports ${frame.frameWidth}x${frame.frameHeight} but profile ${model.calibrationId} was solved at ${model.imageWidth}x${model.imageHeight}.`;
+  }
   function ringSlots(delayUs, jitterWindowUs) {
   	const span = delayUs + jitterWindowUs * 2;
   	const slots = Math.ceil(span / ASSUMED_MINIMUM_FRAME_INTERVAL_US) + 8;
@@ -78436,10 +78553,13 @@
   		this.state = "idle";
   		this.lastError = "";
   		this.operation = 0;
-  		this.stopListener = () => {
+  		this.runStopListener = () => {
   			this.endOfferQrDisplay();
   			this.pose.stop();
   			this.calibration.cancel();
+  		};
+  		this.stopListener = () => {
+  			this.runStopListener();
   			this.fusion.stop();
   		};
   		this.disposeListener = () => this.dispose();
@@ -78466,7 +78586,7 @@
   		});
   		this.fusion = new PoseFusionController();
   		this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
-  		this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
+  		this.runtime.on?.("PROJECT_RUN_STOP", this.runStopListener);
   		this.runtime.on?.("PROJECT_LOADED", this.stopListener);
   		this.runtime.on?.("RUNTIME_DISPOSED", this.disposeListener);
   		this.runtime.on?.("targetWasRemoved", this.targetRemovedListener);
@@ -78754,7 +78874,7 @@
   		this.calibration.cancel();
   		this.fusion.stop();
   		this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
-  		this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
+  		this.runtime.off?.("PROJECT_RUN_STOP", this.runStopListener);
   		this.runtime.off?.("PROJECT_LOADED", this.stopListener);
   		this.runtime.off?.("RUNTIME_DISPOSED", this.disposeListener);
   		this.runtime.off?.("targetWasRemoved", this.targetRemovedListener);
