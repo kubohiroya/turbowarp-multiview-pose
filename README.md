@@ -21,16 +21,15 @@ as a temporary sprite skin.
 ## Requirements and safety
 
 - TurboWarp with custom unsandboxed extensions enabled.
-- `@kubohiroya/turbowarp-webrtc` with runtime capability v2, loaded first.
-- `@kubohiroya/turbowarp-camera-source` 0.4 or later, loaded before pose startup.
+- `@kubohiroya/turbowarp-webrtc` 0.3.0 with runtime capability v2, loaded first.
+- `@kubohiroya/turbowarp-camera-source` 0.5.0, loaded before pose startup.
 - A browser and GPU combination supported by TensorFlow.js WebGPU.
 - WebAssembly support for the bundled OpenCV.js 4.12 calibration backend.
-- `@kubohiroya/turbowarp-aframe` 0.2.0 with scene capability v1, loaded before avatar setup.
+- `@kubohiroya/turbowarp-aframe` 0.3.0 with scene capability v1, loaded before avatar setup.
 - The startup-fixed feature flags are independently OFF by default.
 
-The scene capability is currently an unreleased prerequisite implemented by TurboWarp-A-Frame
-commit `1e24b32`. Publish a build containing that commit before releasing the avatar feature; the
-consumer fails closed when capability v1 is absent.
+Scene capability v1 is published in `@kubohiroya/turbowarp-aframe@0.3.0`. The consumer fails closed
+when capability v1 is absent.
 
 Set the flag before loading the extension:
 
@@ -564,7 +563,7 @@ Exports the last validated exact v1 profile, or an empty string when none exists
 
 ### `register avatar asset [ASSET_ID] template JSON [TEMPLATE_JSON] rig JSON [RIG_JSON]`
 
-Registers an A-Frame 0.2.0 template and its Kalidokit rig-output selector mapping.
+Registers an A-Frame 0.3.0 template and its Kalidokit rig-output selector mapping.
 
 | Property | Value |
 |---|---|

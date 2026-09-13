@@ -133,8 +133,8 @@ camera/board geometry and WebAssembly startup remain browser E2E responsibilitie
 `avatarRetargetV1` is an independent startup-fixed, default-OFF flag. It requires runtime key
 `turbowarpAFrameCapability`, calls `requireVersion(1)`, and uses only the seven public synchronous
 scene operations from the TurboWarp-A-Frame capability. The consumer never accesses A-Frame DOM,
-Three.js `object3D`, or GLTF bone internals. Capability commit `1e24b32` is an unreleased prerequisite
-and must be published before this feature is released.
+Three.js `object3D`, or GLTF bone internals. Capability v1 is published in
+`@kubohiroya/turbowarp-aframe@0.3.0`.
 
 An asset registration sends declarative template JSON to A-Frame and retains a validated rig map.
 Each bone maps one supported Kalidokit pose rig output to a selector containing `{avatar}`, plus

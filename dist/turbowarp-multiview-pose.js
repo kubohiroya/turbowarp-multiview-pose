@@ -469,7 +469,7 @@
   			"feature": "avatarRetargetV1",
   			"blockType": "COMMAND",
   			"text": "register avatar asset [ASSET_ID] template JSON [TEMPLATE_JSON] rig JSON [RIG_JSON]",
-  			"description": "Registers an A-Frame 0.2.0 template and its Kalidokit rig-output selector mapping.",
+  			"description": "Registers an A-Frame 0.3.0 template and its Kalidokit rig-output selector mapping.",
   			"arguments": {
   				"ASSET_ID": {
   					"type": "STRING",

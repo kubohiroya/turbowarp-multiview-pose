@@ -116,8 +116,7 @@ detectorのdisposeで解放します。
 `avatarRetargetV1`は独立した起動時固定・既定OFF flagです。runtime key
 `turbowarpAFrameCapability`へ`requireVersion(1)`を呼び、TurboWarp-A-Frame capabilityの公開同期
 scene操作7種だけを利用します。A-Frame DOM、Three.js `object3D`、GLTF内部boneへはアクセス
-しません。capability commit `1e24b32`は未releaseの前提機能であり、本機能のrelease前に公開が
-必要です。
+しません。capability v1は`@kubohiroya/turbowarp-aframe@0.3.0`で公開済みです。
 
 asset登録では宣言的template JSONをA-Frameへ送り、検証済みrig mappingを保持します。各boneは
 対応するKalidokit pose rig出力、`{avatar}`を含むselector、任意Euler offset degreeで定義します。

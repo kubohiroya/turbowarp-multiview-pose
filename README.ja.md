@@ -21,14 +21,13 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 ## 要件と安全性
 
 - unsandboxed custom extensionを利用できるTurboWarp
-- 先に読み込まれた、runtime capability v2対応の`@kubohiroya/turbowarp-webrtc`
-- 姿勢推定より先に読み込まれた`@kubohiroya/turbowarp-camera-source` 0.4以降
+- 先に読み込まれた、runtime capability v2対応の`@kubohiroya/turbowarp-webrtc` 0.3.0
+- 姿勢推定より先に読み込まれた`@kubohiroya/turbowarp-camera-source` 0.5.0
 - TensorFlow.js WebGPUに対応するbrowser／GPU
-- avatar利用時は先に読み込んだscene capability v1対応`turbowarp-aframe` 0.2.0
+- avatar利用時は先に読み込んだscene capability v1対応`turbowarp-aframe` 0.3.0
 - 起動前に明示的に有効化する`qrCourierPairing` feature flag（既定OFF）
 
-scene capabilityは現在、TurboWarp-A-Frame commit `1e24b32`にある未releaseの前提機能です。
-avatar機能をreleaseする前にこのcommitを含むbuildを公開する必要があり、capability v1がない
+scene capability v1は`@kubohiroya/turbowarp-aframe@0.3.0`で公開済みです。capability v1がない
 場合consumerはfail closedします。
 
 ```js
