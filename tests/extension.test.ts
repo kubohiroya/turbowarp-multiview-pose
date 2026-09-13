@@ -174,6 +174,7 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(opcodes).toContain("frameSyncPatternTimestampUs");
     expect(opcodes).not.toContain("prepareOfferQr");
     expect(opcodes).not.toContain("startCameraCalibration");
+    expect(opcodes).not.toContain("registerAvatarAsset");
 
     const allOff = new MultiviewPoseExtension({});
     const offOpcodes = (
