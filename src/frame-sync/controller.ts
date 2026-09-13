@@ -6,7 +6,7 @@ import {
   sampleCells,
   type PanelRect,
 } from "./detector.js";
-import { patternTimestampUs } from "./pattern.js";
+import { PATTERN_WRAP_US, patternTimestampUs } from "./pattern.js";
 import type {
   CapturedFrame,
   FramePumpPort,
@@ -47,6 +47,7 @@ type CalibrationPhase = "range" | "levels";
 
 interface Calibration {
   phase: CalibrationPhase;
+  cancelled: boolean;
   rangeDeadlineUs: number;
   levelsDeadlineUs: number;
   range: PanelRangeAccumulator;
@@ -64,7 +65,20 @@ const DEFAULT_MINIMUM_DECODE_RATE = 0.2;
 const DEFAULT_MINIMUM_CONTRAST = 24;
 const DECODE_RATE_WINDOW = 120;
 const RANGE_PHASE_SHARE = 0.6;
-const MINIMUM_CALIBRATION_SECONDS = 1;
+const LEVELS_PHASE_SHARE = 1 - RANGE_PHASE_SHARE;
+const CALIBRATION_MARGIN = 1.2;
+/**
+ * The slowest pattern cell changes once per half wrap period, so a calibration
+ * phase shorter than that can leave a cell at one level for the whole window.
+ * The panel would then be located from an incomplete region, or the cell would
+ * read as low contrast, and calibration would fail for a reason the operator
+ * cannot act on. The levels phase is the shorter of the two, so it sets the
+ * minimum.
+ */
+const MINIMUM_CALIBRATION_SECONDS =
+  Math.ceil(
+    ((PATTERN_WRAP_US / 2) * CALIBRATION_MARGIN) / LEVELS_PHASE_SHARE / 100_000,
+  ) / 10;
 const MAXIMUM_CALIBRATION_SECONDS = 60;
 
 /**
@@ -162,18 +176,8 @@ export class FrameSyncPatternController {
         new Error("Camera ID must not be empty."),
       );
     }
-    if (
-      !Number.isFinite(seconds) ||
-      seconds < MINIMUM_CALIBRATION_SECONDS ||
-      seconds > MAXIMUM_CALIBRATION_SECONDS
-    ) {
-      this.fail(
-        "invalid-duration",
-        new Error(
-          `Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds.`,
-        ),
-      );
-    }
+    // Validated before leasing a camera the run cannot use.
+    this.requireCalibrationSeconds(seconds);
     this.pipelineState = "acquiring-camera";
     this.code = "";
     this.message = "";
@@ -205,7 +209,11 @@ export class FrameSyncPatternController {
   }
 
   public async stop(): Promise<void> {
-    this.calibration?.settle(new Error("Frame sync decoding stopped."));
+    const calibration = this.calibration;
+    if (calibration) {
+      calibration.cancelled = true;
+      calibration.settle(new Error("Frame sync decoding stopped."));
+    }
     this.calibration = undefined;
     this.pump?.stop();
     this.pump = undefined;
@@ -225,7 +233,7 @@ export class FrameSyncPatternController {
     if (lease) await lease.release().catch(() => undefined);
   }
 
-  private async runCalibration(seconds: number): Promise<void> {
+  private requireCalibrationSeconds(seconds: number): void {
     if (
       !Number.isFinite(seconds) ||
       seconds < MINIMUM_CALIBRATION_SECONDS ||
@@ -234,10 +242,14 @@ export class FrameSyncPatternController {
       this.fail(
         "invalid-duration",
         new Error(
-          `Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds.`,
+          `Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds so that every pattern cell changes at least once.`,
         ),
       );
     }
+  }
+
+  private async runCalibration(seconds: number): Promise<void> {
+    this.requireCalibrationSeconds(seconds);
     this.pipelineState = "calibrating";
     this.code = "";
     this.message = "";
@@ -250,6 +262,7 @@ export class FrameSyncPatternController {
     const finished = new Promise<void>((resolve, reject) => {
       this.calibration = {
         phase: "range",
+        cancelled: false,
         rangeDeadlineUs: startUs + totalUs * RANGE_PHASE_SHARE,
         levelsDeadlineUs: startUs + totalUs,
         range: new PanelRangeAccumulator(
@@ -277,6 +290,10 @@ export class FrameSyncPatternController {
     try {
       await finished;
     } catch (error) {
+      // Stopping is not a failure: `stop` settles the pending calibration, and
+      // reporting that as a camera fault would leave the decoder stuck in the
+      // error state after an ordinary stop or a project halt.
+      if (pending?.cancelled) return;
       this.fail(this.code || "camera-ended", error);
     }
   }

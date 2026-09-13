@@ -490,10 +490,10 @@
       "feature": "frameSyncPatternV1",
       "blockType": "COMMAND",
       "text": "start frame sync decoder for camera [CAMERA_ID] calibrating for [SECONDS] seconds",
-      "description": "Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough.",
+      "description": "Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough. The window must be at least 6.2 seconds so that every pattern cell changes at least once.",
       "arguments": {
         "CAMERA_ID": { "type": "STRING", "defaultValue": "camera-1" },
-        "SECONDS": { "type": "NUMBER", "defaultValue": 6 }
+        "SECONDS": { "type": "NUMBER", "defaultValue": 8 }
       }
     },
     {
@@ -501,9 +501,9 @@
       "feature": "frameSyncPatternV1",
       "blockType": "COMMAND",
       "text": "calibrate frame sync decoder for [SECONDS] seconds",
-      "description": "Runs calibration again on the running decoder, for example after the camera or the projector moved.",
+      "description": "Runs calibration again on the running decoder, for example after the camera or the projector moved. The window must be at least 6.2 seconds so that every pattern cell changes at least once.",
       "arguments": {
-        "SECONDS": { "type": "NUMBER", "defaultValue": 6 }
+        "SECONDS": { "type": "NUMBER", "defaultValue": 8 }
       }
     },
     {

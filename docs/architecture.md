@@ -185,7 +185,11 @@ high-range region whose bounding box is panel shaped, and the rest learns each c
 dark level and measures how often readings decode. Uneven projection is why levels are per cell, and
 a reading that lands between a cell's learned levels is discarded. Calibration fails with
 `panel-not-found`, `low-contrast`, or `decode-unstable` rather than returning untrusted latencies.
-Both phases end on the shared clock, so a stalled camera never leaves the controller waiting.
+The accepted window starts at 6.2 seconds, derived from the slowest cell's 2048 ms change period and
+the share of the window the levels phase gets, so a window that cannot see every cell at both levels
+is refused up front instead of failing later as low contrast. Both phases end on the shared clock, so
+a stalled camera never leaves the controller waiting, and stopping mid-calibration settles the
+pending run without recording a camera fault.
 
 Decoded frames are queued as observations. Timestamps are opaque readings from the external
 synchronized time service, taken when the frame reached the application; the browser-reported frame

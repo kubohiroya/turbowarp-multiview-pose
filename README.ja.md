@@ -154,7 +154,7 @@ recognition eventへ移すだけで、frame alignment、履歴保存／query、t
 show frame sync pattern
 
 （各カメラPC）
-start frame sync decoder for camera [camera-1] calibrating for [6] seconds
+start frame sync decoder for camera [camera-1] calibrating for [8] seconds
 repeat until <計測時間が終わるまで>:
   if <frame sync observation available?> then
     take next frame sync observation
@@ -169,6 +169,9 @@ stop frame sync decoder
 露光が画面のリフレッシュをまたいだ読み取りは、誤った時刻として報告される代わりに捨てられます。
 キャリブレーションは時間方向に変化する画素からパネル位置を求め、各セルの明暗レベルを学習し、
 信用できない数値を出す代わりに `panel-not-found`、`low-contrast`、`decode-unstable` で失敗します。
+キャリブレーション時間は6.2秒以上が必要です。最も遅いセルは2048msに1回しか変化せず、
+レベル学習に使えるのは窓の一部なので、それより短いとセルが片側のレベルのまま終わり、
+操作者には対処のしようがない理由で失敗します。
 
 `frame sync frame timestamp us` は、このPCがフレームを記録し終えた時刻で、`captureTimestampUs` と
 同じ外部の同期時刻サービスから読み取ります。センサの露光時刻が必要な場合は `frame sync frame age us`

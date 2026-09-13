@@ -170,7 +170,7 @@ finishes recording a frame:
 show frame sync pattern
 
 (every camera computer)
-start frame sync decoder for camera [camera-1] calibrating for [6] seconds
+start frame sync decoder for camera [camera-1] calibrating for [8] seconds
 repeat until <the measurement window is over>:
   if <frame sync observation available?> then
     take next frame sync observation
@@ -185,7 +185,10 @@ The pattern is a 4 by 4 grid. Twelve cells carry a millisecond counter that wrap
 four cells carry check bits, so a reading whose exposure straddled a display refresh is discarded
 instead of being reported as a wrong time. Calibration locates the panel by watching which pixels
 change over time, learns the light and dark level of every cell, and fails with `panel-not-found`,
-`low-contrast`, or `decode-unstable` rather than producing numbers it cannot stand behind.
+`low-contrast`, or `decode-unstable` rather than producing numbers it cannot stand behind. The
+window must be at least 6.2 seconds: the slowest cell changes once per 2048 ms and calibration
+spends only part of the window learning levels, so a shorter window can leave a cell at one level
+and fail for a reason the operator cannot act on.
 
 `frame sync frame timestamp us` is the moment this computer finished recording the frame, read from
 the same external synchronized time service as `captureTimestampUs`. Subtract `frame sync frame age
@@ -726,24 +729,24 @@ Returns the period after which the encoded display time repeats, in microseconds
 
 ### `start frame sync decoder for camera [CAMERA_ID] calibrating for [SECONDS] seconds`
 
-Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough.
+Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough. The window must be at least 6.2 seconds so that every pattern cell changes at least once.
 
 | Property | Value |
 |---|---|
 | Type | Command |
 | Opcode | `startFrameSyncDecoder` |
 | `CAMERA_ID` | String, default: `camera-1` |
-| `SECONDS` | Number, default: `6` |
+| `SECONDS` | Number, default: `8` |
 
 ### `calibrate frame sync decoder for [SECONDS] seconds`
 
-Runs calibration again on the running decoder, for example after the camera or the projector moved.
+Runs calibration again on the running decoder, for example after the camera or the projector moved. The window must be at least 6.2 seconds so that every pattern cell changes at least once.
 
 | Property | Value |
 |---|---|
 | Type | Command |
 | Opcode | `calibrateFrameSyncDecoder` |
-| `SECONDS` | Number, default: `6` |
+| `SECONDS` | Number, default: `8` |
 
 ### `stop frame sync decoder`
 

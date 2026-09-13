@@ -17,7 +17,7 @@ const WIDTH = 96;
 const HEIGHT = 72;
 const PANEL: PanelRect = { x: 24, y: 12, width: 48, height: 48 };
 const FRAME_STEP_US = 100_000;
-const CALIBRATION_SECONDS = 6;
+const CALIBRATION_SECONDS = 8;
 
 function renderFrame(code: number | undefined): LuminanceFrame {
   const data = new Uint8Array(WIDTH * HEIGHT).fill(12);
@@ -170,16 +170,38 @@ describe("FrameSyncPatternController", () => {
     expect(harness.release).toHaveBeenCalled();
   });
 
-  it("rejects a calibration window outside the supported range", async () => {
+  it("rejects a window too short for every pattern cell to change", async () => {
     const harness = setup();
+    // The slowest cell toggles once per 2048 ms and the levels phase is 40% of
+    // the window, so 5 seconds cannot see every cell at both levels.
     await expect(
       harness.controller.start({
         cameraId: "camera-1",
-        calibrationSeconds: 0.2,
+        calibrationSeconds: 5,
       }),
-    ).rejects.toThrow("Calibration must run");
+    ).rejects.toThrow("every pattern cell changes at least once");
     expect(harness.controller.errorCode()).toBe("invalid-duration");
     expect(harness.acquireCamera).not.toHaveBeenCalled();
+  });
+
+  it("does not report a camera fault when it is stopped while calibrating", async () => {
+    const harness = setup();
+    const started = harness.controller.start({
+      cameraId: "camera-1",
+      calibrationSeconds: CALIBRATION_SECONDS,
+    });
+    await harness.settle();
+    harness.feed(0);
+    harness.feed(4095);
+    expect(harness.controller.state()).toBe("calibrating");
+
+    await harness.controller.stop();
+    await started;
+
+    expect(harness.controller.state()).toBe("idle");
+    expect(harness.controller.errorCode()).toBe("");
+    expect(harness.controller.errorMessage()).toBe("");
+    expect(harness.release).toHaveBeenCalled();
   });
 
   it("reports a missing camera source", async () => {

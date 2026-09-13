@@ -619,7 +619,7 @@
   			"feature": "frameSyncPatternV1",
   			"blockType": "COMMAND",
   			"text": "start frame sync decoder for camera [CAMERA_ID] calibrating for [SECONDS] seconds",
-  			"description": "Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough.",
+  			"description": "Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough. The window must be at least 6.2 seconds so that every pattern cell changes at least once.",
   			"arguments": {
   				"CAMERA_ID": {
   					"type": "STRING",
@@ -627,7 +627,7 @@
   				},
   				"SECONDS": {
   					"type": "NUMBER",
-  					"defaultValue": 6
+  					"defaultValue": 8
   				}
   			}
   		},
@@ -636,10 +636,10 @@
   			"feature": "frameSyncPatternV1",
   			"blockType": "COMMAND",
   			"text": "calibrate frame sync decoder for [SECONDS] seconds",
-  			"description": "Runs calibration again on the running decoder, for example after the camera or the projector moved.",
+  			"description": "Runs calibration again on the running decoder, for example after the camera or the projector moved. The window must be at least 6.2 seconds so that every pattern cell changes at least once.",
   			"arguments": { "SECONDS": {
   				"type": "NUMBER",
-  				"defaultValue": 6
+  				"defaultValue": 8
   			} }
   		},
   		{
@@ -79548,7 +79548,15 @@
   var DEFAULT_MINIMUM_CONTRAST = 24;
   var DECODE_RATE_WINDOW = 120;
   var RANGE_PHASE_SHARE = .6;
-  var MINIMUM_CALIBRATION_SECONDS = 1;
+  /**
+  * The slowest pattern cell changes once per half wrap period, so a calibration
+  * phase shorter than that can leave a cell at one level for the whole window.
+  * The panel would then be located from an incomplete region, or the cell would
+  * read as low contrast, and calibration would fail for a reason the operator
+  * cannot act on. The levels phase is the shorter of the two, so it sets the
+  * minimum.
+  */
+  var MINIMUM_CALIBRATION_SECONDS = Math.ceil(PATTERN_WRAP_US / 2 * 1.2 / .4 / 1e5) / 10;
   var MAXIMUM_CALIBRATION_SECONDS = 60;
   /**
   * Decodes the projected frame sync pattern out of one camera.
@@ -79615,7 +79623,7 @@
   		const cameraId = options.cameraId.trim();
   		const seconds = options.calibrationSeconds;
   		if (!cameraId) this.fail("camera-unavailable", /* @__PURE__ */ new Error("Camera ID must not be empty."));
-  		if (!Number.isFinite(seconds) || seconds < MINIMUM_CALIBRATION_SECONDS || seconds > MAXIMUM_CALIBRATION_SECONDS) this.fail("invalid-duration", /* @__PURE__ */ new Error(`Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds.`));
+  		this.requireCalibrationSeconds(seconds);
   		this.pipelineState = "acquiring-camera";
   		this.code = "";
   		this.message = "";
@@ -79640,7 +79648,11 @@
   		await this.runCalibration(seconds);
   	}
   	async stop() {
-  		this.calibration?.settle(/* @__PURE__ */ new Error("Frame sync decoding stopped."));
+  		const calibration = this.calibration;
+  		if (calibration) {
+  			calibration.cancelled = true;
+  			calibration.settle(/* @__PURE__ */ new Error("Frame sync decoding stopped."));
+  		}
   		this.calibration = void 0;
   		this.pump?.stop();
   		this.pump = void 0;
@@ -79659,8 +79671,11 @@
   		}
   		if (lease) await lease.release().catch(() => void 0);
   	}
+  	requireCalibrationSeconds(seconds) {
+  		if (!Number.isFinite(seconds) || seconds < MINIMUM_CALIBRATION_SECONDS || seconds > MAXIMUM_CALIBRATION_SECONDS) this.fail("invalid-duration", /* @__PURE__ */ new Error(`Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds so that every pattern cell changes at least once.`));
+  	}
   	async runCalibration(seconds) {
-  		if (!Number.isFinite(seconds) || seconds < MINIMUM_CALIBRATION_SECONDS || seconds > MAXIMUM_CALIBRATION_SECONDS) this.fail("invalid-duration", /* @__PURE__ */ new Error(`Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds.`));
+  		this.requireCalibrationSeconds(seconds);
   		this.pipelineState = "calibrating";
   		this.code = "";
   		this.message = "";
@@ -79673,6 +79688,7 @@
   		const finished = new Promise((resolve, reject) => {
   			this.calibration = {
   				phase: "range",
+  				cancelled: false,
   				rangeDeadlineUs: startUs + totalUs * RANGE_PHASE_SHARE,
   				levelsDeadlineUs: startUs + totalUs,
   				range: new PanelRangeAccumulator(this.analysisWidth, this.analysisHeight),
@@ -79695,6 +79711,7 @@
   		try {
   			await finished;
   		} catch (error) {
+  			if (pending?.cancelled) return;
   			this.fail(this.code || "camera-ended", error);
   		}
   	}
