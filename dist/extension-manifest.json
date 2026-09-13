@@ -3,6 +3,76 @@
   "id": "kubohiroyamultiviewpose",
   "blocks": [
     {
+      "opcode": "addCameraCalibrationSample",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationBackend",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationErrorCode",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationJson",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationJsonValid",
+      "blockType": "BOOLEAN",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "cameraCalibrationReady",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationReprojectionError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationSampleCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationSampleQuality",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cameraCalibrationState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "cancelCameraCalibration",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "cleanupCameraCalibration",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "createAndShowOfferQr",
       "blockType": "COMMAND",
       "arguments": [
@@ -41,6 +111,16 @@
       "opcode": "endOfferQrDisplay",
       "blockType": "COMMAND",
       "arguments": []
+    },
+    {
+      "opcode": "importCameraCalibration",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "JSON",
+          "type": "STRING"
+        }
+      ]
     },
     {
       "opcode": "inferNextPoseFrame",
@@ -143,6 +223,41 @@
       "arguments": [
         {
           "id": "INDEX",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
+      "opcode": "solveCameraCalibration",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "startCameraCalibration",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "CALIBRATION_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "COLUMNS",
+          "type": "NUMBER"
+        },
+        {
+          "id": "MAX_ERROR_PX",
+          "type": "NUMBER"
+        },
+        {
+          "id": "ROWS",
+          "type": "NUMBER"
+        },
+        {
+          "id": "SQUARE_METERS",
           "type": "NUMBER"
         }
       ]

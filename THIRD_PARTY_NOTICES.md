@@ -20,3 +20,8 @@ TypeBox is bundled for JSON Schema-compatible protocol validation and is distrib
 License:
 
 - <https://github.com/sinclairzx81/typebox>
+
+The calibration bundle includes OpenCV.js 4.12 through `@techstark/opencv-js`. OpenCV is
+distributed under the Apache License 2.0:
+
+- <https://github.com/TechStark/opencv-js>

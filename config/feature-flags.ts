@@ -2,6 +2,7 @@ export interface MultiviewPoseFeatureFlags {
   readonly qrCourierPairing: boolean;
   readonly webgpuMoveNetMultiPose: boolean;
   readonly protocolV1Codec: boolean;
+  readonly cameraCalibrationV1: boolean;
 }
 
 interface FeatureFlagGlobal {
@@ -15,4 +16,5 @@ export const featureFlags: MultiviewPoseFeatureFlags = Object.freeze({
   qrCourierPairing: overrides?.qrCourierPairing === true,
   webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
   protocolV1Codec: overrides?.protocolV1Codec === true,
+  cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
 });

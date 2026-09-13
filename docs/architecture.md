@@ -97,3 +97,29 @@ all bounded values. A separate recursive key guard rejects WebRTC offers, answer
 material, and credential fields before persistence, even if a later schema accidentally permits a
 nested extension point. SessionPolicy also enforces `expiresAt > issuedAt` and rejects expired
 policies at application-validation time.
+
+## Camera calibration workflow
+
+`cameraCalibrationV1` is startup-fixed and default OFF. A session validates the camera and
+calibration identifiers plus a 3–20 by 3–20 inner-corner chessboard and a square size in meters,
+then obtains a named Camera Source lease. The actual first frame dimensions become immutable for
+the session; later resolution changes fail before detection.
+
+Each explicitly requested sample performs one temporary video-to-canvas copy. The exact-pinned
+OpenCV.js 4.12 WebAssembly backend is bundled but lazily initialized by the first sample or solve.
+It detects the complete chessboard, refines corners to subpixel
+precision, and scores board coverage plus Laplacian sharpness. Quality below 0.2 and views within
+0.015 normalized RMS corner displacement of any retained view are rejected. The controller retains
+8–40 diverse samples and does not run a continuous CPU sampling loop or a second reference solver.
+
+`calibrateCamera` produces the intrinsic matrix, distortion vector, and RMS reprojection error. The
+last sample is deliberately reserved as the stage-world board placement. Its returned rotation and
+translation are inverted into the row-major 4 by 4 `worldFromCameraMatrix`. Results above the
+configured RMS threshold or outside CameraCalibration v1 bounds do not replace the last valid
+profile.
+
+Cancel, project reload, and extension disposal release the lease and temporary samples while
+keeping the last validated profile in memory. Explicit cleanup clears that profile too. Import uses
+the same exact v1 schema and recursively rejects pairing-secret keys. The 11 MB uncompressed bundle
+increase is accepted to keep the sole production backend available on an offline venue LAN; real
+camera/board geometry and WebAssembly startup remain browser E2E responsibilities.

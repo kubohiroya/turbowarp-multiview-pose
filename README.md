@@ -15,6 +15,7 @@ as a temporary sprite skin.
 - Runs MoveNet MultiPose Lightning for up to six tracked people through TensorFlow.js WebGPU only.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
 - Validates and round-trips all six pinned multiview-pose v1 application contracts.
+- Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
 
 ## Requirements and safety
 
@@ -22,6 +23,7 @@ as a temporary sprite skin.
 - `@kubohiroya/turbowarp-webrtc` with runtime capability v2, loaded first.
 - `@kubohiroya/turbowarp-camera-source` 0.4 or later, loaded before pose startup.
 - A browser and GPU combination supported by TensorFlow.js WebGPU.
+- WebAssembly support for the bundled OpenCV.js 4.12 calibration backend.
 - The startup-fixed feature flags are independently OFF by default.
 
 Set the flag before loading the extension:
@@ -41,6 +43,12 @@ Enable the six-contract codec independently:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {protocolV1Codec: true};
+```
+
+Enable camera calibration independently:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -91,6 +99,24 @@ v1 SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, ClockProbe, and P
 contracts. Use `protocol error path` and `protocol error message` after a failed validation. Unknown
 fields and versions fail closed; WebRTC offer, answer, SDP, ICE, DTLS, and credential keys are
 forbidden recursively because pairing secrets must not enter persistent application contracts.
+
+The shared camera/fusion calibration workflow is:
+
+```text
+start camera calibration camera [pose] profile [calibration-1] board [9] by [6]
+  square [0.025] m max error [1.5] px
+repeat until <camera calibration sample count = 8>:
+  add camera calibration sample
+solve camera calibration
+set [calibrationJson] to (CameraCalibration v1 JSON)
+```
+
+Move and tilt the board between intrinsic samples. Put it at the intended stage-world origin for the
+last sample; that last detected board defines the `worldFromCameraMatrix`. Resolution is fixed from
+the actual Camera Source frame at session start. Sample acceptance requires the complete inner-corner
+grid, quality at least 0.2, and normalized corner displacement at least 0.015 from every retained
+sample. Between 8 and 40 samples are retained. A solve above the configured reprojection RMS is
+rejected without replacing the last validated profile.
 
 ## Block reference
 
@@ -341,6 +367,158 @@ Returns the detailed message for the latest parse or validation error.
 | Type | Reporter |
 | Opcode | `protocolErrorMessage` |
 
+### `start camera calibration camera [CAMERA_ID] profile [CALIBRATION_ID] board [COLUMNS] by [ROWS] square [SQUARE_METERS] m max error [MAX_ERROR_PX] px`
+
+Leases a named Camera Source video and fixes its real resolution for a chessboard calibration session.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `startCameraCalibration` |
+| `CAMERA_ID` | String, default: `pose` |
+| `CALIBRATION_ID` | String, default: `calibration-1` |
+| `COLUMNS` | Number, default: `9` |
+| `ROWS` | Number, default: `6` |
+| `SQUARE_METERS` | Number, default: `0.025` |
+| `MAX_ERROR_PX` | Number, default: `1.5` |
+
+### `add camera calibration sample`
+
+Detects the full board in the latest shared camera frame and retains it when quality and novelty pass.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `addCameraCalibrationSample` |
+
+### `solve camera calibration`
+
+Solves intrinsic, distortion, and world-from-camera values from at least eight accepted samples.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `solveCameraCalibration` |
+
+### `cancel camera calibration`
+
+Releases the camera lease and temporary samples while preserving the last validated profile.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `cancelCameraCalibration` |
+
+### `cleanup camera calibration`
+
+Releases the session and also clears the last in-memory calibration profile.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `cleanupCameraCalibration` |
+
+### `import CameraCalibration v1 [JSON]`
+
+Imports an exact CameraCalibration v1 JSON profile after schema and credential-boundary validation.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `importCameraCalibration` |
+| `JSON` | String, default: `{}` |
+
+### `CameraCalibration v1 [JSON] valid?`
+
+Validates a calibration profile without replacing the last validated profile.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `cameraCalibrationJsonValid` |
+| `JSON` | String, default: `{}` |
+
+### `camera calibration ready?`
+
+Reports whether a fixed-resolution camera session can accept a sample or solve.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `cameraCalibrationReady` |
+
+### `camera calibration state`
+
+Returns the current calibration session state.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationState` |
+
+### `camera calibration backend`
+
+Returns the single pinned production solve backend identifier.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationBackend` |
+
+### `camera calibration sample count`
+
+Returns the accepted sample count for the current or last solved session.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationSampleCount` |
+
+### `camera calibration sample quality`
+
+Returns the latest accepted board coverage and sharpness quality score from zero to one.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationSampleQuality` |
+
+### `camera calibration reprojection error px`
+
+Returns the latest solve RMS reprojection error in pixels.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationReprojectionError` |
+
+### `camera calibration error code`
+
+Returns a stable code for board, camera, sample, solve, reprojection, or profile errors.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationErrorCode` |
+
+### `camera calibration error`
+
+Returns the detailed calibration diagnostic.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationError` |
+
+### `CameraCalibration v1 JSON`
+
+Exports the last validated exact v1 profile, or an empty string when none exists.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraCalibrationJson` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -359,6 +537,10 @@ Returns the detailed message for the latest parse or validation error.
 | Protocol feature flag OFF | Codec blocks are hidden; pose, camera preview, and pairing remain independent. |
 | Unknown contract/version | Validation fails at `/schema` or `/version`; no fallback parser is selected. |
 | Pairing credential key | Validation fails at its JSON Pointer path and no decoded value is retained. |
+| Calibration flag OFF | Calibration blocks are hidden; the other vertical slices remain independent. |
+| Resolution changes mid-session | The sample is rejected with `resolution-mismatch`. |
+| Weak or duplicate board view | The sample is rejected without entering the solve set. |
+| Cancel/reload/disposal | Camera lease and temporary samples are released; the last valid profile remains. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.
@@ -396,6 +578,15 @@ when a sibling multiview-pose checkout (or `MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`)
 fail on upstream working-copy drift. Contract fixtures are copied from that pinned package and
 cross-checked against both the schema and block-facing codec.
 
+Calibration uses one production backend: exact-pinned `@techstark/opencv-js` 4.12.0-release.1. A
+requested sample lazily initializes the bundled backend and copies one video frame to a temporary
+canvas, then OpenCV WebAssembly performs
+chessboard detection, subpixel refinement, `calibrateCamera`, and Rodrigues conversion. There is no
+separate CPU reference solver. Bundling the backend makes offline venue use possible but increases
+the uncompressed extension bundle by about 11 MB. Unit tests inject the backend and Camera Source;
+real camera, printed-board, OpenCV WASM initialization, and geometric accuracy require browser E2E
+validation on deployment hardware.
+
 ## Rollback
 
 Set `qrCourierPairing` to `false` before extension startup, stop the project to release temporary
@@ -405,6 +596,8 @@ To roll back pose inference only, set `webgpuMoveNetMultiPose` to `false` before
 the project. Camera preview and pairing blocks remain independently available.
 Set `protocolV1Codec` to `false` to remove the high-level codec blocks; unsupported versions remain
 rejected rather than falling back to v1.
+Set `cameraCalibrationV1` to `false` to stop new calibration sessions. Cancel before reload to release
+temporary samples; retain and use only a previously validated exact v1 profile.
 
 ## License
 

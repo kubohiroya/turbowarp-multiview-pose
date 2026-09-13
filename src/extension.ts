@@ -13,6 +13,9 @@ import { PosePipelineController } from "./pose/controller.js";
 import { TfjsWebGpuMoveNet } from "./pose/tfjs-movenet.js";
 import type { PoseModelPort } from "./pose/types.js";
 import { ProtocolV1Codec } from "./protocol/codec.js";
+import { CameraCalibrationController } from "./calibration/controller.js";
+import { OpenCvChessboardCalibrationBackend } from "./calibration/opencv-backend.js";
+import type { CalibrationBackendPort } from "./calibration/types.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -26,7 +29,11 @@ interface DefinitionArgument {
 
 interface BlockDefinition {
   opcode: string;
-  feature: "qrCourierPairing" | "webgpuMoveNetMultiPose" | "protocolV1Codec";
+  feature:
+    | "qrCourierPairing"
+    | "webgpuMoveNetMultiPose"
+    | "protocolV1Codec"
+    | "cameraCalibrationV1";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -44,9 +51,11 @@ export interface MultiviewPoseExtensionOptions {
   enabled?: boolean;
   poseEnabled?: boolean;
   protocolEnabled?: boolean;
+  calibrationEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
+  calibrationBackend?: CalibrationBackendPort;
   nowMilliseconds?: () => number;
   clockId?: string;
 }
@@ -57,11 +66,13 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly enabled: boolean;
   private readonly poseEnabled: boolean;
   private readonly protocolEnabled: boolean;
+  private readonly calibrationEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
   private readonly pose: PosePipelineController;
   private readonly protocol: ProtocolV1Codec;
+  private readonly calibration: CameraCalibrationController;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
@@ -69,6 +80,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly stopListener = () => {
     this.endOfferQrDisplay();
     void this.pose.stop();
+    void this.calibration.cancel();
   };
   private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
@@ -82,6 +94,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       options.poseEnabled ?? featureFlags.webgpuMoveNetMultiPose;
     this.protocolEnabled =
       options.protocolEnabled ?? featureFlags.protocolV1Codec;
+    this.calibrationEnabled =
+      options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -95,6 +109,14 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       ...(options.clockId ? { clockId: options.clockId } : {}),
     });
     this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
+    this.calibration = new CameraCalibrationController({
+      runtime: this.runtime,
+      backend:
+        options.calibrationBackend ?? new OpenCvChessboardCalibrationBackend(),
+      ...(options.nowMilliseconds
+        ? { nowMilliseconds: options.nowMilliseconds }
+        : {}),
+    });
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -306,9 +328,95 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.protocol.errorMessage();
   }
 
+  public async startCameraCalibration(args: {
+    CAMERA_ID: unknown;
+    CALIBRATION_ID: unknown;
+    COLUMNS: unknown;
+    ROWS: unknown;
+    SQUARE_METERS: unknown;
+    MAX_ERROR_PX: unknown;
+  }): Promise<void> {
+    this.requireCalibrationEnabled();
+    await this.calibration.start({
+      cameraId: Scratch.Cast.toString(args.CAMERA_ID),
+      calibrationId: Scratch.Cast.toString(args.CALIBRATION_ID),
+      board: {
+        columns: Scratch.Cast.toNumber(args.COLUMNS),
+        rows: Scratch.Cast.toNumber(args.ROWS),
+        squareSizeMeters: Scratch.Cast.toNumber(args.SQUARE_METERS),
+      },
+      maximumReprojectionErrorPx: Scratch.Cast.toNumber(args.MAX_ERROR_PX),
+    });
+  }
+
+  public async addCameraCalibrationSample(): Promise<void> {
+    this.requireCalibrationEnabled();
+    await this.calibration.addSample();
+  }
+
+  public async solveCameraCalibration(): Promise<void> {
+    this.requireCalibrationEnabled();
+    await this.calibration.solve();
+  }
+
+  public async cancelCameraCalibration(): Promise<void> {
+    await this.calibration.cancel();
+  }
+
+  public async cleanupCameraCalibration(): Promise<void> {
+    await this.calibration.cleanup();
+  }
+
+  public async importCameraCalibration(args: { JSON: unknown }): Promise<void> {
+    this.requireCalibrationEnabled();
+    await this.calibration.importProfile(Scratch.Cast.toString(args.JSON));
+  }
+
+  public cameraCalibrationJsonValid(args: { JSON: unknown }): boolean {
+    this.requireCalibrationEnabled();
+    return this.calibration.validateProfile(Scratch.Cast.toString(args.JSON));
+  }
+
+  public cameraCalibrationReady(): boolean {
+    return this.calibrationEnabled && this.calibration.ready();
+  }
+
+  public cameraCalibrationState(): string {
+    return this.calibrationEnabled ? this.calibration.state() : "disabled";
+  }
+
+  public cameraCalibrationBackend(): string {
+    return this.calibrationEnabled ? this.calibration.backend() : "disabled";
+  }
+
+  public cameraCalibrationSampleCount(): number {
+    return this.calibration.sampleCount();
+  }
+
+  public cameraCalibrationSampleQuality(): number {
+    return this.calibration.latestSampleQuality();
+  }
+
+  public cameraCalibrationReprojectionError(): number {
+    return this.calibration.latestReprojectionError();
+  }
+
+  public cameraCalibrationErrorCode(): string {
+    return this.calibration.errorCode();
+  }
+
+  public cameraCalibrationError(): string {
+    return this.calibration.errorMessage();
+  }
+
+  public cameraCalibrationJson(): string {
+    return this.calibration.profileJson();
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
+    void this.calibration.cancel();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -340,10 +448,19 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     }
   }
 
+  private requireCalibrationEnabled(): void {
+    if (!this.calibrationEnabled) {
+      throw new Error(
+        "Camera calibration v1 is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
   private blockEnabled(feature: BlockDefinition["feature"]): boolean {
     if (feature === "qrCourierPairing") return this.enabled;
     if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
-    return this.protocolEnabled;
+    if (feature === "protocolV1Codec") return this.protocolEnabled;
+    return this.calibrationEnabled;
   }
 
   private requireSession(): OfferQrSession {

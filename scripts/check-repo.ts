@@ -77,6 +77,15 @@ const license = await readFile("LICENSE", "utf8");
 const config = await readFile("src/config.ts", "utf8");
 const poseAdapter = await readFile("src/pose/tfjs-movenet.ts", "utf8");
 const poseController = await readFile("src/pose/controller.ts", "utf8");
+const calibrationBackend = await readFile(
+  "src/calibration/opencv-backend.ts",
+  "utf8",
+);
+const calibrationController = await readFile(
+  "src/calibration/controller.ts",
+  "utf8",
+);
+const featureFlagSource = await readFile("config/feature-flags.ts", "utf8");
 const protocolIntegrity = JSON.parse(
   await readFile("schemas/protocol-v1-integrity.json", "utf8"),
 ) as ProtocolIntegrityManifest;
@@ -87,6 +96,7 @@ checkReadmes();
 checkLicense();
 checkGeneratedArtifacts();
 checkPosePolicy();
+checkCalibrationPolicy();
 await checkProtocolSchemaIntegrity();
 await checkPackContents();
 
@@ -265,6 +275,36 @@ function checkPosePolicy() {
     errors.push(
       "MoveNet pipeline must acquire frames only through Camera Source",
     );
+  }
+}
+
+function checkCalibrationPolicy() {
+  if (
+    packageMetadata.dependencies?.["@techstark/opencv-js"] !==
+    "4.12.0-release.1"
+  ) {
+    errors.push(
+      "package.json must pin @techstark/opencv-js exactly to 4.12.0-release.1",
+    );
+  }
+  for (const required of [
+    "findChessboardCorners",
+    "cornerSubPix",
+    "calibrateCamera",
+    "Rodrigues",
+  ]) {
+    if (!calibrationBackend.includes(required)) {
+      errors.push(`OpenCV calibration backend must call ${required}`);
+    }
+  }
+  if (
+    calibrationBackend.includes("getUserMedia(") ||
+    calibrationController.includes("getUserMedia(")
+  ) {
+    errors.push("Calibration must acquire frames only through Camera Source");
+  }
+  if (!featureFlagSource.includes("cameraCalibrationV1")) {
+    errors.push("Camera calibration must have a startup-fixed feature flag");
   }
 }
 

@@ -218,6 +218,145 @@
       "text": "protocol error message",
       "description": "Returns the detailed message for the latest parse or validation error.",
       "arguments": {}
+    },
+    {
+      "opcode": "startCameraCalibration",
+      "feature": "cameraCalibrationV1",
+      "blockType": "COMMAND",
+      "text": "start camera calibration camera [CAMERA_ID] profile [CALIBRATION_ID] board [COLUMNS] by [ROWS] square [SQUARE_METERS] m max error [MAX_ERROR_PX] px",
+      "description": "Leases a named Camera Source video and fixes its real resolution for a chessboard calibration session.",
+      "arguments": {
+        "CAMERA_ID": { "type": "STRING", "defaultValue": "pose" },
+        "CALIBRATION_ID": { "type": "STRING", "defaultValue": "calibration-1" },
+        "COLUMNS": { "type": "NUMBER", "defaultValue": 9 },
+        "ROWS": { "type": "NUMBER", "defaultValue": 6 },
+        "SQUARE_METERS": { "type": "NUMBER", "defaultValue": 0.025 },
+        "MAX_ERROR_PX": { "type": "NUMBER", "defaultValue": 1.5 }
+      }
+    },
+    {
+      "opcode": "addCameraCalibrationSample",
+      "feature": "cameraCalibrationV1",
+      "blockType": "COMMAND",
+      "text": "add camera calibration sample",
+      "description": "Detects the full board in the latest shared camera frame and retains it when quality and novelty pass.",
+      "arguments": {}
+    },
+    {
+      "opcode": "solveCameraCalibration",
+      "feature": "cameraCalibrationV1",
+      "blockType": "COMMAND",
+      "text": "solve camera calibration",
+      "description": "Solves intrinsic, distortion, and world-from-camera values from at least eight accepted samples.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cancelCameraCalibration",
+      "feature": "cameraCalibrationV1",
+      "blockType": "COMMAND",
+      "text": "cancel camera calibration",
+      "description": "Releases the camera lease and temporary samples while preserving the last validated profile.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cleanupCameraCalibration",
+      "feature": "cameraCalibrationV1",
+      "blockType": "COMMAND",
+      "text": "cleanup camera calibration",
+      "description": "Releases the session and also clears the last in-memory calibration profile.",
+      "arguments": {}
+    },
+    {
+      "opcode": "importCameraCalibration",
+      "feature": "cameraCalibrationV1",
+      "blockType": "COMMAND",
+      "text": "import CameraCalibration v1 [JSON]",
+      "description": "Imports an exact CameraCalibration v1 JSON profile after schema and credential-boundary validation.",
+      "arguments": {
+        "JSON": { "type": "STRING", "defaultValue": "{}" }
+      }
+    },
+    {
+      "opcode": "cameraCalibrationJsonValid",
+      "feature": "cameraCalibrationV1",
+      "blockType": "BOOLEAN",
+      "text": "CameraCalibration v1 [JSON] valid?",
+      "description": "Validates a calibration profile without replacing the last validated profile.",
+      "arguments": {
+        "JSON": { "type": "STRING", "defaultValue": "{}" }
+      }
+    },
+    {
+      "opcode": "cameraCalibrationReady",
+      "feature": "cameraCalibrationV1",
+      "blockType": "BOOLEAN",
+      "text": "camera calibration ready?",
+      "description": "Reports whether a fixed-resolution camera session can accept a sample or solve.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationState",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration state",
+      "description": "Returns the current calibration session state.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationBackend",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration backend",
+      "description": "Returns the single pinned production solve backend identifier.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationSampleCount",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration sample count",
+      "description": "Returns the accepted sample count for the current or last solved session.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationSampleQuality",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration sample quality",
+      "description": "Returns the latest accepted board coverage and sharpness quality score from zero to one.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationReprojectionError",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration reprojection error px",
+      "description": "Returns the latest solve RMS reprojection error in pixels.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationErrorCode",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration error code",
+      "description": "Returns a stable code for board, camera, sample, solve, reprojection, or profile errors.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationError",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "camera calibration error",
+      "description": "Returns the detailed calibration diagnostic.",
+      "arguments": {}
+    },
+    {
+      "opcode": "cameraCalibrationJson",
+      "feature": "cameraCalibrationV1",
+      "blockType": "REPORTER",
+      "text": "CameraCalibration v1 JSON",
+      "description": "Exports the last validated exact v1 profile, or an empty string when none exists.",
+      "arguments": {}
     }
   ]
 }

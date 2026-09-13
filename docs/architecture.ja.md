@@ -67,6 +67,30 @@ TypeBoxのtuple／array制約でCOCO-17順序、6人上限、matrix size、各�
 永続化前に拒否します。SessionPolicyはapplication validationとして`expiresAt > issuedAt`と
 未期限切れも検証します。
 
+## camera calibration workflow
+
+`cameraCalibrationV1`は起動時固定・既定OFFです。camera／calibration ID、inner cornerが縦横
+3〜20のchessboard、meter単位のsquare sizeを検証してから、named Camera Source leaseを取得
+します。最初の実frame解像度をsession中は固定し、途中変更は検出前に拒否します。
+
+明示的なsample要求ごとに一度だけvideoから一時canvasへcopyします。exact pinしたOpenCV.js
+4.12 WebAssembly backendはbundle内に含め、最初のsampleまたはsolveで遅延初期化します。
+完全なchessboardを検出してsubpixel精度へ補正し、board coverageと
+Laplacian sharpnessから品質を評価します。quality 0.2未満、および保持viewのいずれかと正規化
+RMS corner変位0.015未満のviewは拒否します。8〜40の多様なsampleを保持し、継続的なCPU
+sampling loopや別の参照solverは実装しません。
+
+`calibrateCamera`がintrinsic matrix、distortion vector、RMS reprojection errorを求めます。
+最後のsampleを舞台world board配置として予約し、そのrotation／translationを反転してrow-major
+4×4 `worldFromCameraMatrix`を作ります。設定RMS上限またはCameraCalibration v1境界を超える結果は
+最後の有効profileを置き換えません。
+
+cancel、project reload、extension disposeではleaseと一時sampleを解放し、最後の検証済みprofile
+はmemoryに維持します。明示cleanupだけがprofileも消去します。importもexact v1 schemaで検証し、
+pairing-secret keyを再帰的に拒否します。offline会場LANで唯一のproduction backendを使えるよう
+非圧縮bundle約11 MB増を受け入れ、実camera／board幾何精度とWebAssembly起動はbrowser E2Eで
+検証します。
+
 ## WebGPU MoveNet MultiPoseの縦切り
 
 `webgpuMoveNetMultiPose`は独立した起動時固定・既定OFF flagです。TensorFlow.jsではWebGPU

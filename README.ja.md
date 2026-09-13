@@ -15,6 +15,7 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - TensorFlow.js WebGPU限定でMoveNet MultiPose Lightningを実行し、最大6人を追跡します。
 - COCO-17観測を`twmp/pose-frame-2d` version 1 JSONとして取得できます。
 - multiview-poseの6種類のv1 application contractを検証し、JSONをround-tripします。
+- 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
 
 ## 要件と安全性
 
@@ -39,6 +40,12 @@ globalThis.__TWMP_FEATURE_FLAGS__ = {webgpuMoveNetMultiPose: true};
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {protocolV1Codec: true};
+```
+
+camera calibrationも独立して有効化します。
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
 ```
 
 起動時にTensorFlow.js backendとして`webgpu`を明示選択し、それ以外なら
@@ -81,6 +88,23 @@ unknown field／versionはfail closedし、診断をJSON Pointer pathとmessage�
 offer、answer、SDP、ICE、DTLS、credentialに相当するkeyは再帰的に拒否し、pairing secretを
 永続application contractへ混入させません。
 
+camera app／fusion app共用のcalibration workflowは次のとおりです。
+
+```text
+start camera calibration camera [pose] profile [calibration-1] board [9] by [6]
+  square [0.025] m max error [1.5] px
+repeat until <camera calibration sample count = 8>:
+  add camera calibration sample
+solve camera calibration
+set [calibrationJson] to (CameraCalibration v1 JSON)
+```
+
+intrinsic sampleごとにboardを移動・傾斜させ、最後のsampleではboardを舞台world原点に置きます。
+最後のboard poseから`worldFromCameraMatrix`を作成します。session開始時のCamera Source実frame
+解像度を固定し、途中変更を拒否します。完全なinner corner grid、quality 0.2以上、保持sample
+すべてに対する正規化corner変位0.015以上を要求し、8〜40 sampleでsolveします。設定した
+reprojection RMSを超える解は拒否し、最後の検証済みprofileを置き換えません。
+
 ## 開発
 
 ```bash
@@ -101,12 +125,22 @@ test環境では実行しないため、実機browser／GPUで互換性とthroug
 multiview-pose checkoutまたは`MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`があれば上流作業copyの
 driftも検出します。上流fixtureのcopyはschemaとblock向けcodecの両方でcross-checkします。
 
+calibrationのproduction backendはexact pinした`@techstark/opencv-js` 4.12.0-release.1だけです。
+最初のsampleまたはsolveでbundle内backendを遅延初期化し、sample要求時だけvideo frameを
+一時canvasへcopyします。OpenCV WebAssemblyでchessboard検出、subpixel
+refinement、`calibrateCamera`、Rodrigues変換を行います。別のCPU参照solverは作りません。
+offline会場で利用できる代わりに、非圧縮bundleは約11 MB増加します。unit testではbackendと
+Camera Sourceを注入し、実camera／印刷board／OpenCV WASM初期化／幾何精度は配備機材上の
+browser E2Eで別途検証します。
+
 ## ロールバック
 
 起動前に`qrCourierPairing`をOFFにし、projectを停止して一時skinを解放したあと、
 TurboWarp WebRTCのmanual copy/paste pairingへ戻します。
 姿勢推定だけを切り戻す場合は、起動前に`webgpuMoveNetMultiPose`をOFFにしてprojectを
 再読み込みします。camera previewとpairing blockは独立して利用できます。
+`cameraCalibrationV1`をOFFにすると新規sessionを停止できます。一時sampleをcancelで解放し、
+検証済みのexact v1 profileだけを維持します。
 高位codecだけを切り戻す場合は`protocolV1Codec`をOFFにします。未知versionをv1として
 解釈するfallbackは行いません。
 

@@ -72,7 +72,7 @@ function setup(code = "offer-code") {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MultiviewPoseExtension offer QR blocks", () => {
-  it("keeps the QR, pose, and protocol feature flags independent", () => {
+  it("keeps the QR, pose, protocol, and calibration feature flags independent", () => {
     setup();
     const poseModel = {
       initializeWebGpu: vi.fn(async () => undefined),
@@ -118,6 +118,26 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(protocolOpcodes).not.toContain("startWebGpuMoveNetMultiPose");
     expect(protocolOpcodes).toContain("decodeProtocolJson");
     expect(protocolOpcodes).toContain("protocolErrorPath");
+
+    const calibrationOnly = new MultiviewPoseExtension({
+      enabled: false,
+      poseEnabled: false,
+      protocolEnabled: false,
+      calibrationEnabled: true,
+      calibrationBackend: {
+        name: "mock-calibration-backend",
+        captureSample: vi.fn(async () => undefined),
+        solve: vi.fn(async () => {
+          throw new Error("not used");
+        }),
+      },
+    });
+    const calibrationOpcodes = (
+      calibrationOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(calibrationOpcodes).toContain("startCameraCalibration");
+    expect(calibrationOpcodes).toContain("cameraCalibrationJson");
+    expect(calibrationOpcodes).not.toContain("decodeProtocolJson");
   });
 
   it("exposes protocol round-trip and diagnostic reporters", () => {
@@ -287,6 +307,51 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     listeners.get("RUNTIME_DISPOSED")?.();
     await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(2));
     expect(dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases calibration camera leases on project reload and disposal", async () => {
+    const { runtime, listeners } = setup();
+    const release = vi.fn(async () => undefined);
+    runtime.ext_kubohiroyacamerasource = {
+      acquireCamera: vi.fn(async () => ({
+        getFrameSource: vi.fn(() => ({
+          kind: "video" as const,
+          element: {} as HTMLVideoElement,
+          width: 800,
+          height: 600,
+          mirrored: false,
+          deviceId: "device-1",
+        })),
+        release,
+      })),
+    };
+    const extension = new MultiviewPoseExtension({
+      runtime,
+      calibrationEnabled: true,
+      calibrationBackend: {
+        name: "mock-calibration-backend",
+        captureSample: vi.fn(async () => undefined),
+        solve: vi.fn(async () => {
+          throw new Error("not used");
+        }),
+      },
+    });
+    const start = () =>
+      extension.startCameraCalibration({
+        CAMERA_ID: "camera-1",
+        CALIBRATION_ID: "calibration-1",
+        COLUMNS: 9,
+        ROWS: 6,
+        SQUARE_METERS: 0.025,
+        MAX_ERROR_PX: 1.5,
+      });
+    await start();
+    listeners.get("PROJECT_LOADED")?.();
+    await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+    expect(extension.cameraCalibrationState()).toBe("idle");
+    await start();
+    listeners.get("RUNTIME_DISPOSED")?.();
+    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(2));
   });
 
   it("cleans the old skin on re-prepare and when the displayed target is removed", async () => {

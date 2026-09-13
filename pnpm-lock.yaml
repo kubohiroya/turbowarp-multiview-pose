@@ -20,6 +20,9 @@ importers:
       '@sinclair/typebox':
         specifier: 0.34.52
         version: 0.34.52
+      '@techstark/opencv-js':
+        specifier: 4.12.0-release.1
+        version: 4.12.0-release.1
       '@tensorflow-models/pose-detection':
         specifier: 2.1.3
         version: 2.1.3(@mediapipe/pose@0.5.1675469404)(@tensorflow/tfjs-backend-wasm@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-backend-webgl@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-backend-webgpu@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-converter@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-core@4.22.0)
@@ -429,6 +432,9 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@techstark/opencv-js@4.12.0-release.1':
+    resolution: {integrity: sha512-LtTaph9v/HqLPXEg3m1xs2h7QJh10pUpuDT0nj8g77lelWnTwwQrehtd+fXElLOdrkqc4Fea6Z/sJBvEJLYPfw==}
 
   '@tensorflow-models/pose-detection@2.1.3':
     resolution: {integrity: sha512-SEq4K8fmkVVh9U2VemS2kKuT6DDZf3mO+fcid6F2/DSYMtVrGU13kWo0Q+GAwLznIPaNhlOxVVUgWiDXKUPlzA==}
@@ -1558,6 +1564,8 @@ snapshots:
   '@sinclair/typebox@0.34.52': {}
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@techstark/opencv-js@4.12.0-release.1': {}
 
   '@tensorflow-models/pose-detection@2.1.3(@mediapipe/pose@0.5.1675469404)(@tensorflow/tfjs-backend-wasm@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-backend-webgl@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-backend-webgpu@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-converter@4.22.0(@tensorflow/tfjs-core@4.22.0))(@tensorflow/tfjs-core@4.22.0)':
     dependencies:
