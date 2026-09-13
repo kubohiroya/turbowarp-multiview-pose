@@ -1,5 +1,6 @@
 # Architecture
 
+[User guide](../README.md) | [TurboWarp extension API](turbowarp-extension-api.md) |
 [日本語](architecture.ja.md)
 
 ## Build outputs
@@ -36,6 +37,11 @@ Blocks, arguments, and menus are sorted by their identifiers before serializatio
 descriptions, default values, and static menu items are intentionally excluded because they do not
 identify saved-project API references. A compatibility checker can therefore distinguish API
 changes from documentation or localization changes.
+
+The manifest and TurboWarp blocks are the package's public API. Source-level controllers and ports
+are internal implementation seams and are not npm exports. See the
+[extension API reference](turbowarp-extension-api.md) for loading order, lifecycle values, errors,
+and data contracts.
 
 ## Drift detection
 
