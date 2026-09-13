@@ -145,9 +145,12 @@ stop pose fusion
 ```
 
 Each camera keeps its own timestamp-ordered ring buffer. A frame that arrives out of order inside
-the jitter window is inserted at its timestamp position; a duplicate timestamp, an arrival older
-than the jitter window, and an arrival older than the retained window of a full ring are counted by
-`dropped pose frame count` instead of being buffered.
+the jitter window is inserted at its timestamp position. A frame is counted by
+`dropped pose frame count` instead of being buffered when its camera has no loaded profile
+(`unknown-camera`), when its `calibrationId` or frame size does not match that profile
+(`calibration-mismatch`), when its timestamp is already buffered, when it is older than the jitter
+window, and when it is older than the retained window of a full ring. Load every camera profile
+before the frames of that camera start arriving.
 
 `fuse PoseFrame3D at buffered delay` fuses the instant one configured delay behind the newest
 buffered timestamp, which is why the delay must cover the slowest camera's jitter. Every camera is
@@ -158,13 +161,17 @@ fuse an explicit past instant instead.
 
 The synchronized 2D sets are associated across cameras by two-view reprojection error, so one person
 never takes two views from the same camera. Each cluster seen by at least two cameras is triangulated
-per keypoint with score weighting, cheirality and reprojection checks, and stable `person-N`
-identifiers. A keypoint that is left with fewer than two confident views holds its last triangulated
-position and reports score `0`.
+per keypoint with score weighting and a cheirality check, and keeps a stable `person-N` identifier.
+When the views of a keypoint disagree, the largest set of views that agree on one point within the
+reprojection threshold wins, so a minority of wrong detections is discarded rather than pulling the
+keypoint away from the truth. A keypoint left with fewer than two confident views holds its last
+triangulated position and reports score `0`.
 
 Transient shortages do not throw and do not replace the last fused frame: `fuse` reports `false`,
 `pose fusion state` returns `buffering`, and `pose fusion error code` returns `empty-buffer`,
-`insufficient-cameras`, or `no-fused-person`. Invalid JSON, a foreign schema, and an invalid
+`insufficient-cameras`, or `no-fused-person`. Frames that cannot be buffered report
+`unknown-camera`, `calibration-mismatch`, or `frame-dropped` without throwing, so one misconfigured
+peer cannot break a running project script. Invalid JSON, a foreign schema, and an invalid
 calibration profile throw.
 
 ## Block reference
@@ -772,6 +779,8 @@ Returns the latest fusion error message.
 | Late or duplicate 2D frame | The frame is counted by `dropped pose frame count` and never enters a ring buffer. |
 | Instant without two cameras | Fusion reports `insufficient-cameras`, keeps the last fused frame, and does not throw. |
 | Keypoint with fewer than two views | Its last triangulated position is held and its score is reported as `0`. |
+| Frame without a matching profile | The frame is dropped with `unknown-camera` or `calibration-mismatch`; it never reaches a ring buffer. |
+| Scripts finish running | Buffered frames survive; only the stop button, project reload, and disposal clear them. |
 | Fusion stop/reload/disposal | Buffers and fused results are cleared; loaded calibration profiles survive until cleanup. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,

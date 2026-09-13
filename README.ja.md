@@ -132,8 +132,10 @@ stop pose fusion
 ```
 
 cameraごとにtimestamp順のring bufferを持ちます。jitter window内で順序が入れ替わって届いた
-frameはtimestamp位置へ挿入し、timestampの重複、jitter windowより古い到着、満杯のring
-より古い到着は`dropped pose frame count`へ計上してbufferしません。
+frameはtimestamp位置へ挿入します。profile未読み込みのcamera（`unknown-camera`）、profileと
+`calibrationId`や解像度が一致しないframe（`calibration-mismatch`）、timestampの重複、jitter window
+より古い到着、満杯のringより古い到着は、`dropped pose frame count`へ計上してbufferしません。
+各cameraのprofileは、そのcameraのframeが届き始める前に読み込んでください。
 
 `fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayだけ過去の瞬間を
 統合します。delayは最も遅いcameraのjitterを吸収できる値にしてください。その共通の瞬間で
@@ -142,14 +144,19 @@ frameはtimestamp位置へ挿入し、timestampの重複、jitter windowより�
 します。明示した過去の瞬間を統合する場合は`fuse PoseFrame3D at timestamp [] us`を使います。
 
 同期した2D setは2視点のreprojection誤差でcamera間対応付けし、1人が同じcameraから2視点を
-取ることはありません。2台以上のcameraが観測したclusterをkeypointごとに、score重み付け、
-cheirality判定、reprojection判定付きで三角測量し、`person-N`のidentityを維持します。
-確信のある視点が2つ未満のkeypointは、最後に三角測量できた位置を保持しscore `0`を返します。
+取ることはありません。2台以上のcameraが観測したclusterをkeypointごとに、score重み付けと
+cheirality判定付きで三角測量し、`person-N`のidentityを維持します。視点同士が食い違う場合は、
+reprojection閾値内で1点に一致する最大の視点集合を採用するため、少数の誤検出はkeypointを
+引きずらずに捨てられます。確信のある視点が2つ未満のkeypointは、最後に三角測量できた位置を
+保持しscore `0`を返します。
 
 一時的な不足ではerrorをthrowせず、直前の統合結果も置き換えません。`fuse`は`false`を返し、
 `pose fusion state`は`buffering`、`pose fusion error code`は`empty-buffer`、
-`insufficient-cameras`、`no-fused-person`のいずれかを返します。不正なJSON、他contractのschema、
-不正なcalibration profileはerrorになります。
+`insufficient-cameras`、`no-fused-person`のいずれかを返します。bufferできないframeも
+`unknown-camera`、`calibration-mismatch`、`frame-dropped`を返すだけでthrowしないため、設定を
+誤ったpeer 1台で実行中のscriptが止まることはありません。不正なJSON、他contractのschema、
+不正なcalibration profileはerrorになります。scriptが走り終わっただけではbufferを破棄せず、
+停止ボタン、project reload、disposeで破棄します。
 
 ## 開発
 

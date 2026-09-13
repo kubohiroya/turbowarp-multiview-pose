@@ -123,6 +123,13 @@ frameは、ringの短い側をずらしてtimestamp位置へ挿入するため�
 古い到着はdropとして計上し、bufferしません。ここではcameraごとのclock offsetを推定しません。
 capture timestampは別実装の同期済みlocal time serviceが与える不透明値のまま扱います。
 
+frameをbufferするのは、その`cameraId`のcalibration profileが読み込み済みで、かつそのprofileが
+frameを説明できる場合だけです。`calibrationId`や解像度が一致しないframeは、誤ったintrinsicで
+そのまま三角測量されてしまうため拒否します。これらは重複や遅延到着と同様にdropとして計上し、
+throwしません。ingestはdata channelのhot pathであり、設定を誤ったpeer 1台で実行中のscriptを
+止めるべきではないからです。calibration済みcameraしかbufferしないので、未知のcamera IDが
+ring bufferを占有することもありません。
+
 `fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayを引いた1つの過去の
 瞬間を解決し、全cameraをその瞬間で再sampleします。前後のframeで挟めたkeypointは線形補間し、
 片側がocclusionのkeypointは低信頼値を混ぜず見えている側の観測を採用します。挟めないcamera、
@@ -130,11 +137,18 @@ capture timestampは別実装の同期済みlocal time serviceが与える不透
 それを超える場合は寄与しません。
 
 camera間の対応付けは、異なるcameraの追跡人物のすべての組について、共有する確信のあるkeypoint
-での2視点reprojection誤差の平均をcostとし、共有keypointが4点以上あることを要求します。costの
-小さい組から貪欲にmergeし、同一cameraの2視点が1人になるmergeは拒否します。2台以上のcameraが
-覆うclusterは、keypointごとにscore重み付き線形解法、cheirality判定、最悪視点を1回だけ除外する
-reprojection判定で三角測量します。pixel観測はprofileのOpenCV rational modelで歪み補正するため、
-係数0／4／5／8個に対応し、それ以外はprofile読み込み時に拒否します。
+での2視点reprojection誤差の平均をcostとし、共有keypointは4点以上・最大12点で打ち切ります。costの
+小さい組から貪欲にmergeし、同一cameraの2視点が1人になるmergeは拒否します。2視点の三角測量は
+2本の視線の最短距離の中点を閉形式で求め、この二乗オーダーの段を反復解法から外します。3視点
+以上はscore重み付き線形解法（Jacobiは相対収束判定）を使います。16 camera×6人の上限で1回の統合
+は約80 ms、4 camera×2人では約1 msです。
+
+2台以上のcameraが覆うclusterは、keypointごとにcheirality判定とreprojection判定付きで三角測量
+します。全視点が一致しない場合は、2視点ごとの仮解に対してreprojection閾値内に収まる視点数を
+数え、最大の一致集合で三角測量し直します。これにより少数の誤検出はkeypointを引きずらずに
+捨てられます（視点が2つの解に均等に割れる場合は原理的に区別できません）。pixel観測はprofileの
+OpenCV rational modelで歪み補正するため、係数0／4／5／8個に対応し、それ以外はprofile読み込み時
+に拒否します。
 
 registryはcameraとtracking IDの重なりから`person-N`のidentityを維持し、keypointごとに最後に
 三角測量できた位置を保持します。確信のある視点が2つ未満のkeypointはその位置を保持してscore `0`
@@ -143,5 +157,8 @@ pinnedのPoseFrame3D v1 schemaで検証します。
 
 bufferが空、覆うcameraが2台未満、多視点で見えた人物がいない場合は想定内の一時状態として
 `false`を返し、直前の統合結果を保持したままerror codeを公開します。不正なJSON、他contractの
-schema、不正なcalibration profileはerrorになります。project停止、project reload、extension dispose
+schema、不正なcalibration profileはerrorになります。停止ボタン、project reload、extension dispose
 ではbufferと統合結果を解放し、明示cleanupでは読み込み済みcalibration profileも解放します。
+`PROJECT_RUN_STOP`では解放しません。runtimeはthread queueが空になるたびにこのeventを出すため、
+hat scriptでframeをbufferするevent駆動のprojectがmessageの合間にjitter bufferを失ってしまいます。
+camera leaseと一時skinはこのeventでも解放します。

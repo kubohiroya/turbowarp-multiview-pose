@@ -225,6 +225,13 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
       timestampUs: 121_000,
     });
 
+    // Hat-driven projects idle between messages; PROJECT_RUN_STOP must not
+    // discard what the jitter buffer has accumulated.
+    listeners.get("PROJECT_RUN_STOP")?.();
+    expect(extension.poseFusionState()).toBe("ready");
+    expect(extension.poseFusionBufferedFrameCount()).toBe(6);
+    expect(extension.latestPoseFrame3D()).not.toBe("");
+
     listeners.get("PROJECT_STOP_ALL")?.();
     expect(extension.poseFusionState()).toBe("idle");
     expect(extension.poseFusionBufferedFrameCount()).toBe(0);

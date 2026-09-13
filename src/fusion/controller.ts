@@ -26,6 +26,7 @@ export type PoseFusionState =
 export type PoseFusionErrorCode =
   | ""
   | "calibration-invalid"
+  | "calibration-mismatch"
   | "frame-invalid"
   | "frame-dropped"
   | "unknown-camera"
@@ -59,6 +60,7 @@ export class PoseFusionController {
   private geometryOptions: FusionGeometryOptions =
     DEFAULT_FUSION_GEOMETRY_OPTIONS;
   private delayUs = 0;
+  private rejectedFrames = 0;
   private started = false;
   private sequence = 0;
   private fusionState: PoseFusionState = "idle";
@@ -102,6 +104,7 @@ export class PoseFusionController {
     };
     this.buffer.configure(this.jitterOptions);
     this.identities.clear();
+    this.rejectedFrames = 0;
     this.sequence = 0;
     this.latestFrame = undefined;
     this.latestFrameJsonValue = "";
@@ -114,6 +117,7 @@ export class PoseFusionController {
   public stop(): void {
     this.buffer.clear();
     this.identities.clear();
+    this.rejectedFrames = 0;
     this.sequence = 0;
     this.latestFrame = undefined;
     this.latestFrameJsonValue = "";
@@ -157,7 +161,11 @@ export class PoseFusionController {
     this.clearError();
   }
 
-  /** Buffers one PoseFrame2D. Duplicate and late frames are counted, not thrown. */
+  /**
+   * Buffers one PoseFrame2D. Malformed or foreign JSON throws; a frame without a
+   * matching calibration profile, a duplicate, and a late arrival are counted as
+   * dropped so a misconfigured peer cannot break a running project script.
+   */
   public ingestFrame(json: string): void {
     this.requireStarted();
     const decoded = decodeProtocolJson(json, Date.now());
@@ -168,14 +176,18 @@ export class PoseFusionController {
       this.fail("frame-invalid", message);
     }
     const frame = decoded.value as unknown as PoseFrame2DV1;
-    if (
-      !this.buffer.cameraIds().includes(frame.cameraId) &&
-      this.buffer.cameraIds().length >= MAX_FUSION_CAMERAS
-    ) {
-      this.fail(
-        "frame-invalid",
-        `At most ${MAX_FUSION_CAMERAS} cameras can be buffered.`,
+    const model = this.models.get(frame.cameraId);
+    if (!model) {
+      this.drop(
+        "unknown-camera",
+        `No calibration profile is loaded for camera ${frame.cameraId}.`,
       );
+      return;
+    }
+    const mismatch = describeCalibrationMismatch(frame, model);
+    if (mismatch) {
+      this.drop("calibration-mismatch", mismatch);
+      return;
     }
     const outcome = this.buffer.ingest(frame);
     if (outcome === "accepted") {
@@ -208,15 +220,23 @@ export class PoseFusionController {
       );
     }
     this.fusionState = "fusing";
-    const sample = this.buffer.sampleAt(timestampUs);
+    const resampled = this.buffer.sampleAt(timestampUs);
+    // A profile replaced after buffering leaves stale frames behind; they are
+    // excluded here until they age out of the ring.
+    const sample = {
+      timestampUs,
+      cameras: resampled.cameras.filter((camera) => {
+        const model = this.models.get(camera.cameraId);
+        return (
+          model !== undefined && !describeCalibrationMismatch(camera, model)
+        );
+      }),
+    };
     this.latestSample = sample;
-    const calibrated = sample.cameras.filter((camera) =>
-      this.models.has(camera.cameraId),
-    );
-    if (calibrated.length < this.geometryOptions.minCamerasPerPerson) {
+    if (sample.cameras.length < this.geometryOptions.minCamerasPerPerson) {
       this.reject(
         "insufficient-cameras",
-        `Only ${calibrated.length} calibrated camera(s) covered ${timestampUs} us.`,
+        `Only ${sample.cameras.length} calibrated camera(s) covered ${timestampUs} us.`,
       );
       return false;
     }
@@ -309,7 +329,7 @@ export class PoseFusionController {
   }
 
   public droppedFrameCount(): number {
-    return this.buffer.droppedFrameCount();
+    return this.buffer.droppedFrameCount() + this.rejectedFrames;
   }
 
   public personCount(): number {
@@ -356,6 +376,13 @@ export class PoseFusionController {
     }
   }
 
+  /** Rejected before buffering: counted as dropped instead of thrown. */
+  private drop(code: PoseFusionErrorCode, message: string): void {
+    this.rejectedFrames += 1;
+    this.fusionErrorCode = code;
+    this.fusionErrorMessage = `${code}: ${message}`;
+  }
+
   /** Expected transient shortage: no throw, no replacement of the last frame. */
   private reject(code: PoseFusionErrorCode, message: string): void {
     this.fusionState = "buffering";
@@ -374,6 +401,28 @@ export class PoseFusionController {
     this.fusionErrorCode = "";
     this.fusionErrorMessage = "";
   }
+}
+
+/** Rejects frames that a profile cannot describe, instead of fusing them. */
+function describeCalibrationMismatch(
+  frame: {
+    cameraId: string;
+    calibrationId: string;
+    frameWidth: number;
+    frameHeight: number;
+  },
+  model: CameraModel,
+): string | undefined {
+  if (frame.calibrationId !== model.calibrationId) {
+    return `Camera ${frame.cameraId} reports calibration ${frame.calibrationId} but profile ${model.calibrationId} is loaded.`;
+  }
+  if (
+    frame.frameWidth !== model.imageWidth ||
+    frame.frameHeight !== model.imageHeight
+  ) {
+    return `Camera ${frame.cameraId} reports ${frame.frameWidth}x${frame.frameHeight} but profile ${model.calibrationId} was solved at ${model.imageWidth}x${model.imageHeight}.`;
+  }
+  return undefined;
 }
 
 function ringSlots(delayUs: number, jitterWindowUs: number): number {

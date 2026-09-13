@@ -210,6 +210,82 @@ describe("PoseFusionController", () => {
     expect(controller.latestFrameJson()).toBe("");
   });
 
+  it("drops frames whose profile does not describe them", () => {
+    const controller = startedController();
+    const half = (calibration: CameraCalibrationV1): string => {
+      const frame = poseFrame2D("camera-1", 200_000, [
+        projectPerson(calibration, "movenet-1", skeleton({ x: 0, y: 0, z: 0 })),
+      ]);
+      frame.frameWidth = 640;
+      frame.frameHeight = 360;
+      for (const person of frame.persons) {
+        for (const keypoint of person.keypoints) {
+          keypoint.x /= 2;
+          keypoint.y /= 2;
+        }
+      }
+      return JSON.stringify(frame);
+    };
+    controller.ingestFrame(half(calibrations[0]!));
+    expect(controller.errorCode()).toBe("calibration-mismatch");
+    expect(controller.errorMessage()).toMatch(/640x360/u);
+    expect(controller.bufferedFrameCount()).toBe(0);
+    expect(controller.droppedFrameCount()).toBe(1);
+
+    const foreignProfile = poseFrame2D("camera-2", 200_000, []);
+    foreignProfile.calibrationId = "camera-2-profile-v2";
+    controller.ingestFrame(JSON.stringify(foreignProfile));
+    expect(controller.errorCode()).toBe("calibration-mismatch");
+    expect(controller.bufferedFrameCount()).toBe(0);
+
+    // An uncalibrated camera never occupies a ring buffer.
+    controller.ingestFrame(
+      JSON.stringify(poseFrame2D("camera-9", 200_000, [])),
+    );
+    expect(controller.errorCode()).toBe("unknown-camera");
+    expect(controller.bufferedFrameCount()).toBe(0);
+    expect(controller.droppedFrameCount()).toBe(3);
+  });
+
+  it("fuses a keypoint from the largest consensus view set", () => {
+    const controller = new PoseFusionController();
+    const rig = [
+      lookAtCalibration("camera-1", { x: 3.4, y: 1.7, z: 3.1 }),
+      lookAtCalibration("camera-2", { x: -3.2, y: 1.8, z: 2.9 }),
+      lookAtCalibration("camera-3", { x: 0.2, y: 2.6, z: -3.8 }),
+      lookAtCalibration("camera-4", { x: -3.4, y: 1.6, z: -3.2 }),
+      lookAtCalibration("camera-5", { x: 3.6, y: 2.2, z: -3.1 }),
+    ];
+    for (const calibration of rig) {
+      controller.loadCalibration(JSON.stringify(calibration));
+    }
+    controller.start({
+      delayMilliseconds: 0,
+      jitterMilliseconds: 80,
+      minKeypointScore: 0.3,
+    });
+    const points = skeleton({ x: 0.1, y: 0, z: 0.2 });
+    for (const [index, calibration] of rig.entries()) {
+      const person = projectPerson(calibration, "movenet-1", points);
+      // Two of the five cameras report a confident but wrong nose, so the
+      // fusion needs more than one refinement round to reach the clean views.
+      if (index >= 3) {
+        const nose = person.keypoints[0]!;
+        nose.x += 55 + index * 30;
+        nose.y -= 40 + index * 25;
+      }
+      controller.ingestFrame(
+        JSON.stringify(poseFrame2D(calibration.cameraId, 100_000, [person])),
+      );
+    }
+    expect(controller.fuseAt(100_000)).toBe(true);
+    const nose = persons(controller)[0]?.keypoints[0];
+    expect(nose?.score).toBeGreaterThan(0);
+    expect(nose?.x).toBeCloseTo(points[0]!.x, 3);
+    expect(nose?.y).toBeCloseTo(points[0]!.y, 3);
+    expect(nose?.z).toBeCloseTo(points[0]!.z, 3);
+  });
+
   it("counts dropped frames and rejects foreign or malformed payloads", () => {
     const controller = startedController();
     const frame = JSON.stringify(

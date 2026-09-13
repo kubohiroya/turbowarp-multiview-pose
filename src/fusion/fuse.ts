@@ -36,6 +36,14 @@ export const DEFAULT_FUSION_GEOMETRY_OPTIONS: FusionGeometryOptions = {
 };
 
 const COORDINATE_LIMIT = 1_000_000;
+/** Shared keypoints that already decide one person-pair cost. */
+const MAX_PAIR_KEYPOINTS = 12;
+
+interface FusedKeypoint {
+  point: Vector3;
+  score: number;
+  error: number;
+}
 
 interface PersonView {
   cameraId: string;
@@ -158,7 +166,11 @@ function associateViews(
   return [...clusters.values()];
 }
 
-/** Mean two-view reprojection error over the shared visible keypoints. */
+/**
+ * Mean two-view reprojection error over the shared visible keypoints. The scan
+ * stops once enough evidence is collected and gives up as soon as too few
+ * keypoints remain, because this runs for every cross-camera person pair.
+ */
 function pairCost(
   left: PersonView,
   right: PersonView,
@@ -166,7 +178,10 @@ function pairCost(
 ): number | undefined {
   let total = 0;
   let shared = 0;
-  for (const keypointId of COCO_17_KEYPOINT_IDS) {
+  for (const [index, keypointId] of COCO_17_KEYPOINT_IDS.entries()) {
+    if (shared >= MAX_PAIR_KEYPOINTS) break;
+    const remaining = COCO_17_KEYPOINT_IDS.length - index;
+    if (shared + remaining < options.minSharedKeypoints) return undefined;
     const first = left.observations.get(keypointId);
     const second = right.observations.get(keypointId);
     if (!first || !second) continue;
@@ -225,53 +240,64 @@ function fuseCluster(
   };
 }
 
+/**
+ * Triangulates one keypoint from every confident view. When the full set does
+ * not agree, the largest two-view consensus set wins, so a minority of wrong
+ * detections is discarded instead of dragging the point away from the truth.
+ */
 function fuseKeypoint(
   observations: readonly KeypointObservation[],
   options: FusionGeometryOptions,
-): { point: Vector3; score: number; error: number } | undefined {
-  let candidates = [...observations];
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (candidates.length < 2) return undefined;
-    const point = triangulate(candidates);
-    if (!point || !withinBounds(point)) return undefined;
-    const visible = candidates.filter(
-      (observation) => depthOf(observation.model, point) > 0,
-    );
-    if (visible.length < 2) return undefined;
-    if (visible.length !== candidates.length) {
-      candidates = visible;
-      continue;
+): FusedKeypoint | undefined {
+  if (observations.length < 2) return undefined;
+  const agreed = evaluateViews(observations, options);
+  if (agreed) return agreed;
+  if (observations.length === 2) return undefined;
+
+  let best: { result: FusedKeypoint; inliers: number } | undefined;
+  for (let left = 0; left < observations.length; left += 1) {
+    for (let right = left + 1; right < observations.length; right += 1) {
+      const first = observations[left];
+      const second = observations[right];
+      if (!first || !second) continue;
+      const seed = triangulate([first, second]);
+      if (!seed || !withinBounds(seed)) continue;
+      const inliers = observations.filter((observation) => {
+        if (depthOf(observation.model, seed) <= 0) return false;
+        const error = meanReprojectionError(seed, [observation]);
+        return error !== undefined && error <= options.maxReprojectionErrorPx;
+      });
+      if (inliers.length < 2) continue;
+      const result = evaluateViews(inliers, options);
+      if (!result) continue;
+      if (
+        !best ||
+        inliers.length > best.inliers ||
+        (inliers.length === best.inliers && result.error < best.result.error)
+      ) {
+        best = { result, inliers: inliers.length };
+      }
     }
-    const error = meanReprojectionError(point, candidates);
-    if (error === undefined) return undefined;
-    if (error <= options.maxReprojectionErrorPx) {
-      const score =
-        candidates.reduce(
-          (total, observation) => total + observation.score,
-          0,
-        ) / candidates.length;
-      return { point, score: clampScore(score), error };
-    }
-    if (candidates.length <= 2) return undefined;
-    candidates = dropWorstObservation(point, candidates);
   }
-  return undefined;
+  return best?.result;
 }
 
-function dropWorstObservation(
-  point: Vector3,
-  observations: readonly KeypointObservation[],
-): KeypointObservation[] {
-  let worstIndex = 0;
-  let worstError = -1;
-  observations.forEach((observation, index) => {
-    const error = meanReprojectionError(point, [observation]) ?? Infinity;
-    if (error > worstError) {
-      worstError = error;
-      worstIndex = index;
-    }
-  });
-  return observations.filter((_, index) => index !== worstIndex);
+/** Triangulates one view set and rejects it unless every view agrees. */
+function evaluateViews(
+  views: readonly KeypointObservation[],
+  options: FusionGeometryOptions,
+): FusedKeypoint | undefined {
+  const point = triangulate(views);
+  if (!point || !withinBounds(point)) return undefined;
+  if (!inFrontOfAll(point, views)) return undefined;
+  const error = meanReprojectionError(point, views);
+  if (error === undefined || error > options.maxReprojectionErrorPx) {
+    return undefined;
+  }
+  const score =
+    views.reduce((total, observation) => total + observation.score, 0) /
+    views.length;
+  return { point, score: clampScore(score), error };
 }
 
 function inFrontOfAll(

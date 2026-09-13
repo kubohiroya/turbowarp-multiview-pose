@@ -142,6 +142,13 @@ minus the jitter window, and an arrival older than the oldest retained frame of 
 counted as dropped instead of buffered. None of this estimates a per-camera clock offset: capture
 timestamps stay opaque values from the separate synchronized local time service.
 
+A frame is only buffered when a calibration profile for its `cameraId` is loaded and that profile
+describes it: a mismatched `calibrationId` or frame size would otherwise be triangulated silently
+with the wrong intrinsics. Such frames, like duplicates and late arrivals, are counted as dropped
+rather than thrown, because ingest runs on the data-channel hot path and one misconfigured peer must
+not break a running project script. Because only calibrated cameras are buffered, stray camera IDs
+cannot occupy the ring buffers either.
+
 `fuse PoseFrame3D at buffered delay` resolves the newest buffered timestamp minus the configured
 delay, and every camera is resampled at that single past instant. A keypoint bracketed by two frames
 is interpolated linearly; a keypoint that is occluded on one side of the bracket keeps the visible
@@ -151,12 +158,20 @@ window and otherwise contributes nothing.
 
 Cross-camera association scores every pair of tracked persons from different cameras by the mean
 two-view reprojection error over their shared confident keypoints, requiring at least four shared
-keypoints. Pairs are merged greedily from the lowest cost, and a merge that would place two views of
-the same camera in one person is rejected. Each cluster covered by at least two cameras is
-triangulated per keypoint with a score-weighted linear solver, a cheirality check, and a
-reprojection check that drops the worst view once before giving up. Pixel observations are
-undistorted with the OpenCV rational model of the profile, so 0, 4, 5, or 8 coefficients are
-supported and anything else is rejected when the profile is loaded.
+keypoints and stopping at twelve. Pairs are merged greedily from the lowest cost, and a merge that
+would place two views of the same camera in one person is rejected. Two-view triangulation uses the
+closed-form midpoint of both viewing rays, which keeps this quadratic stage off the iterative
+solver; the general case still uses the score-weighted linear solver with a relative Jacobi
+convergence threshold. One fusion at the 16 camera by 6 person limit measures about 80 ms, against
+about 1 ms for four cameras and two performers.
+
+Each cluster covered by at least two cameras is triangulated per keypoint with a cheirality check
+and a reprojection check. When the full view set does not agree, every two-view seed is scored by
+how many views fall inside the reprojection threshold, and the largest consensus set is
+re-triangulated; a minority of wrong detections is therefore discarded instead of dragging the
+keypoint away from the truth, while views split evenly between two consistent answers stay
+ambiguous. Pixel observations are undistorted with the OpenCV rational model of the profile, so 0,
+4, 5, or 8 coefficients are supported and anything else is rejected when the profile is loaded.
 
 A registry keeps stable `person-N` identifiers by camera and tracking-ID overlap, and keeps the last
 triangulated position of every keypoint. A keypoint left with fewer than two confident views holds
@@ -165,6 +180,9 @@ The assembled frame is checked against the pinned PoseFrame3D v1 schema before i
 
 Empty buffers, fewer than two covering cameras, and an instant with no multi-camera person are
 expected transient states: they report `false`, keep the last fused frame, and expose an error code.
-Invalid JSON, a foreign schema, and an invalid calibration profile throw. Project stop, project
+Invalid JSON, a foreign schema, and an invalid calibration profile throw. The stop button, project
 reload, and extension disposal clear buffers and fused results; explicit cleanup also clears the
-loaded calibration profiles.
+loaded calibration profiles. `PROJECT_RUN_STOP` deliberately does not: the runtime emits it whenever
+the thread queue empties, and an event-driven fusion project that buffers frames from hat scripts
+would otherwise lose its jitter buffer between messages. Camera leases and temporary skins are still
+released there.

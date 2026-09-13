@@ -181,6 +181,10 @@ export function triangulate(
   observations: readonly KeypointObservation[],
 ): Vector3 | undefined {
   if (observations.length < 2) return undefined;
+  if (observations.length === 2) {
+    const [first, second] = observations;
+    if (first && second) return triangulateTwoViews(first, second);
+  }
   const normal = new Array<number>(16).fill(0);
   for (const observation of observations) {
     const rotation = observation.model.rotation;
@@ -224,6 +228,100 @@ export function triangulate(
   return point;
 }
 
+/**
+ * Closed-form two-view triangulation: the midpoint of the shortest segment
+ * between both viewing rays. Two rays carry no redundancy to weight, so this
+ * replaces the iterative solver on the hot association path.
+ */
+function triangulateTwoViews(
+  first: KeypointObservation,
+  second: KeypointObservation,
+): Vector3 | undefined {
+  const firstCenter = cameraCenter(first.model);
+  const secondCenter = cameraCenter(second.model);
+  const firstRay = rayDirection(first.model, first.x, first.y);
+  const secondRay = rayDirection(second.model, second.x, second.y);
+  const between = [
+    element(firstCenter, 0) - element(secondCenter, 0),
+    element(firstCenter, 1) - element(secondCenter, 1),
+    element(firstCenter, 2) - element(secondCenter, 2),
+  ];
+  const rayDot = dot(firstRay, secondRay);
+  const denominator = 1 - rayDot * rayDot;
+  if (Math.abs(denominator) < 1e-12) return undefined;
+  const firstOffset = dot(firstRay, between);
+  const secondOffset = dot(secondRay, between);
+  const firstDepth = (rayDot * secondOffset - firstOffset) / denominator;
+  const secondDepth = (secondOffset - rayDot * firstOffset) / denominator;
+  const point = {
+    x:
+      (element(firstCenter, 0) +
+        firstDepth * element(firstRay, 0) +
+        element(secondCenter, 0) +
+        secondDepth * element(secondRay, 0)) /
+      2,
+    y:
+      (element(firstCenter, 1) +
+        firstDepth * element(firstRay, 1) +
+        element(secondCenter, 1) +
+        secondDepth * element(secondRay, 1)) /
+      2,
+    z:
+      (element(firstCenter, 2) +
+        firstDepth * element(firstRay, 2) +
+        element(secondCenter, 2) +
+        secondDepth * element(secondRay, 2)) /
+      2,
+  };
+  if (
+    !isFiniteNumber(point.x) ||
+    !isFiniteNumber(point.y) ||
+    !isFiniteNumber(point.z)
+  ) {
+    return undefined;
+  }
+  return point;
+}
+
+/** Camera position in world coordinates. */
+function cameraCenter(model: CameraModel): number[] {
+  return transposedRotationTimes(model.rotation, model.translation).map(
+    (value) => -value,
+  );
+}
+
+/** Unit viewing ray of one normalized observation in world coordinates. */
+function rayDirection(model: CameraModel, x: number, y: number): number[] {
+  const direction = transposedRotationTimes(model.rotation, [x, y, 1]);
+  const length = Math.hypot(
+    element(direction, 0),
+    element(direction, 1),
+    element(direction, 2),
+  );
+  if (length === 0) return [0, 0, 1];
+  return direction.map((value) => value / length);
+}
+
+function transposedRotationTimes(
+  rotation: readonly number[],
+  vector: readonly number[],
+): number[] {
+  return [0, 1, 2].map(
+    (row) =>
+      element(rotation, row) * element(vector, 0) +
+      element(rotation, row + 3) * element(vector, 1) +
+      element(rotation, row + 6) * element(vector, 2),
+  );
+}
+
+function dot(left: readonly number[], right: readonly number[]): number {
+  return (
+    element(left, 0) * element(right, 0) +
+    element(left, 1) * element(right, 1) +
+    element(left, 2) * element(right, 2)
+  );
+}
+
 /** Mean pixel distance between the reprojected point and every observation. */
 export function meanReprojectionError(
   point: Vector3,
@@ -245,12 +343,19 @@ export function meanReprojectionError(
 function smallestEigenvector4(matrix: readonly number[]): number[] {
   const a = matrix.slice();
   const v = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  let scale = 0;
+  for (let index = 0; index < 4; index += 1) {
+    scale += element(a, index * 4 + index) ** 2;
+  }
+  // Relative threshold: an absolute one never fires for well-scaled systems and
+  // would always spend the full sweep budget.
+  const converged = Math.max(scale, 1e-300) * 1e-24;
   for (let sweep = 0; sweep < 32; sweep += 1) {
     let off = 0;
     for (let p = 0; p < 3; p += 1) {
       for (let q = p + 1; q < 4; q += 1) off += element(a, p * 4 + q) ** 2;
     }
-    if (off < 1e-30) break;
+    if (off < converged) break;
     for (let p = 0; p < 3; p += 1) {
       for (let q = p + 1; q < 4; q += 1) {
         const apq = element(a, p * 4 + q);

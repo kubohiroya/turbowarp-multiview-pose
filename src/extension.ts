@@ -81,10 +81,19 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private state: OfferQrState = "idle";
   private lastError = "";
   private operation = 0;
-  private readonly stopListener = () => {
+  /**
+   * Runs whenever the thread queue empties, which releases camera leases and
+   * temporary skins but must keep buffered fusion state alive: event-driven
+   * projects buffer frames from hat scripts that finish between messages.
+   */
+  private readonly runStopListener = () => {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
+  };
+  /** The stop button and project reload also discard buffered fusion state. */
+  private readonly stopListener = () => {
+    this.runStopListener();
     this.fusion.stop();
   };
   private readonly disposeListener = () => this.dispose();
@@ -121,7 +130,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     });
     this.fusion = new PoseFusionController();
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
-    this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
+    this.runtime.on?.("PROJECT_RUN_STOP", this.runStopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
     this.runtime.on?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.on?.("targetWasRemoved", this.targetRemovedListener);
@@ -515,7 +524,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     void this.calibration.cancel();
     this.fusion.stop();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
-    this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
+    this.runtime.off?.("PROJECT_RUN_STOP", this.runStopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
     this.runtime.off?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.off?.("targetWasRemoved", this.targetRemovedListener);
