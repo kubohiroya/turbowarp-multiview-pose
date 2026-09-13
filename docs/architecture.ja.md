@@ -110,3 +110,34 @@ controllerはCamera Sourceから`{cameraId: "pose"}`のleaseを取得し、media
 停止時は実行中の初期化／推論を待ち、detectorをdisposeし、camera leaseと最新frameを解放します。
 TensorFlow.js backendはprocess全体で共有されるためresetせず、本機能が所有するmodel resourceは
 detectorのdisposeで解放します。
+
+## PoseFrame3D avatar retarget
+
+`avatarRetargetV1`は独立した起動時固定・既定OFF flagです。runtime key
+`turbowarpAFrameCapability`へ`requireVersion(1)`を呼び、TurboWarp-A-Frame capabilityの公開同期
+scene操作7種だけを利用します。A-Frame DOM、Three.js `object3D`、GLTF内部boneへはアクセス
+しません。capability commit `1e24b32`は未releaseの前提機能であり、本機能のrelease前に公開が
+必要です。
+
+asset登録では宣言的template JSONをA-Frameへ送り、検証済みrig mappingを保持します。各boneは
+対応するKalidokit pose rig出力、`{avatar}`を含むselector、任意Euler offset degreeで定義します。
+適用時は対応するexact-v1 PoseFrame3DとPoseFrame2Dの両方を要求します。PoseFrame3Dの`personId`と
+PoseFrame2Dの`trackingId`が一致するpersonだけを結合しますが、これは時刻alignmentではありません。
+
+adapterは両方のCOCO-17 recordを、exact pinした`kalidokit@1.1.5`が要求する33 positionへ
+決定論的に変換します。screen座標にはPoseFrame2Dの`frameWidth`／`frameHeight`を使い、world座標は
+外部serviceの値を維持します。不足するBlazePose face／hand／foot pointは低visibilityで中点補間
+または複製します。`runtime: "tfjs"`、`enableLegs: true`のKalidokit `Pose.solve`だけをrotation
+solverとし、radian出力をA-Frame degreeへ変換します。hips結果にroot scale／offsetを適用し、
+自前rotation fallbackは持ちません。joint／personがbinding threshold未満なら該当transformだけを
+skipし、直前値を維持します。
+
+最大6 person IDを一意なtemplate instanceへbindします。recognition遷移は設定可能なA-Frame
+eventで通知し、application側がPerformance DSLのstart／end effectへ接続できます。1人の
+capability失敗は`partial`診断へ集約し、他avatarを継続します。rebind、明示reset、project
+lifecycle reset、disposeでは可能ならend eventを送り、生成instanceと一時状態をcleanupします。
+
+PoseFrame3Dは別実装の3D serviceから届くexact v1境界dataです。`timestampUs`は不透明値として
+recognition event dataへcopyするだけです。frame alignment、履歴保持／query、triangulation、
+3D solveは行いません。Kalidokitは上流でdeprecatedでありnative BlazePose landmarkを想定するため、
+このCOCO-17拡張は明示的な精度制約です。release前に対象GLTF rigを実browserで検証します。

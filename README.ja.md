@@ -16,6 +16,7 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - COCO-17観測を`twmp/pose-frame-2d` version 1 JSONとして取得できます。
 - multiview-poseの5種類のv1 application contractを検証し、JSONをround-tripします。
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
+- 外部PoseFrame3D v1を最大6人の宣言的A-Frame avatar rigへretargetします。
 
 ## 要件と安全性
 
@@ -23,7 +24,12 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - 先に読み込まれた、runtime capability v2対応の`@kubohiroya/turbowarp-webrtc`
 - 姿勢推定より先に読み込まれた`@kubohiroya/turbowarp-camera-source` 0.4以降
 - TensorFlow.js WebGPUに対応するbrowser／GPU
+- avatar利用時は先に読み込んだscene capability v1対応`turbowarp-aframe` 0.2.0
 - 起動前に明示的に有効化する`qrCourierPairing` feature flag（既定OFF）
+
+scene capabilityは現在、TurboWarp-A-Frame commit `1e24b32`にある未releaseの前提機能です。
+avatar機能をreleaseする前にこのcommitを含むbuildを公開する必要があり、capability v1がない
+場合consumerはfail closedします。
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {qrCourierPairing: true};
@@ -46,6 +52,12 @@ camera calibrationも独立して有効化します。
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
+```
+
+avatar retargetも独立して有効化します。
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {avatarRetargetV1: true};
 ```
 
 起動時にTensorFlow.js backendとして`webgpu`を明示選択し、それ以外なら
@@ -109,6 +121,30 @@ intrinsic sampleごとにboardを移動・傾斜させ、最後のsampleではbo
 すべてに対する正規化corner変位0.015以上を要求し、8〜40 sampleでsolveします。設定した
 reprojection RMSを超える解は拒否し、最後の検証済みprofileを置き換えません。
 
+avatar retargetは次のように利用します。
+
+```text
+register avatar asset [actor] template JSON [(templateJson)] rig JSON [(rigJson)]
+bind person [performer-1] to avatar [avatar-1] asset [actor] under [#scene] confidence [0.3]
+forever:
+  apply PoseFrame3D [(externalPoseFrame3D)] with PoseFrame2D [(matchingPoseFrame2D)] to avatars
+```
+
+rig JSONではKalidokit pose出力を`{avatar}`を含むA-Frame template node selectorへ対応付けます。
+PoseFrame3Dの`personId`とPoseFrame2Dの`trackingId`を対応させ、両方のCOCO-17 recordを決定論的に
+BlazePose-33へ変換し、exact pinした`kalidokit@1.1.5`の`Pose.solve`だけをrotation solverとして
+使います。PoseFrame2D座標は宣言されたframe sizeで正規化します。存在しないhand／foot／face
+landmarkは意図的に低visibilityで複製または補間するため、native BlazePose-33入力より精度が
+低くなります。rootはKalidokitのhips結果に設定scale／offsetを適用します。低confidence／missing
+jointでは該当boneの直前transformを維持し、1人の欠落や更新失敗で他avatarを停止しません。
+認識遷移はavatar rootから設定可能なA-Frame event（既定`twmp-recognition-start`／
+`twmp-recognition-end`）を送ります。
+
+PoseFrame3Dは別実装の3D serviceが生成する境界dataです。この機能拡張は不透明な`timestampUs`を
+recognition eventへ移すだけで、frame alignment、履歴保存／query、triangulation、3D solveを
+実装しません。Kalidokitは上流でdeprecatedとなっておりBlazePose landmark向けなので、release
+時には対象GLTF rigと実browser動作を検証する必要があります。自前solver fallbackはありません。
+
 ## 開発
 
 ```bash
@@ -137,6 +173,10 @@ offline会場で利用できる代わりに、非圧縮bundleは約11 MB増加�
 Camera Sourceを注入し、実camera／印刷board／OpenCV WASM初期化／幾何精度は配備機材上の
 browser E2Eで別途検証します。
 
+avatar unit testはA-Frame scene capability v1をmockし、exact PoseFrame3D validation、root／bone
+transform、confidence、6人上限、1人単位の失敗分離、recognition event、rebind、scene reset検出、
+cleanupを検証します。実A-Frame scene／GLTF asset／avatar rigはbrowser E2Eで別途検証します。
+
 ## ロールバック
 
 起動前に`qrCourierPairing`をOFFにし、projectを停止して一時skinを解放したあと、
@@ -147,6 +187,8 @@ TurboWarp WebRTCのmanual copy/paste pairingへ戻します。
 検証済みのexact v1 profileだけを維持します。
 高位codecだけを切り戻す場合は`protocolV1Codec`をOFFにします。未知versionをv1として
 解釈するfallbackは行いません。
+avatar retargetだけを切り戻す場合は起動前に`avatarRetargetV1`をOFFにします。A-Frameの汎用
+scene graphと静的avatar表示は維持されます。
 
 ## ライセンス
 

@@ -38,6 +38,11 @@
   <p>The independent <code>cameraCalibrationV1</code> flag is OFF by default. A high-level state machine leases the named Camera Source stream, fixes its real resolution, accepts diverse chessboard samples, and exports an exact CameraCalibration v1 profile.</p>
   <p>The bundled, exact-pinned OpenCV.js 4.12 WebAssembly backend is the sole solver. It estimates intrinsic, distortion, and world-from-camera values and rejects insufficient samples, resolution changes, weak views, excessive reprojection RMS, unknown profile versions, and pairing credentials.</p>
 
+  <h2>PoseFrame3D avatar retargeting</h2>
+  <p>The independent <code>avatarRetargetV1</code> flag is OFF by default. The adapter requires TurboWarp-A-Frame 0.2.0 scene capability v1 and uses only its public template, selector transform, event, count, and delete operations.</p>
+  <p>Corresponding external PoseFrame3D and PoseFrame2D v1 values can drive up to six declarative rigs. The adapter matches person IDs, expands COCO-17 to BlazePose-33, and uses exact-pinned Kalidokit 1.1.5 as its only rotation solver before sending public selector transforms to A-Frame.</p>
+  <p>The deterministic expansion uses reduced-visibility duplicates for unavailable hand, foot, and face landmarks and is less precise than native BlazePose input. Kalidokit is deprecated upstream, so intended GLTF rigs require real-browser validation. This extension provides no custom solver fallback and does not align frames, query history, triangulate, or solve 3D data.</p>
+
   <h2>Development</h2>
   <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>
 </body>

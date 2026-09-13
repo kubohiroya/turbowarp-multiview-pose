@@ -25,3 +25,7 @@ The calibration bundle includes OpenCV.js 4.12 through `@techstark/opencv-js`. O
 distributed under the Apache License 2.0:
 
 - <https://github.com/TechStark/opencv-js>
+
+Kalidokit 1.1.5 is bundled as the avatar pose solver and is distributed under the MIT License:
+
+- <https://github.com/yeemachine/kalidokit>

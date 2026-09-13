@@ -8,6 +8,66 @@
       "arguments": []
     },
     {
+      "opcode": "applyPoseFrame3DToAvatars",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "POSE2D_JSON",
+          "type": "STRING"
+        },
+        {
+          "id": "POSE3D_JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "avatarBindingCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "avatarRetargetError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "avatarRetargetState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "avatarUpdatedCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "bindAvatarPerson",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "ASSET_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "CONFIDENCE",
+          "type": "NUMBER"
+        },
+        {
+          "id": "INSTANCE_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "PARENT",
+          "type": "STRING"
+        },
+        {
+          "id": "PERSON_ID",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "cameraCalibrationBackend",
       "blockType": "REPORTER",
       "arguments": []
@@ -218,6 +278,29 @@
       "arguments": []
     },
     {
+      "opcode": "registerAvatarAsset",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "ASSET_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "RIG_JSON",
+          "type": "STRING"
+        },
+        {
+          "id": "TEMPLATE_JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "resetAvatarRetarget",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "showNextOfferQrPart",
       "blockType": "COMMAND",
       "arguments": []
@@ -289,6 +372,16 @@
       "opcode": "stopWebGpuMoveNetMultiPose",
       "blockType": "COMMAND",
       "arguments": []
+    },
+    {
+      "opcode": "unbindAvatarPerson",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "PERSON_ID",
+          "type": "STRING"
+        }
+      ]
     },
     {
       "opcode": "webGpuMoveNetReady",

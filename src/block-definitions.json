@@ -359,6 +359,99 @@
       "text": "CameraCalibration v1 JSON",
       "description": "Exports the last validated exact v1 profile, or an empty string when none exists.",
       "arguments": {}
+    },
+    {
+      "opcode": "registerAvatarAsset",
+      "feature": "avatarRetargetV1",
+      "blockType": "COMMAND",
+      "text": "register avatar asset [ASSET_ID] template JSON [TEMPLATE_JSON] rig JSON [RIG_JSON]",
+      "description": "Registers an A-Frame 0.2.0 template and its Kalidokit rig-output selector mapping.",
+      "arguments": {
+        "ASSET_ID": { "type": "STRING", "defaultValue": "actor" },
+        "TEMPLATE_JSON": {
+          "type": "STRING",
+          "defaultValue": "{\"type\":\"group\",\"children\":[]}"
+        },
+        "RIG_JSON": {
+          "type": "STRING",
+          "defaultValue": "{\"bones\":[{\"selector\":\"#{avatar}-left-arm\",\"rig\":\"LeftUpperArm\"}]}"
+        }
+      }
+    },
+    {
+      "opcode": "bindAvatarPerson",
+      "feature": "avatarRetargetV1",
+      "blockType": "COMMAND",
+      "text": "bind person [PERSON_ID] to avatar [INSTANCE_ID] asset [ASSET_ID] under [PARENT] confidence [CONFIDENCE]",
+      "description": "Creates an avatar instance and binds one PoseFrame3D person ID to it.",
+      "arguments": {
+        "PERSON_ID": { "type": "STRING", "defaultValue": "performer-1" },
+        "INSTANCE_ID": { "type": "STRING", "defaultValue": "avatar-1" },
+        "ASSET_ID": { "type": "STRING", "defaultValue": "actor" },
+        "PARENT": { "type": "STRING", "defaultValue": "#scene" },
+        "CONFIDENCE": { "type": "NUMBER", "defaultValue": 0.3 }
+      }
+    },
+    {
+      "opcode": "unbindAvatarPerson",
+      "feature": "avatarRetargetV1",
+      "blockType": "COMMAND",
+      "text": "unbind avatar for person [PERSON_ID]",
+      "description": "Emits recognition end, removes the created avatar instance, and clears its binding.",
+      "arguments": {
+        "PERSON_ID": { "type": "STRING", "defaultValue": "performer-1" }
+      }
+    },
+    {
+      "opcode": "applyPoseFrame3DToAvatars",
+      "feature": "avatarRetargetV1",
+      "blockType": "COMMAND",
+      "text": "apply PoseFrame3D [POSE3D_JSON] with PoseFrame2D [POSE2D_JSON] to avatars",
+      "description": "Adapts corresponding exact v1 frames to BlazePose-33, solves only with Kalidokit, and applies up to six rigs.",
+      "arguments": {
+        "POSE3D_JSON": { "type": "STRING", "defaultValue": "{}" },
+        "POSE2D_JSON": { "type": "STRING", "defaultValue": "{}" }
+      }
+    },
+    {
+      "opcode": "resetAvatarRetarget",
+      "feature": "avatarRetargetV1",
+      "blockType": "COMMAND",
+      "text": "reset avatar retarget state",
+      "description": "Removes retarget-created instances and clears assets, bindings, effects, and diagnostics after a scene reset.",
+      "arguments": {}
+    },
+    {
+      "opcode": "avatarBindingCount",
+      "feature": "avatarRetargetV1",
+      "blockType": "REPORTER",
+      "text": "avatar binding count",
+      "description": "Returns the current person-to-avatar binding count, at most six.",
+      "arguments": {}
+    },
+    {
+      "opcode": "avatarUpdatedCount",
+      "feature": "avatarRetargetV1",
+      "blockType": "REPORTER",
+      "text": "avatars updated by last frame",
+      "description": "Returns how many bound avatars accepted the last PoseFrame3D.",
+      "arguments": {}
+    },
+    {
+      "opcode": "avatarRetargetState",
+      "feature": "avatarRetargetV1",
+      "blockType": "REPORTER",
+      "text": "avatar retarget state",
+      "description": "Returns disabled, idle, configured, bound, ready, partial, or error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "avatarRetargetError",
+      "feature": "avatarRetargetV1",
+      "blockType": "REPORTER",
+      "text": "avatar retarget error",
+      "description": "Returns per-person errors from the latest frame while other avatars continue updating.",
+      "arguments": {}
     }
   ]
 }

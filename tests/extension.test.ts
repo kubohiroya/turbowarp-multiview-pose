@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MultiviewPoseExtension } from "../src/extension.js";
 import { WEBRTC_CAPABILITY_KEY } from "../src/webrtc-capability.js";
+import { AFRAME_CAPABILITY_KEY } from "../src/avatar/aframe-port.js";
 
 interface FakeRenderer extends TurboWarpRenderer {
   created: Map<number, string>;
@@ -72,7 +73,7 @@ function setup(code = "offer-code") {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MultiviewPoseExtension offer QR blocks", () => {
-  it("keeps the QR, pose, protocol, and calibration feature flags independent", () => {
+  it("keeps all five feature flags independent", () => {
     setup();
     const poseModel = {
       initializeWebGpu: vi.fn(async () => undefined),
@@ -137,6 +138,20 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(calibrationOpcodes).toContain("startCameraCalibration");
     expect(calibrationOpcodes).toContain("cameraCalibrationJson");
     expect(calibrationOpcodes).not.toContain("decodeProtocolJson");
+
+    const avatarOnly = new MultiviewPoseExtension({
+      enabled: false,
+      poseEnabled: false,
+      protocolEnabled: false,
+      calibrationEnabled: false,
+      avatarEnabled: true,
+    });
+    const avatarOpcodes = (
+      avatarOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(avatarOpcodes).toContain("registerAvatarAsset");
+    expect(avatarOpcodes).toContain("applyPoseFrame3DToAvatars");
+    expect(avatarOpcodes).not.toContain("startCameraCalibration");
   });
 
   it("exposes protocol round-trip and diagnostic reporters", () => {
@@ -165,6 +180,50 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(extension.protocolJsonValid({ JSON: "{" })).toBe(false);
     expect(extension.protocolErrorPath()).toBe("/");
     expect(extension.protocolErrorMessage()).toMatch(/Invalid JSON/u);
+  });
+
+  it("cleans avatar instances through A-Frame capability v1 on disposal", () => {
+    const { runtime, listeners } = setup();
+    const nodes = new Set<string>();
+    const deleteSelector = vi.fn((selector: string) =>
+      nodes.delete(selector.replace(/^#/u, "")),
+    );
+    runtime[AFRAME_CAPABILITY_KEY] = {
+      version: 1,
+      requireVersion() {
+        return this;
+      },
+      loadTemplate: vi.fn(),
+      createFromTemplate: vi.fn(
+        (_template: string, instance: string) => void nodes.add(instance),
+      ),
+      setPosition: vi.fn(),
+      setRotation: vi.fn(),
+      emitEvent: vi.fn(),
+      deleteSelector,
+      countSelector: vi.fn((selector: string) =>
+        nodes.has(selector.replace(/^#/u, "")) ? 1 : 0,
+      ),
+    };
+    const extension = new MultiviewPoseExtension({
+      runtime,
+      avatarEnabled: true,
+    });
+    extension.registerAvatarAsset({
+      ASSET_ID: "actor",
+      TEMPLATE_JSON: '{"type":"group"}',
+      RIG_JSON: '{"bones":[{"selector":"#{avatar}-arm","rig":"LeftUpperArm"}]}',
+    });
+    extension.bindAvatarPerson({
+      PERSON_ID: "performer-1",
+      INSTANCE_ID: "avatar-1",
+      ASSET_ID: "actor",
+      PARENT: "#scene",
+      CONFIDENCE: 0.3,
+    });
+    listeners.get("RUNTIME_DISPOSED")?.();
+    expect(deleteSelector).toHaveBeenCalledWith("#avatar-1");
+    expect(extension.avatarBindingCount()).toBe(0);
   });
 
   it("keeps QR courier blocks hidden while the startup flag is off", async () => {

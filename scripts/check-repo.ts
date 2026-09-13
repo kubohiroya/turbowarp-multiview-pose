@@ -85,6 +85,12 @@ const calibrationController = await readFile(
   "src/calibration/controller.ts",
   "utf8",
 );
+const avatarCapability = await readFile("src/avatar/aframe-port.ts", "utf8");
+const avatarController = await readFile("src/avatar/controller.ts", "utf8");
+const kalidokitAdapter = await readFile(
+  "src/avatar/kalidokit-adapter.ts",
+  "utf8",
+);
 const featureFlagSource = await readFile("config/feature-flags.ts", "utf8");
 const protocolIntegrity = JSON.parse(
   await readFile("schemas/protocol-v1-integrity.json", "utf8"),
@@ -97,6 +103,7 @@ checkLicense();
 checkGeneratedArtifacts();
 checkPosePolicy();
 checkCalibrationPolicy();
+checkAvatarPolicy();
 await checkProtocolSchemaIntegrity();
 await checkPackContents();
 
@@ -305,6 +312,62 @@ function checkCalibrationPolicy() {
   }
   if (!featureFlagSource.includes("cameraCalibrationV1")) {
     errors.push("Camera calibration must have a startup-fixed feature flag");
+  }
+}
+
+function checkAvatarPolicy() {
+  if (packageMetadata.dependencies?.kalidokit !== "1.1.5") {
+    errors.push("package.json must pin Kalidokit exactly to 1.1.5");
+  }
+  if (
+    packageMetadata.peerDependencies?.["@kubohiroya/turbowarp-aframe"] !==
+    "0.2.0"
+  ) {
+    errors.push(
+      "package.json must pin the TurboWarp-A-Frame peer exactly to 0.2.0",
+    );
+  }
+  if (!featureFlagSource.includes("avatarRetargetV1")) {
+    errors.push("Avatar retargeting must have a startup-fixed feature flag");
+  }
+  if (
+    !avatarCapability.includes(
+      'AFRAME_CAPABILITY_KEY = "turbowarpAFrameCapability"',
+    ) ||
+    !avatarCapability.includes("requireVersion(1)")
+  ) {
+    errors.push("Avatar retargeting must require A-Frame scene capability v1");
+  }
+  if (
+    /ext_turbowarpaframe|object3D|querySelector|getElementById/u.test(
+      avatarController,
+    )
+  ) {
+    errors.push(
+      "Avatar retargeting must not use private A-Frame or DOM internals",
+    );
+  }
+  if (
+    /triangulat|time.?offset|frame.?history|history.?query/u.test(
+      avatarController,
+    )
+  ) {
+    errors.push(
+      "Avatar retargeting must not implement 3D fusion or time synchronization",
+    );
+  }
+  if (
+    !kalidokitAdapter.includes('from "kalidokit"') ||
+    !kalidokitAdapter.includes("this.solver.solve(") ||
+    !kalidokitAdapter.includes('runtime: "tfjs"') ||
+    !kalidokitAdapter.includes("enableLegs: true")
+  ) {
+    errors.push(
+      "Avatar retargeting must use the exact-pinned Kalidokit Pose.solve adapter",
+    );
+  }
+  if (/Math\.(?:atan2|acos|asin)/u.test(avatarController)) {
+    errors.push("Avatar retargeting must not add a custom rotation solver");
   }
 }
 

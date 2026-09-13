@@ -127,3 +127,38 @@ keeping the last validated profile in memory. Explicit cleanup clears that profi
 the same exact v1 schema and recursively rejects pairing-secret keys. The 11 MB uncompressed bundle
 increase is accepted to keep the sole production backend available on an offline venue LAN; real
 camera/board geometry and WebAssembly startup remain browser E2E responsibilities.
+
+## PoseFrame3D avatar retargeting
+
+`avatarRetargetV1` is an independent startup-fixed, default-OFF flag. It requires runtime key
+`turbowarpAFrameCapability`, calls `requireVersion(1)`, and uses only the seven public synchronous
+scene operations from the TurboWarp-A-Frame capability. The consumer never accesses A-Frame DOM,
+Three.js `object3D`, or GLTF bone internals. Capability commit `1e24b32` is an unreleased prerequisite
+and must be published before this feature is released.
+
+An asset registration sends declarative template JSON to A-Frame and retains a validated rig map.
+Each bone maps one supported Kalidokit pose rig output to a selector containing `{avatar}`, plus
+optional Euler offset degrees. Applying a frame requires corresponding exact-v1 PoseFrame3D and
+PoseFrame2D values. A person is joined only by PoseFrame3D `personId` equal to PoseFrame2D
+`trackingId`; this is not temporal alignment.
+
+The adapter maps both COCO-17 records deterministically to the 33 positions required by
+exact-pinned `kalidokit@1.1.5`. Screen coordinates use PoseFrame2D `frameWidth` and `frameHeight`;
+world coordinates retain the external service coordinate values. Missing BlazePose face, hand, and
+foot points are midpoint-interpolated or duplicated with reduced visibility. Kalidokit `Pose.solve`
+with `runtime: "tfjs"` and `enableLegs: true` is the sole rotation solver. Its radians are converted
+to A-Frame degrees, and its hips result drives the configured root scale and offset. There is no
+custom rotation fallback. Joint or person confidence below the binding threshold skips only that
+transform and preserves its prior value.
+
+At most six person IDs bind to unique template instances. Recognition transitions use configurable
+A-Frame events, allowing the application to connect Performance DSL start/end effects without this
+adapter owning effect execution. Per-person capability failures are collected as `partial` state so
+other avatars continue. Rebind, explicit reset, project lifecycle reset, and disposal emit end when
+possible, delete created instances, and clear temporary state.
+
+PoseFrame3D is exact v1 boundary data from a separate 3D service. Its `timestampUs` is opaque and is
+only copied into recognition event data. This extension performs no frame alignment, history
+retention/query, triangulation, or 3D solve. Kalidokit is deprecated upstream and expects native
+BlazePose landmarks; the deterministic COCO-17 expansion is therefore an explicit accuracy
+constraint, and intended GLTF rigs require real-browser validation before release.

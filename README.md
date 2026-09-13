@@ -16,6 +16,7 @@ as a temporary sprite skin.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
 - Validates and round-trips all five pinned multiview-pose v1 application contracts.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
+- Retargets external PoseFrame3D v1 data onto up to six declarative A-Frame avatar rigs.
 
 ## Requirements and safety
 
@@ -24,7 +25,12 @@ as a temporary sprite skin.
 - `@kubohiroya/turbowarp-camera-source` 0.4 or later, loaded before pose startup.
 - A browser and GPU combination supported by TensorFlow.js WebGPU.
 - WebAssembly support for the bundled OpenCV.js 4.12 calibration backend.
+- `@kubohiroya/turbowarp-aframe` 0.2.0 with scene capability v1, loaded before avatar setup.
 - The startup-fixed feature flags are independently OFF by default.
+
+The scene capability is currently an unreleased prerequisite implemented by TurboWarp-A-Frame
+commit `1e24b32`. Publish a build containing that commit before releasing the avatar feature; the
+consumer fails closed when capability v1 is absent.
 
 Set the flag before loading the extension:
 
@@ -49,6 +55,12 @@ Enable camera calibration independently:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
+```
+
+Enable avatar retargeting independently:
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {avatarRetargetV1: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -121,6 +133,32 @@ the actual Camera Source frame at session start. Sample acceptance requires the 
 grid, quality at least 0.2, and normalized corner displacement at least 0.015 from every retained
 sample. Between 8 and 40 samples are retained. A solve above the configured reprojection RMS is
 rejected without replacing the last validated profile.
+
+The avatar retarget vertical slice is:
+
+```text
+register avatar asset [actor] template JSON [(templateJson)] rig JSON [(rigJson)]
+bind person [performer-1] to avatar [avatar-1] asset [actor] under [#scene] confidence [0.3]
+forever:
+  apply PoseFrame3D [(externalPoseFrame3D)] with PoseFrame2D [(matchingPoseFrame2D)] to avatars
+```
+
+Rig JSON maps Kalidokit pose outputs to declarative A-Frame template selectors containing
+`{avatar}`. The controller matches PoseFrame3D `personId` to PoseFrame2D `trackingId`, adapts both
+COCO-17 records deterministically to BlazePose-33, and uses exact-pinned `kalidokit@1.1.5`
+`Pose.solve` as its only rotation solver. PoseFrame2D coordinates are normalized using its declared
+frame size. Missing hand, foot, and face landmarks are duplicated or interpolated with deliberately
+low visibility; this compatibility adapter is less precise than native BlazePose-33 input. The root
+uses Kalidokit's hips result plus the configured scale and offset. A low-confidence or missing joint
+preserves that bone's last transform; one missing or invalid performer does not stop other bindings.
+Recognition transitions emit configurable A-Frame events (default
+`twmp-recognition-start` and `twmp-recognition-end`) from the avatar root.
+
+PoseFrame3D is boundary data produced by a separate 3D service. This extension carries its opaque
+`timestampUs` into recognition events only; it does not align frames, retain/query history,
+triangulate observations, or solve 3D coordinates. Kalidokit is deprecated upstream and was designed
+for BlazePose landmarks, so release validation must include the intended GLTF rigs and real browser
+motion; no custom solver fallback is provided.
 
 ## Block reference
 
@@ -524,6 +562,98 @@ Exports the last validated exact v1 profile, or an empty string when none exists
 | Type | Reporter |
 | Opcode | `cameraCalibrationJson` |
 
+### `register avatar asset [ASSET_ID] template JSON [TEMPLATE_JSON] rig JSON [RIG_JSON]`
+
+Registers an A-Frame 0.2.0 template and its Kalidokit rig-output selector mapping.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `registerAvatarAsset` |
+| `ASSET_ID` | String, default: `actor` |
+| `TEMPLATE_JSON` | String, default: `{"type":"group","children":[]}` |
+| `RIG_JSON` | String, default: `{"bones":[{"selector":"#{avatar}-left-arm","rig":"LeftUpperArm"}]}` |
+
+### `bind person [PERSON_ID] to avatar [INSTANCE_ID] asset [ASSET_ID] under [PARENT] confidence [CONFIDENCE]`
+
+Creates an avatar instance and binds one PoseFrame3D person ID to it.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `bindAvatarPerson` |
+| `PERSON_ID` | String, default: `performer-1` |
+| `INSTANCE_ID` | String, default: `avatar-1` |
+| `ASSET_ID` | String, default: `actor` |
+| `PARENT` | String, default: `#scene` |
+| `CONFIDENCE` | Number, default: `0.3` |
+
+### `unbind avatar for person [PERSON_ID]`
+
+Emits recognition end, removes the created avatar instance, and clears its binding.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `unbindAvatarPerson` |
+| `PERSON_ID` | String, default: `performer-1` |
+
+### `apply PoseFrame3D [POSE3D_JSON] with PoseFrame2D [POSE2D_JSON] to avatars`
+
+Adapts corresponding exact v1 frames to BlazePose-33, solves only with Kalidokit, and applies up to six rigs.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `applyPoseFrame3DToAvatars` |
+| `POSE3D_JSON` | String, default: `{}` |
+| `POSE2D_JSON` | String, default: `{}` |
+
+### `reset avatar retarget state`
+
+Removes retarget-created instances and clears assets, bindings, effects, and diagnostics after a scene reset.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `resetAvatarRetarget` |
+
+### `avatar binding count`
+
+Returns the current person-to-avatar binding count, at most six.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `avatarBindingCount` |
+
+### `avatars updated by last frame`
+
+Returns how many bound avatars accepted the last PoseFrame3D.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `avatarUpdatedCount` |
+
+### `avatar retarget state`
+
+Returns disabled, idle, configured, bound, ready, partial, or error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `avatarRetargetState` |
+
+### `avatar retarget error`
+
+Returns per-person errors from the latest frame while other avatars continue updating.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `avatarRetargetError` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## Important behavior
@@ -592,6 +722,11 @@ the uncompressed extension bundle by about 11 MB. Unit tests inject the backend 
 real camera, printed-board, OpenCV WASM initialization, and geometric accuracy require browser E2E
 validation on deployment hardware.
 
+Avatar tests inject A-Frame scene capability v1 and exercise exact PoseFrame3D validation, root and
+bone transforms, confidence handling, six-person limits, per-person failure isolation, recognition
+events, rebind, scene-reset detection, and cleanup. A real A-Frame scene, GLTF asset, and avatar rig
+still require browser E2E validation.
+
 ## Rollback
 
 Set `qrCourierPairing` to `false` before extension startup, stop the project to release temporary
@@ -603,6 +738,8 @@ Set `protocolV1Codec` to `false` to remove the high-level codec blocks; unsuppor
 rejected rather than falling back to v1.
 Set `cameraCalibrationV1` to `false` to stop new calibration sessions. Cancel before reload to release
 temporary samples; retain and use only a previously validated exact v1 profile.
+Set `avatarRetargetV1` to `false` before startup to remove retarget blocks while preserving the
+generic A-Frame scene graph and static avatars.
 
 ## License
 

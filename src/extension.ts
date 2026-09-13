@@ -16,6 +16,8 @@ import { ProtocolV1Codec } from "./protocol/codec.js";
 import { CameraCalibrationController } from "./calibration/controller.js";
 import { OpenCvChessboardCalibrationBackend } from "./calibration/opencv-backend.js";
 import type { CalibrationBackendPort } from "./calibration/types.js";
+import { AvatarRetargetController } from "./avatar/controller.js";
+import type { AvatarPoseSolverPort } from "./avatar/types.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -33,7 +35,8 @@ interface BlockDefinition {
     | "qrCourierPairing"
     | "webgpuMoveNetMultiPose"
     | "protocolV1Codec"
-    | "cameraCalibrationV1";
+    | "cameraCalibrationV1"
+    | "avatarRetargetV1";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -52,10 +55,12 @@ export interface MultiviewPoseExtensionOptions {
   poseEnabled?: boolean;
   protocolEnabled?: boolean;
   calibrationEnabled?: boolean;
+  avatarEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
   calibrationBackend?: CalibrationBackendPort;
+  avatarPoseSolver?: AvatarPoseSolverPort;
   nowMilliseconds?: () => number;
 }
 
@@ -66,12 +71,14 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly poseEnabled: boolean;
   private readonly protocolEnabled: boolean;
   private readonly calibrationEnabled: boolean;
+  private readonly avatarEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
   private readonly pose: PosePipelineController;
   private readonly protocol: ProtocolV1Codec;
   private readonly calibration: CameraCalibrationController;
+  private readonly avatar: AvatarRetargetController;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
@@ -80,6 +87,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
+    this.avatar.reset();
   };
   private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
@@ -95,6 +103,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       options.protocolEnabled ?? featureFlags.protocolV1Codec;
     this.calibrationEnabled =
       options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
+    this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -112,6 +121,10 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
         ? { nowMilliseconds: options.nowMilliseconds }
         : {}),
     });
+    this.avatar = new AvatarRetargetController(
+      this.runtime,
+      options.avatarPoseSolver,
+    );
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -412,10 +425,77 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.calibration.profileJson();
   }
 
+  public registerAvatarAsset(args: {
+    ASSET_ID: unknown;
+    TEMPLATE_JSON: unknown;
+    RIG_JSON: unknown;
+  }): void {
+    this.requireAvatarEnabled();
+    this.avatar.registerAsset(
+      Scratch.Cast.toString(args.ASSET_ID),
+      Scratch.Cast.toString(args.TEMPLATE_JSON),
+      Scratch.Cast.toString(args.RIG_JSON),
+    );
+  }
+
+  public bindAvatarPerson(args: {
+    PERSON_ID: unknown;
+    INSTANCE_ID: unknown;
+    ASSET_ID: unknown;
+    PARENT: unknown;
+    CONFIDENCE: unknown;
+  }): void {
+    this.requireAvatarEnabled();
+    this.avatar.bind(
+      Scratch.Cast.toString(args.PERSON_ID),
+      Scratch.Cast.toString(args.INSTANCE_ID),
+      Scratch.Cast.toString(args.ASSET_ID),
+      Scratch.Cast.toString(args.PARENT),
+      Scratch.Cast.toNumber(args.CONFIDENCE),
+    );
+  }
+
+  public unbindAvatarPerson(args: { PERSON_ID: unknown }): void {
+    this.requireAvatarEnabled();
+    this.avatar.unbind(Scratch.Cast.toString(args.PERSON_ID));
+  }
+
+  public applyPoseFrame3DToAvatars(args: {
+    POSE3D_JSON: unknown;
+    POSE2D_JSON: unknown;
+  }): void {
+    this.requireAvatarEnabled();
+    this.avatar.apply(
+      Scratch.Cast.toString(args.POSE3D_JSON),
+      Scratch.Cast.toString(args.POSE2D_JSON),
+    );
+  }
+
+  public resetAvatarRetarget(): void {
+    this.avatar.reset();
+  }
+
+  public avatarBindingCount(): number {
+    return this.avatarEnabled ? this.avatar.bindingCount() : 0;
+  }
+
+  public avatarUpdatedCount(): number {
+    return this.avatarEnabled ? this.avatar.updatedCount() : 0;
+  }
+
+  public avatarRetargetState(): string {
+    return this.avatarEnabled ? this.avatar.state() : "disabled";
+  }
+
+  public avatarRetargetError(): string {
+    return this.avatar.error();
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
+    this.avatar.reset();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -455,11 +535,20 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     }
   }
 
+  private requireAvatarEnabled(): void {
+    if (!this.avatarEnabled) {
+      throw new Error(
+        "Avatar retarget v1 is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
   private blockEnabled(feature: BlockDefinition["feature"]): boolean {
     if (feature === "qrCourierPairing") return this.enabled;
     if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
     if (feature === "protocolV1Codec") return this.protocolEnabled;
-    return this.calibrationEnabled;
+    if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
+    return this.avatarEnabled;
   }
 
   private requireSession(): OfferQrSession {

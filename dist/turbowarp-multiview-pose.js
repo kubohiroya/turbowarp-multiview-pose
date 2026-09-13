@@ -463,6 +463,124 @@
   			"text": "CameraCalibration v1 JSON",
   			"description": "Exports the last validated exact v1 profile, or an empty string when none exists.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "registerAvatarAsset",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "COMMAND",
+  			"text": "register avatar asset [ASSET_ID] template JSON [TEMPLATE_JSON] rig JSON [RIG_JSON]",
+  			"description": "Registers an A-Frame 0.2.0 template and its Kalidokit rig-output selector mapping.",
+  			"arguments": {
+  				"ASSET_ID": {
+  					"type": "STRING",
+  					"defaultValue": "actor"
+  				},
+  				"TEMPLATE_JSON": {
+  					"type": "STRING",
+  					"defaultValue": "{\"type\":\"group\",\"children\":[]}"
+  				},
+  				"RIG_JSON": {
+  					"type": "STRING",
+  					"defaultValue": "{\"bones\":[{\"selector\":\"#{avatar}-left-arm\",\"rig\":\"LeftUpperArm\"}]}"
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "bindAvatarPerson",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "COMMAND",
+  			"text": "bind person [PERSON_ID] to avatar [INSTANCE_ID] asset [ASSET_ID] under [PARENT] confidence [CONFIDENCE]",
+  			"description": "Creates an avatar instance and binds one PoseFrame3D person ID to it.",
+  			"arguments": {
+  				"PERSON_ID": {
+  					"type": "STRING",
+  					"defaultValue": "performer-1"
+  				},
+  				"INSTANCE_ID": {
+  					"type": "STRING",
+  					"defaultValue": "avatar-1"
+  				},
+  				"ASSET_ID": {
+  					"type": "STRING",
+  					"defaultValue": "actor"
+  				},
+  				"PARENT": {
+  					"type": "STRING",
+  					"defaultValue": "#scene"
+  				},
+  				"CONFIDENCE": {
+  					"type": "NUMBER",
+  					"defaultValue": .3
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "unbindAvatarPerson",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "COMMAND",
+  			"text": "unbind avatar for person [PERSON_ID]",
+  			"description": "Emits recognition end, removes the created avatar instance, and clears its binding.",
+  			"arguments": { "PERSON_ID": {
+  				"type": "STRING",
+  				"defaultValue": "performer-1"
+  			} }
+  		},
+  		{
+  			"opcode": "applyPoseFrame3DToAvatars",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "COMMAND",
+  			"text": "apply PoseFrame3D [POSE3D_JSON] with PoseFrame2D [POSE2D_JSON] to avatars",
+  			"description": "Adapts corresponding exact v1 frames to BlazePose-33, solves only with Kalidokit, and applies up to six rigs.",
+  			"arguments": {
+  				"POSE3D_JSON": {
+  					"type": "STRING",
+  					"defaultValue": "{}"
+  				},
+  				"POSE2D_JSON": {
+  					"type": "STRING",
+  					"defaultValue": "{}"
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "resetAvatarRetarget",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "COMMAND",
+  			"text": "reset avatar retarget state",
+  			"description": "Removes retarget-created instances and clears assets, bindings, effects, and diagnostics after a scene reset.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "avatarBindingCount",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "REPORTER",
+  			"text": "avatar binding count",
+  			"description": "Returns the current person-to-avatar binding count, at most six.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "avatarUpdatedCount",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "REPORTER",
+  			"text": "avatars updated by last frame",
+  			"description": "Returns how many bound avatars accepted the last PoseFrame3D.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "avatarRetargetState",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "REPORTER",
+  			"text": "avatar retarget state",
+  			"description": "Returns disabled, idle, configured, bound, ready, partial, or error.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "avatarRetargetError",
+  			"feature": "avatarRetargetV1",
+  			"blockType": "REPORTER",
+  			"text": "avatar retarget error",
+  			"description": "Returns per-person errors from the latest frame while other avatars continue updating.",
+  			"arguments": {}
   		}
   	]
   };
@@ -474,7 +592,8 @@
   	qrCourierPairing: overrides?.qrCourierPairing === true,
   	webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
   	protocolV1Codec: overrides?.protocolV1Codec === true,
-  	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true
+  	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
+  	avatarRetargetV1: overrides?.avatarRetargetV1 === true
   });
   //#endregion
   //#region config/qr-config.ts
@@ -3125,13 +3244,13 @@
   	return {
   		schema: "twmp/pose-frame-2d",
   		version: 1,
-  		cameraId: identifier$3(context.cameraId, "camera ID"),
-  		peerId: identifier$3(context.peerId, "peer ID"),
+  		cameraId: identifier$4(context.cameraId, "camera ID"),
+  		peerId: identifier$4(context.peerId, "peer ID"),
   		sequence: safeInteger(context.sequence, "sequence"),
   		captureTimestampUs: safeInteger(context.captureTimestampUs, "capture timestamp"),
   		frameWidth: dimension(context.frameWidth, "frame width"),
   		frameHeight: dimension(context.frameHeight, "frame height"),
-  		calibrationId: identifier$3(context.calibrationId, "calibration ID"),
+  		calibrationId: identifier$4(context.calibrationId, "calibration ID"),
   		persons: poses.slice(0, 6).map(toPerson)
   	};
   }
@@ -3154,7 +3273,7 @@
   		})
   	};
   }
-  function identifier$3(value, label) {
+  function identifier$4(value, label) {
   	if (!/^[A-Za-z0-9._-]{1,64}$/u.test(value)) throw new Error(`Invalid ${label}.`);
   	return value;
   }
@@ -3347,12 +3466,12 @@
   }
   function normalizeStartOptions$1(options) {
   	return {
-  		cameraId: identifier$2(options.cameraId, "camera ID"),
-  		peerId: identifier$2(options.peerId, "peer ID"),
-  		calibrationId: identifier$2(options.calibrationId, "calibration ID")
+  		cameraId: identifier$3(options.cameraId, "camera ID"),
+  		peerId: identifier$3(options.peerId, "peer ID"),
+  		calibrationId: identifier$3(options.calibrationId, "calibration ID")
   	};
   }
-  function identifier$2(value, label) {
+  function identifier$3(value, label) {
   	const text = value.trim();
   	if (!/^[A-Za-z0-9._-]{1,64}$/u.test(text)) throw new Error(`Invalid ${label}.`);
   	return text;
@@ -3651,7 +3770,7 @@
   	}
   }
   /** Clamps a value to a specified range. */
-  function clamp(min, x, max) {
+  function clamp$1(min, x, max) {
   	return Math.max(min, Math.min(x, max));
   }
   function nearestLargerEven(val) {
@@ -6003,7 +6122,7 @@
   	bytesFromStringArray: () => bytesFromStringArray,
   	bytesPerElement: () => bytesPerElement,
   	checkConversionForErrors: () => checkConversionForErrors,
-  	clamp: () => clamp,
+  	clamp: () => clamp$1,
   	computeStrides: () => computeStrides,
   	convertBackendValuesAndArrayBuffer: () => convertBackendValuesAndArrayBuffer,
   	createScalarValue: () => createScalarValue,
@@ -26024,7 +26143,7 @@
   	}
   	return bestThresh;
   }
-  var threshold;
+  var threshold$1;
   var init_threshold = __esmMin((() => {
   	init_tensor1d();
   	init_operation();
@@ -26046,7 +26165,7 @@
   	init_tensor();
   	init_util();
   	init_tensor_util_env();
-  	threshold = /* @__PURE__ */ op({ threshold_ });
+  	threshold$1 = /* @__PURE__ */ op({ threshold_ });
   }));
   //#endregion
   //#region node_modules/.pnpm/@tensorflow+tfjs-core@4.22.0/node_modules/@tensorflow/tfjs-core/dist/ops/image/transform.js
@@ -27982,7 +28101,7 @@
   		nonMaxSuppressionWithScoreAsync,
   		nonMaxSuppressionPadded,
   		nonMaxSuppressionPaddedAsync,
-  		threshold,
+  		threshold: threshold$1,
   		transform: transform$1
   	};
   	linalg = {
@@ -30549,7 +30668,7 @@
   	for (let i = 0; i < newIndices.length; i++) {
   		const axisSize = inputShape[i];
   		if (newIndices[i] < 0) newIndices[i] += axisSize;
-  		newIndices[i] = clamp(0, newIndices[i], inputShape[i]);
+  		newIndices[i] = clamp$1(0, newIndices[i], inputShape[i]);
   	}
   	return newIndices;
   }
@@ -30567,7 +30686,7 @@
   	}
   	const axisSize = inputShape[axis];
   	if (start < 0) start += axisSize;
-  	start = clamp(0, start, axisSize - 1);
+  	start = clamp$1(0, start, axisSize - 1);
   	return start;
   }
   function stopForAxis(endMask, stopIndices, strides, inputShape, axis, ellipsisMask) {
@@ -30579,8 +30698,8 @@
   	}
   	const axisSize = inputShape[axis];
   	if (stop < 0) stop += axisSize;
-  	if (stride > 0) stop = clamp(0, stop, axisSize);
-  	else stop = clamp(-1, stop, axisSize - 1);
+  	if (stride > 0) stop = clamp$1(0, stop, axisSize);
+  	else stop = clamp$1(-1, stop, axisSize - 1);
   	return stop;
   }
   /**
@@ -68917,7 +69036,7 @@
   });
   //#endregion
   //#region src/protocol/schemas.ts
-  var identifier$1 = Type.String({
+  var identifier$2 = Type.String({
   	minLength: 1,
   	maxLength: 64,
   	pattern: "^[A-Za-z0-9._-]+$"
@@ -68974,22 +69093,22 @@
   var SessionPolicySchema = object({
   	schema: Type.Literal("twmp/session-policy"),
   	version: Type.Literal(1),
-  	sessionId: identifier$1,
+  	sessionId: identifier$2,
   	revision: Type.Integer({
   		minimum: 1,
   		maximum: Number.MAX_SAFE_INTEGER
   	}),
   	issuedAt: utcDateTime,
   	expiresAt: utcDateTime,
-  	fusionPeerId: identifier$1,
+  	fusionPeerId: identifier$2,
   	cameraPeers: Type.Array(object({
-  		cameraId: identifier$1,
-  		peerId: identifier$1,
+  		cameraId: identifier$2,
+  		peerId: identifier$2,
   		displayName: Type.String({
   			minLength: 1,
   			maxLength: 80
   		}),
-  		calibrationId: identifier$1
+  		calibrationId: identifier$2
   	}), {
   		minItems: 1,
   		maxItems: 16
@@ -69016,8 +69135,8 @@
   var CameraCalibrationSchema = object({
   	schema: Type.Literal("twmp/camera-calibration"),
   	version: Type.Literal(1),
-  	calibrationId: identifier$1,
-  	cameraId: identifier$1,
+  	calibrationId: identifier$2,
+  	cameraId: identifier$2,
   	imageWidth: Type.Integer({
   		minimum: 1,
   		maximum: 16384
@@ -69038,8 +69157,8 @@
   var PoseFrame2DSchema = object({
   	schema: Type.Literal("twmp/pose-frame-2d"),
   	version: Type.Literal(1),
-  	cameraId: identifier$1,
-  	peerId: identifier$1,
+  	cameraId: identifier$2,
+  	peerId: identifier$2,
   	sequence: timestampUs,
   	captureTimestampUs: timestampUs,
   	frameWidth: Type.Integer({
@@ -69050,9 +69169,9 @@
   		minimum: 1,
   		maximum: 16384
   	}),
-  	calibrationId: identifier$1,
+  	calibrationId: identifier$2,
   	persons: Type.Array(object({
-  		trackingId: identifier$1,
+  		trackingId: identifier$2,
   		score,
   		keypoints: keypoints2d
   	}), { maxItems: 6 })
@@ -69063,9 +69182,9 @@
   	sequence: timestampUs,
   	timestampUs,
   	persons: Type.Array(object({
-  		personId: identifier$1,
+  		personId: identifier$2,
   		score,
-  		cameraIds: Type.Array(identifier$1, {
+  		cameraIds: Type.Array(identifier$2, {
   			minItems: 2,
   			maxItems: 16,
   			uniqueItems: true
@@ -69083,15 +69202,15 @@
   		schema: Type.Literal("twmp/performance-dsl"),
   		version: Type.Literal(1),
   		performers: Type.Array(object({
-  			performerId: identifier$1,
+  			performerId: identifier$2,
   			displayName: Type.String({
   				minLength: 1,
   				maxLength: 80
   			}),
   			glowStickColor: Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" }),
-  			recognitionStartEffect: identifier$1,
-  			recognitionEndEffect: identifier$1,
-  			avatarAsset: identifier$1
+  			recognitionStartEffect: identifier$2,
+  			recognitionEndEffect: identifier$2,
+  			avatarAsset: identifier$2
   		}), {
   			minItems: 1,
   			maxItems: 6
@@ -69523,8 +69642,8 @@
   	if (!Number.isFinite(options.board.squareSizeMeters) || options.board.squareSizeMeters <= 0 || options.board.squareSizeMeters > 1) throw new Error("invalid-board: square size must be within (0, 1] meter.");
   	if (!Number.isFinite(options.maximumReprojectionErrorPx) || options.maximumReprojectionErrorPx <= 0 || options.maximumReprojectionErrorPx > 100) throw new Error("invalid-board: maximum reprojection error must be within (0, 100] px.");
   	return {
-  		cameraId: identifier(options.cameraId, "camera ID"),
-  		calibrationId: identifier(options.calibrationId, "calibration ID"),
+  		cameraId: identifier$1(options.cameraId, "camera ID"),
+  		calibrationId: identifier$1(options.calibrationId, "calibration ID"),
   		board: {
   			columns,
   			rows,
@@ -69586,7 +69705,7 @@
   	if (typeof candidate !== "object" || candidate === null || !("acquireCamera" in candidate) || typeof candidate.acquireCamera !== "function") throw new Error("TurboWarp Camera Source is not loaded.");
   	return candidate;
   }
-  function identifier(value, label) {
+  function identifier$1(value, label) {
   	const text = value.trim();
   	if (!/^[A-Za-z0-9._-]{1,64}$/u.test(text)) throw new Error(`invalid-board: invalid ${label}.`);
   	return text;
@@ -77142,6 +77261,1902 @@
   	return Math.min(1, Math.max(0, value));
   }
   //#endregion
+  //#region src/avatar/aframe-port.ts
+  var AFRAME_CAPABILITY_KEY = "turbowarpAFrameCapability";
+  var METHODS = [
+  	"loadTemplate",
+  	"createFromTemplate",
+  	"setPosition",
+  	"setRotation",
+  	"emitEvent",
+  	"deleteSelector",
+  	"countSelector",
+  	"requireVersion"
+  ];
+  function requireAFramePublicBlocks(runtime) {
+  	const candidate = runtime[AFRAME_CAPABILITY_KEY];
+  	if (typeof candidate !== "object" || candidate === null) throw new Error("TurboWarp-A-Frame capability v1 must be loaded before avatar retargeting.");
+  	for (const method of METHODS) if (typeof Reflect.get(candidate, method) !== "function") throw new Error(`TurboWarp-A-Frame capability v1 is missing ${method}().`);
+  	const capability = candidate;
+  	if (capability.version !== 1) throw new Error(`TurboWarp-A-Frame capability v1 is required; found version ${String(capability.version)}.`);
+  	return capability.requireVersion(1);
+  }
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/utils/helpers.js
+  /**
+  * Returns a clamped value between min and max values
+  * @param {Number} val : transformed value
+  * @param {Number} min : minimum value
+  * @param {Number} max : maximum value
+  */
+  var clamp = (val, min, max) => {
+  	return Math.max(Math.min(val, max), min);
+  };
+  /**
+  * Returns a remapped value between 0 and 1 using min and max values
+  * @param {Number} value : transformed value
+  * @param {Number} min : minimum value
+  * @param {Number} max : maximum value
+  */
+  var remap = (val, min, max) => {
+  	return (clamp(val, min, max) - min) / (max - min);
+  };
+  /** A set of default pose values in radians to serve as "rest" values */
+  var RestingDefault = {
+  	Face: {
+  		eye: {
+  			l: 1,
+  			r: 1
+  		},
+  		mouth: {
+  			x: 0,
+  			y: 0,
+  			shape: {
+  				A: 0,
+  				E: 0,
+  				I: 0,
+  				O: 0,
+  				U: 0
+  			}
+  		},
+  		head: {
+  			x: 0,
+  			y: 0,
+  			z: 0,
+  			width: .3,
+  			height: .6,
+  			position: {
+  				x: .5,
+  				y: .5,
+  				z: 0
+  			}
+  		},
+  		brow: 0,
+  		pupil: {
+  			x: 0,
+  			y: 0
+  		}
+  	},
+  	Pose: {
+  		RightUpperArm: {
+  			x: 0,
+  			y: 0,
+  			z: -1.25
+  		},
+  		LeftUpperArm: {
+  			x: 0,
+  			y: 0,
+  			z: 1.25
+  		},
+  		RightLowerArm: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		LeftLowerArm: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		LeftUpperLeg: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		RightUpperLeg: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		RightLowerLeg: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		LeftLowerLeg: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		LeftHand: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		RightHand: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		Spine: {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		Hips: {
+  			position: {
+  				x: 0,
+  				y: 0,
+  				z: 0
+  			},
+  			rotation: {
+  				x: 0,
+  				y: 0,
+  				z: 0
+  			}
+  		}
+  	},
+  	RightHand: {
+  		RightWrist: {
+  			x: -.13,
+  			y: -.07,
+  			z: -1.04
+  		},
+  		RightRingProximal: {
+  			x: 0,
+  			y: 0,
+  			z: -.13
+  		},
+  		RightRingIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: -.4
+  		},
+  		RightRingDistal: {
+  			x: 0,
+  			y: 0,
+  			z: -.04
+  		},
+  		RightIndexProximal: {
+  			x: 0,
+  			y: 0,
+  			z: -.24
+  		},
+  		RightIndexIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: -.25
+  		},
+  		RightIndexDistal: {
+  			x: 0,
+  			y: 0,
+  			z: -.06
+  		},
+  		RightMiddleProximal: {
+  			x: 0,
+  			y: 0,
+  			z: -.09
+  		},
+  		RightMiddleIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: -.44
+  		},
+  		RightMiddleDistal: {
+  			x: 0,
+  			y: 0,
+  			z: -.06
+  		},
+  		RightThumbProximal: {
+  			x: -.23,
+  			y: -.33,
+  			z: -.12
+  		},
+  		RightThumbIntermediate: {
+  			x: -.2,
+  			y: -.199,
+  			z: -.0139
+  		},
+  		RightThumbDistal: {
+  			x: -.2,
+  			y: .002,
+  			z: .15
+  		},
+  		RightLittleProximal: {
+  			x: 0,
+  			y: 0,
+  			z: -.09
+  		},
+  		RightLittleIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: -.225
+  		},
+  		RightLittleDistal: {
+  			x: 0,
+  			y: 0,
+  			z: -.1
+  		}
+  	},
+  	LeftHand: {
+  		LeftWrist: {
+  			x: -.13,
+  			y: -.07,
+  			z: -1.04
+  		},
+  		LeftRingProximal: {
+  			x: 0,
+  			y: 0,
+  			z: .13
+  		},
+  		LeftRingIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: .4
+  		},
+  		LeftRingDistal: {
+  			x: 0,
+  			y: 0,
+  			z: .049
+  		},
+  		LeftIndexProximal: {
+  			x: 0,
+  			y: 0,
+  			z: .24
+  		},
+  		LeftIndexIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: .25
+  		},
+  		LeftIndexDistal: {
+  			x: 0,
+  			y: 0,
+  			z: .06
+  		},
+  		LeftMiddleProximal: {
+  			x: 0,
+  			y: 0,
+  			z: .09
+  		},
+  		LeftMiddleIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: .44
+  		},
+  		LeftMiddleDistal: {
+  			x: 0,
+  			y: 0,
+  			z: .066
+  		},
+  		LeftThumbProximal: {
+  			x: -.23,
+  			y: .33,
+  			z: .12
+  		},
+  		LeftThumbIntermediate: {
+  			x: -.2,
+  			y: .25,
+  			z: .05
+  		},
+  		LeftThumbDistal: {
+  			x: -.2,
+  			y: .17,
+  			z: -.06
+  		},
+  		LeftLittleProximal: {
+  			x: 0,
+  			y: 0,
+  			z: .17
+  		},
+  		LeftLittleIntermediate: {
+  			x: 0,
+  			y: 0,
+  			z: .4
+  		},
+  		LeftLittleDistal: {
+  			x: 0,
+  			y: 0,
+  			z: .1
+  		}
+  	}
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/constants.js
+  var RIGHT = "Right";
+  var LEFT = "Left";
+  var PI = Math.PI;
+  var TWO_PI = Math.PI * 2;
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/utils/vector.js
+  /** Vector Math class. */
+  var Vector = class Vector {
+  	constructor(a, b, c) {
+  		var _a, _b, _c, _d, _e, _f;
+  		if (Array.isArray(a)) {
+  			this.x = (_a = a[0]) !== null && _a !== void 0 ? _a : 0;
+  			this.y = (_b = a[1]) !== null && _b !== void 0 ? _b : 0;
+  			this.z = (_c = a[2]) !== null && _c !== void 0 ? _c : 0;
+  			return;
+  		}
+  		if (!!a && typeof a === "object") {
+  			this.x = (_d = a.x) !== null && _d !== void 0 ? _d : 0;
+  			this.y = (_e = a.y) !== null && _e !== void 0 ? _e : 0;
+  			this.z = (_f = a.z) !== null && _f !== void 0 ? _f : 0;
+  			return;
+  		}
+  		this.x = a !== null && a !== void 0 ? a : 0;
+  		this.y = b !== null && b !== void 0 ? b : 0;
+  		this.z = c !== null && c !== void 0 ? c : 0;
+  	}
+  	/**
+  	* Returns the negative of this vector.
+  	*/
+  	negative() {
+  		return new Vector(-this.x, -this.y, -this.z);
+  	}
+  	/**
+  	* Add a vector or number to this vector.
+  	* @param {Vector | number} a: Vector or number to add
+  	* @returns {Vector} New vector
+  	*/
+  	add(v) {
+  		if (v instanceof Vector) return new Vector(this.x + v.x, this.y + v.y, this.z + v.z);
+  		else return new Vector(this.x + v, this.y + v, this.z + v);
+  	}
+  	/**
+  	* Substracts a vector or number from this vector.
+  	* @param {Vector | number} a: Vector or number to subtract
+  	* @returns {Vector} New vector
+  	*/
+  	subtract(v) {
+  		if (v instanceof Vector) return new Vector(this.x - v.x, this.y - v.y, this.z - v.z);
+  		else return new Vector(this.x - v, this.y - v, this.z - v);
+  	}
+  	/**
+  	* Multiplies a vector or a number to a vector.
+  	* @param {Vector | number} a: Vector or number to multiply
+  	* @param {Vector} b: Vector to multiply
+  	*/
+  	multiply(v) {
+  		if (v instanceof Vector) return new Vector(this.x * v.x, this.y * v.y, this.z * v.z);
+  		else return new Vector(this.x * v, this.y * v, this.z * v);
+  	}
+  	/**
+  	* Divide this vector by a vector or a number.
+  	* @param {Vector | number} a: Vector or number to divide
+  	* @returns {Vector} New vector
+  	*/
+  	divide(v) {
+  		if (v instanceof Vector) return new Vector(this.x / v.x, this.y / v.y, this.z / v.z);
+  		else return new Vector(this.x / v, this.y / v, this.z / v);
+  	}
+  	/**
+  	* Check if the given vector is equal to this vector.
+  	* @param {Vector} v: Vector to compare
+  	* @returns {boolean} True if equal
+  	*/
+  	equals(v) {
+  		return this.x == v.x && this.y == v.y && this.z == v.z;
+  	}
+  	/**
+  	* Returns the dot product of this vector and another vector.
+  	* @param {Vector} v: Vector to dot
+  	* @returns {number} Dot product
+  	*/
+  	dot(v) {
+  		return this.x * v.x + this.y * v.y + this.z * v.z;
+  	}
+  	/**
+  	* Cross product of two vectors.
+  	* @param {Vector} a: Vector to cross
+  	* @param {Vector} b: Vector to cross
+  	*/
+  	cross(v) {
+  		return new Vector(this.y * v.z - this.z * v.y, this.z * v.x - this.x * v.z, this.x * v.y - this.y * v.x);
+  	}
+  	/**
+  	* Get the length of the Vector
+  	* @returns {number} Length
+  	*/
+  	length() {
+  		return Math.sqrt(this.dot(this));
+  	}
+  	/**
+  	* Find the distance between this and another vector.
+  	* @param {Vector} v: Vector to find distance to
+  	* @param {2 | 3} d: 2D or 3D distance
+  	* @returns {number} Distance
+  	*/
+  	distance(v, d = 3) {
+  		if (d === 2) return Math.sqrt(Math.pow(this.x - v.x, 2) + Math.pow(this.y - v.y, 2));
+  		else return Math.sqrt(Math.pow(this.x - v.x, 2) + Math.pow(this.y - v.y, 2) + Math.pow(this.z - v.z, 2));
+  	}
+  	/**
+  	* Lerp between this vector and another vector.
+  	* @param {Vector} v: Vector to lerp to
+  	* @param {number} fraction: Fraction to lerp
+  	* @returns {Vector}
+  	*/
+  	lerp(v, fraction) {
+  		return v.subtract(this).multiply(fraction).add(this);
+  	}
+  	/**
+  	* Returns the unit vector of this vector.
+  	* @returns {Vector} Unit vector
+  	*/
+  	unit() {
+  		return this.divide(this.length());
+  	}
+  	min() {
+  		return Math.min(Math.min(this.x, this.y), this.z);
+  	}
+  	max() {
+  		return Math.max(Math.max(this.x, this.y), this.z);
+  	}
+  	/**
+  	* To Angles
+  	* @param {AxisMap} [axisMap = {x: "x", y: "y", z: "z"}]
+  	* @returns {{ theta: number, phi: number }}
+  	*/
+  	toSphericalCoords(axisMap = {
+  		x: "x",
+  		y: "y",
+  		z: "z"
+  	}) {
+  		return {
+  			theta: Math.atan2(this[axisMap.y], this[axisMap.x]),
+  			phi: Math.acos(this[axisMap.z] / this.length())
+  		};
+  	}
+  	/**
+  	* Returns the angle between this vector and vector a in radians.
+  	* @param {Vector} a: Vector
+  	* @returns {number}
+  	*/
+  	angleTo(a) {
+  		return Math.acos(this.dot(a) / (this.length() * a.length()));
+  	}
+  	/**
+  	* Array representation of the vector.
+  	* @param {number} n: Array length
+  	* @returns {number[]} Array
+  	* @example
+  	* new Vector(1, 2, 3).toArray(); // [1, 2, 3]
+  	*/
+  	toArray(n) {
+  		return [
+  			this.x,
+  			this.y,
+  			this.z
+  		].slice(0, n || 3);
+  	}
+  	/**
+  	* Clone the vector.
+  	* @returns {Vector} New vector
+  	*/
+  	clone() {
+  		return new Vector(this.x, this.y, this.z);
+  	}
+  	/**
+  	* Init this Vector with explicit values
+  	* @param {number} x: X value
+  	* @param {number} y: Y value
+  	* @param {number} z: Z value
+  	*/
+  	init(x, y, z) {
+  		this.x = x;
+  		this.y = y;
+  		this.z = z;
+  		return this;
+  	}
+  	static negative(a, b = new Vector()) {
+  		b.x = -a.x;
+  		b.y = -a.y;
+  		b.z = -a.z;
+  		return b;
+  	}
+  	static add(a, b, c = new Vector()) {
+  		if (b instanceof Vector) {
+  			c.x = a.x + b.x;
+  			c.y = a.y + b.y;
+  			c.z = a.z + b.z;
+  		} else {
+  			c.x = a.x + b;
+  			c.y = a.y + b;
+  			c.z = a.z + b;
+  		}
+  		return c;
+  	}
+  	static subtract(a, b, c = new Vector()) {
+  		if (b instanceof Vector) {
+  			c.x = a.x - b.x;
+  			c.y = a.y - b.y;
+  			c.z = a.z - b.z;
+  		} else {
+  			c.x = a.x - b;
+  			c.y = a.y - b;
+  			c.z = a.z - b;
+  		}
+  		return c;
+  	}
+  	static multiply(a, b, c = new Vector()) {
+  		if (b instanceof Vector) {
+  			c.x = a.x * b.x;
+  			c.y = a.y * b.y;
+  			c.z = a.z * b.z;
+  		} else {
+  			c.x = a.x * b;
+  			c.y = a.y * b;
+  			c.z = a.z * b;
+  		}
+  		return c;
+  	}
+  	static divide(a, b, c = new Vector()) {
+  		if (b instanceof Vector) {
+  			c.x = a.x / b.x;
+  			c.y = a.y / b.y;
+  			c.z = a.z / b.z;
+  		} else {
+  			c.x = a.x / b;
+  			c.y = a.y / b;
+  			c.z = a.z / b;
+  		}
+  		return c;
+  	}
+  	static cross(a, b, c = new Vector()) {
+  		c.x = a.y * b.z - a.z * b.y;
+  		c.y = a.z * b.x - a.x * b.z;
+  		c.z = a.x * b.y - a.y * b.x;
+  		return c;
+  	}
+  	static unit(a, b) {
+  		const length = a.length();
+  		b.x = a.x / length;
+  		b.y = a.y / length;
+  		b.z = a.z / length;
+  		return b;
+  	}
+  	/**
+  	* Create new vector from angles
+  	* @param {number} theta: Theta angle
+  	* @param {number} phi: Phi angle
+  	* @returns {Vector} New vector
+  	*/
+  	static fromAngles(theta, phi) {
+  		return new Vector(Math.cos(theta) * Math.cos(phi), Math.sin(phi), Math.sin(theta) * Math.cos(phi));
+  	}
+  	static randomDirection() {
+  		return Vector.fromAngles(Math.random() * TWO_PI, Math.asin(Math.random() * 2 - 1));
+  	}
+  	static min(a, b) {
+  		return new Vector(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.min(a.z, b.z));
+  	}
+  	static max(a, b) {
+  		return new Vector(Math.max(a.x, b.x), Math.max(a.y, b.y), Math.max(a.z, b.z));
+  	}
+  	/**
+  	* Lerp between two vectors
+  	* @param {Vector} a: Vector a
+  	* @param {Vector} b: Vector b
+  	* @param {number} fraction: Fraction
+  	*/
+  	static lerp(a, b, fraction) {
+  		if (b instanceof Vector) return b.subtract(a).multiply(fraction).add(a);
+  		else return (b - a) * fraction + a;
+  	}
+  	/**
+  	* Create a new vector from an Array
+  	* @param {number[]} array: Array
+  	* @returns {Vector} New vector
+  	*/
+  	static fromArray(a) {
+  		if (Array.isArray(a)) return new Vector(a[0], a[1], a[2]);
+  		return new Vector(a.x, a.y, a.z);
+  	}
+  	/**
+  	* Angle between two vectors
+  	* @param {Vector} a: Vector a
+  	* @param {Vector} b: Vector b
+  	* @returns
+  	*/
+  	static angleBetween(a, b) {
+  		return a.angleTo(b);
+  	}
+  	static distance(a, b, d) {
+  		if (d === 2) return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+  		else return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2) + Math.pow(a.z - b.z, 2));
+  	}
+  	static toDegrees(a) {
+  		return a * (180 / PI);
+  	}
+  	static normalizeAngle(radians) {
+  		let angle = radians % TWO_PI;
+  		angle = angle > PI ? angle - TWO_PI : angle < -PI ? TWO_PI + angle : angle;
+  		return angle / PI;
+  	}
+  	static normalizeRadians(radians) {
+  		if (radians >= PI / 2) radians -= TWO_PI;
+  		if (radians <= -PI / 2) {
+  			radians += TWO_PI;
+  			radians = PI - radians;
+  		}
+  		return radians / PI;
+  	}
+  	static find2DAngle(cx, cy, ex, ey) {
+  		const dy = ey - cy;
+  		const dx = ex - cx;
+  		return Math.atan2(dy, dx);
+  	}
+  	/**
+  	* Find 3D rotation between two vectors
+  	* @param {Vector} a: First vector
+  	* @param {Vector} b: Second vector
+  	* @param {boolean} normalize: Normalize the result
+  	*/
+  	static findRotation(a, b, normalize = true) {
+  		if (normalize) return new Vector(Vector.normalizeRadians(Vector.find2DAngle(a.z, a.x, b.z, b.x)), Vector.normalizeRadians(Vector.find2DAngle(a.z, a.y, b.z, b.y)), Vector.normalizeRadians(Vector.find2DAngle(a.x, a.y, b.x, b.y)));
+  		else return new Vector(Vector.find2DAngle(a.z, a.x, b.z, b.x), Vector.find2DAngle(a.z, a.y, b.z, b.y), Vector.find2DAngle(a.x, a.y, b.x, b.y));
+  	}
+  	/**
+  	* Find roll pitch yaw of plane formed by 3 points
+  	* @param {Vector} a: Vector
+  	* @param {Vector} b: Vector
+  	* @param {Vector} c: Vector
+  	*/
+  	static rollPitchYaw(a, b, c) {
+  		if (!c) return new Vector(Vector.normalizeAngle(Vector.find2DAngle(a.z, a.y, b.z, b.y)), Vector.normalizeAngle(Vector.find2DAngle(a.z, a.x, b.z, b.x)), Vector.normalizeAngle(Vector.find2DAngle(a.x, a.y, b.x, b.y)));
+  		const qb = b.subtract(a);
+  		const qc = c.subtract(a);
+  		const unitZ = qb.cross(qc).unit();
+  		const unitX = qb.unit();
+  		const unitY = unitZ.cross(unitX);
+  		const beta = Math.asin(unitZ.x) || 0;
+  		const alpha = Math.atan2(-unitZ.y, unitZ.z) || 0;
+  		const gamma = Math.atan2(-unitY.x, unitX.x) || 0;
+  		return new Vector(Vector.normalizeAngle(alpha), Vector.normalizeAngle(beta), Vector.normalizeAngle(gamma));
+  	}
+  	/**
+  	* Find angle between 3D Coordinates
+  	* @param {Vector | number} a: Vector or Number
+  	* @param {Vector | number} b: Vector or Number
+  	* @param {Vector | number} c: Vector or Number
+  	*/
+  	static angleBetween3DCoords(a, b, c) {
+  		if (!(a instanceof Vector)) {
+  			a = new Vector(a);
+  			b = new Vector(b);
+  			c = new Vector(c);
+  		}
+  		const v1 = a.subtract(b);
+  		const v2 = c.subtract(b);
+  		const v1norm = v1.unit();
+  		const v2norm = v2.unit();
+  		const dotProducts = v1norm.dot(v2norm);
+  		const angle = Math.acos(dotProducts);
+  		return Vector.normalizeRadians(angle);
+  	}
+  	/**
+  	* Get normalized, spherical coordinates for the vector bc, relative to vector ab
+  	* @param {Vector | number} a: Vector or Number
+  	* @param {Vector | number} b: Vector or Number
+  	* @param {Vector | number} c: Vector or Number
+  	* @param {AxisMap} axisMap: Mapped axis to get the right spherical coords
+  	*/
+  	static getRelativeSphericalCoords(a, b, c, axisMap) {
+  		if (!(a instanceof Vector)) {
+  			a = new Vector(a);
+  			b = new Vector(b);
+  			c = new Vector(c);
+  		}
+  		const v1 = b.subtract(a);
+  		const v2 = c.subtract(b);
+  		const v1norm = v1.unit();
+  		const v2norm = v2.unit();
+  		const { theta: theta1, phi: phi1 } = v1norm.toSphericalCoords(axisMap);
+  		const { theta: theta2, phi: phi2 } = v2norm.toSphericalCoords(axisMap);
+  		const theta = theta1 - theta2;
+  		const phi = phi1 - phi2;
+  		return {
+  			theta: Vector.normalizeAngle(theta),
+  			phi: Vector.normalizeAngle(phi)
+  		};
+  	}
+  	/**
+  	* Get normalized, spherical coordinates for the vector bc
+  	* @param {Vector | number} a: Vector or Number
+  	* @param {Vector | number} b: Vector or Number
+  	* @param {AxisMap} axisMap: Mapped axis to get the right spherical coords
+  	*/
+  	static getSphericalCoords(a, b, axisMap = {
+  		x: "x",
+  		y: "y",
+  		z: "z"
+  	}) {
+  		if (!(a instanceof Vector)) {
+  			a = new Vector(a);
+  			b = new Vector(b);
+  		}
+  		const { theta, phi } = b.subtract(a).unit().toSphericalCoords(axisMap);
+  		return {
+  			theta: Vector.normalizeAngle(-theta),
+  			phi: Vector.normalizeAngle(PI / 2 - phi)
+  		};
+  	}
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/PoseSolver/calcArms.js
+  /**
+  * Calculates arm rotation as euler angles
+  * @param {Array} lm : array of 3D pose vectors from tfjs or mediapipe
+  */
+  var calcArms = (lm) => {
+  	const UpperArm = {
+  		r: Vector.findRotation(lm[11], lm[13]),
+  		l: Vector.findRotation(lm[12], lm[14])
+  	};
+  	UpperArm.r.y = Vector.angleBetween3DCoords(lm[12], lm[11], lm[13]);
+  	UpperArm.l.y = Vector.angleBetween3DCoords(lm[11], lm[12], lm[14]);
+  	const LowerArm = {
+  		r: Vector.findRotation(lm[13], lm[15]),
+  		l: Vector.findRotation(lm[14], lm[16])
+  	};
+  	LowerArm.r.y = Vector.angleBetween3DCoords(lm[11], lm[13], lm[15]);
+  	LowerArm.l.y = Vector.angleBetween3DCoords(lm[12], lm[14], lm[16]);
+  	LowerArm.r.z = clamp(LowerArm.r.z, -2.14, 0);
+  	LowerArm.l.z = clamp(LowerArm.l.z, -2.14, 0);
+  	const Hand = {
+  		r: Vector.findRotation(Vector.fromArray(lm[15]), Vector.lerp(Vector.fromArray(lm[17]), Vector.fromArray(lm[19]), .5)),
+  		l: Vector.findRotation(Vector.fromArray(lm[16]), Vector.lerp(Vector.fromArray(lm[18]), Vector.fromArray(lm[20]), .5))
+  	};
+  	const rightArmRig = rigArm(UpperArm.r, LowerArm.r, Hand.r, RIGHT);
+  	const leftArmRig = rigArm(UpperArm.l, LowerArm.l, Hand.l, LEFT);
+  	return {
+  		UpperArm: {
+  			r: rightArmRig.UpperArm,
+  			l: leftArmRig.UpperArm
+  		},
+  		LowerArm: {
+  			r: rightArmRig.LowerArm,
+  			l: leftArmRig.LowerArm
+  		},
+  		Hand: {
+  			r: rightArmRig.Hand,
+  			l: leftArmRig.Hand
+  		},
+  		Unscaled: {
+  			UpperArm,
+  			LowerArm,
+  			Hand
+  		}
+  	};
+  };
+  /**
+  * Converts normalized rotation values into radians clamped by human limits
+  * @param {Object} UpperArm : normalized rotation values
+  * @param {Object} LowerArm : normalized rotation values
+  * @param {Object} Hand : normalized rotation values
+  * @param {Side} side : left or right
+  */
+  var rigArm = (UpperArm, LowerArm, Hand, side = RIGHT) => {
+  	const invert = side === "Right" ? 1 : -1;
+  	UpperArm.z *= -2.3 * invert;
+  	UpperArm.y *= PI * invert;
+  	UpperArm.y -= Math.max(LowerArm.x);
+  	UpperArm.y -= -invert * Math.max(LowerArm.z, 0);
+  	UpperArm.x -= .3 * invert;
+  	LowerArm.z *= -2.14 * invert;
+  	LowerArm.y *= 2.14 * invert;
+  	LowerArm.x *= 2.14 * invert;
+  	UpperArm.x = clamp(UpperArm.x, -.5, PI);
+  	LowerArm.x = clamp(LowerArm.x, -.3, .3);
+  	Hand.y = clamp(Hand.z * 2, -.6, .6);
+  	Hand.z = Hand.z * -2.3 * invert;
+  	return {
+  		UpperArm,
+  		LowerArm,
+  		Hand
+  	};
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/PoseSolver/calcHips.js
+  /**
+  * Calculates Hip rotation and world position
+  * @param {Array} lm3d : array of 3D pose vectors from tfjs or mediapipe
+  * @param {Array} lm2d : array of 2D pose vectors from tfjs or mediapipe
+  */
+  var calcHips = (lm3d, lm2d) => {
+  	const hipLeft2d = Vector.fromArray(lm2d[23]);
+  	const hipRight2d = Vector.fromArray(lm2d[24]);
+  	const shoulderLeft2d = Vector.fromArray(lm2d[11]);
+  	const shoulderRight2d = Vector.fromArray(lm2d[12]);
+  	const hipCenter2d = hipLeft2d.lerp(hipRight2d, 1);
+  	const shoulderCenter2d = shoulderLeft2d.lerp(shoulderRight2d, 1);
+  	const spineLength = hipCenter2d.distance(shoulderCenter2d);
+  	const hips = { position: {
+  		x: clamp(hipCenter2d.x - .4, -1, 1),
+  		y: 0,
+  		z: clamp(spineLength - 1, -2, 0)
+  	} };
+  	hips.worldPosition = {
+  		x: hips.position.x,
+  		y: 0,
+  		z: hips.position.z * Math.pow(hips.position.z * -2, 2)
+  	};
+  	hips.worldPosition.x *= hips.worldPosition.z;
+  	hips.rotation = Vector.rollPitchYaw(lm3d[23], lm3d[24]);
+  	if (hips.rotation.y > .5) hips.rotation.y -= 2;
+  	hips.rotation.y += .5;
+  	if (hips.rotation.z > 0) hips.rotation.z = 1 - hips.rotation.z;
+  	if (hips.rotation.z < 0) hips.rotation.z = -1 - hips.rotation.z;
+  	const turnAroundAmountHips = remap(Math.abs(hips.rotation.y), .2, .4);
+  	hips.rotation.z *= 1 - turnAroundAmountHips;
+  	hips.rotation.x = 0;
+  	const spine = Vector.rollPitchYaw(lm3d[11], lm3d[12]);
+  	if (spine.y > .5) spine.y -= 2;
+  	spine.y += .5;
+  	if (spine.z > 0) spine.z = 1 - spine.z;
+  	if (spine.z < 0) spine.z = -1 - spine.z;
+  	const turnAroundAmount = remap(Math.abs(spine.y), .2, .4);
+  	spine.z *= 1 - turnAroundAmount;
+  	spine.x = 0;
+  	return rigHips(hips, spine);
+  };
+  /**
+  * Converts normalized rotations to radians and estimates world position of hips
+  * @param {Object} hips : hip position and rotation values
+  * @param {Object} spine : spine position and rotation values
+  */
+  var rigHips = (hips, spine) => {
+  	if (hips.rotation) {
+  		hips.rotation.x *= Math.PI;
+  		hips.rotation.y *= Math.PI;
+  		hips.rotation.z *= Math.PI;
+  	}
+  	spine.x *= PI;
+  	spine.y *= PI;
+  	spine.z *= PI;
+  	return {
+  		Hips: hips,
+  		Spine: spine
+  	};
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/utils/euler.js
+  /** Euler rotation class. */
+  var Euler = class Euler {
+  	constructor(a, b, c, rotationOrder) {
+  		var _a, _b, _c, _d;
+  		if (!!a && typeof a === "object") {
+  			this.x = (_a = a.x) !== null && _a !== void 0 ? _a : 0;
+  			this.y = (_b = a.y) !== null && _b !== void 0 ? _b : 0;
+  			this.z = (_c = a.z) !== null && _c !== void 0 ? _c : 0;
+  			this.rotationOrder = (_d = a.rotationOrder) !== null && _d !== void 0 ? _d : "XYZ";
+  			return;
+  		}
+  		this.x = a !== null && a !== void 0 ? a : 0;
+  		this.y = b !== null && b !== void 0 ? b : 0;
+  		this.z = c !== null && c !== void 0 ? c : 0;
+  		this.rotationOrder = rotationOrder !== null && rotationOrder !== void 0 ? rotationOrder : "XYZ";
+  	}
+  	/**
+  	* Multiplies a number to an Euler.
+  	* @param {number} a: Number to multiply
+  	*/
+  	multiply(v) {
+  		return new Euler(this.x * v, this.y * v, this.z * v, this.rotationOrder);
+  	}
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/PoseSolver/calcLegs.js
+  var offsets = { upperLeg: { z: .1 } };
+  /**
+  * Calculates leg rotation angles
+  * @param {Results} lm : array of 3D pose vectors from tfjs or mediapipe
+  */
+  var calcLegs = (lm) => {
+  	const rightUpperLegSphericalCoords = Vector.getSphericalCoords(lm[23], lm[25], {
+  		x: "y",
+  		y: "z",
+  		z: "x"
+  	});
+  	const leftUpperLegSphericalCoords = Vector.getSphericalCoords(lm[24], lm[26], {
+  		x: "y",
+  		y: "z",
+  		z: "x"
+  	});
+  	const rightLowerLegSphericalCoords = Vector.getRelativeSphericalCoords(lm[23], lm[25], lm[27], {
+  		x: "y",
+  		y: "z",
+  		z: "x"
+  	});
+  	const leftLowerLegSphericalCoords = Vector.getRelativeSphericalCoords(lm[24], lm[26], lm[28], {
+  		x: "y",
+  		y: "z",
+  		z: "x"
+  	});
+  	const hipRotation = Vector.findRotation(lm[23], lm[24]);
+  	const UpperLeg = {
+  		r: new Vector({
+  			x: rightUpperLegSphericalCoords.theta,
+  			y: rightLowerLegSphericalCoords.phi,
+  			z: rightUpperLegSphericalCoords.phi - hipRotation.z
+  		}),
+  		l: new Vector({
+  			x: leftUpperLegSphericalCoords.theta,
+  			y: leftLowerLegSphericalCoords.phi,
+  			z: leftUpperLegSphericalCoords.phi - hipRotation.z
+  		})
+  	};
+  	const LowerLeg = {
+  		r: new Vector({
+  			x: -Math.abs(rightLowerLegSphericalCoords.theta),
+  			y: 0,
+  			z: 0
+  		}),
+  		l: new Vector({
+  			x: -Math.abs(leftLowerLegSphericalCoords.theta),
+  			y: 0,
+  			z: 0
+  		})
+  	};
+  	const rightLegRig = rigLeg(UpperLeg.r, LowerLeg.r, RIGHT);
+  	const leftLegRig = rigLeg(UpperLeg.l, LowerLeg.l, LEFT);
+  	return {
+  		UpperLeg: {
+  			r: rightLegRig.UpperLeg,
+  			l: leftLegRig.UpperLeg
+  		},
+  		LowerLeg: {
+  			r: rightLegRig.LowerLeg,
+  			l: leftLegRig.LowerLeg
+  		},
+  		Unscaled: {
+  			UpperLeg,
+  			LowerLeg
+  		}
+  	};
+  };
+  /**
+  * Converts normalized rotation values into radians clamped by human limits
+  * @param {Object} UpperLeg : normalized rotation values
+  * @param {Object} LowerLeg : normalized rotation values
+  * @param {Side} side : left or right
+  */
+  var rigLeg = (UpperLeg, LowerLeg, side = RIGHT) => {
+  	const invert = side === "Right" ? 1 : -1;
+  	return {
+  		UpperLeg: new Euler({
+  			x: clamp(UpperLeg.x, 0, .5) * PI,
+  			y: clamp(UpperLeg.y, -.25, .25) * PI,
+  			z: clamp(UpperLeg.z, -.5, .5) * PI + invert * offsets.upperLeg.z,
+  			rotationOrder: "XYZ"
+  		}),
+  		LowerLeg: new Euler({
+  			x: LowerLeg.x * PI,
+  			y: LowerLeg.y * PI,
+  			z: LowerLeg.z * PI
+  		})
+  	};
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/PoseSolver/index.js
+  /** Class representing pose solver. */
+  var PoseSolver = class {
+  	/**
+  	* Combines arm, hips, and leg calcs into one method
+  	* @param {Array} lm3d : array of 3D pose vectors from tfjs or mediapipe
+  	* @param {Array} lm2d : array of 2D pose vectors from tfjs or mediapipe
+  	* @param {String} runtime: set as either "tfjs" or "mediapipe"
+  	* @param {IPoseSolveOptions} options: options object
+  	*/
+  	static solve(lm3d, lm2d, { runtime = "mediapipe", video = null, imageSize = null, enableLegs = true } = {}) {
+  		var _a, _b, _c, _d;
+  		if (!lm3d && !lm2d) {
+  			console.error("Need both World Pose and Pose Landmarks");
+  			return;
+  		}
+  		if (video) {
+  			const videoEl = typeof video === "string" ? document.querySelector(video) : video;
+  			imageSize = {
+  				width: videoEl.videoWidth,
+  				height: videoEl.videoHeight
+  			};
+  		}
+  		if (runtime === "tfjs" && imageSize) {
+  			for (const e of lm3d) e.visibility = e.score;
+  			for (const e of lm2d) {
+  				e.x /= imageSize.width;
+  				e.y /= imageSize.height;
+  				e.z = 0;
+  				e.visibility = e.score;
+  			}
+  		}
+  		const Arms = calcArms(lm3d);
+  		const Hips = calcHips(lm3d, lm2d);
+  		const Legs = enableLegs ? calcLegs(lm3d) : null;
+  		const rightHandOffscreen = lm3d[15].y > .1 || ((_a = lm3d[15].visibility) !== null && _a !== void 0 ? _a : 0) < .23 || .995 < lm2d[15].y;
+  		const leftHandOffscreen = lm3d[16].y > .1 || ((_b = lm3d[16].visibility) !== null && _b !== void 0 ? _b : 0) < .23 || .995 < lm2d[16].y;
+  		const leftFootOffscreen = lm3d[23].y > .1 || ((_c = lm3d[23].visibility) !== null && _c !== void 0 ? _c : 0) < .63 || Hips.Hips.position.z > -.4;
+  		const rightFootOffscreen = lm3d[24].y > .1 || ((_d = lm3d[24].visibility) !== null && _d !== void 0 ? _d : 0) < .63 || Hips.Hips.position.z > -.4;
+  		Arms.UpperArm.l = Arms.UpperArm.l.multiply(leftHandOffscreen ? 0 : 1);
+  		Arms.UpperArm.l.z = leftHandOffscreen ? RestingDefault.Pose.LeftUpperArm.z : Arms.UpperArm.l.z;
+  		Arms.UpperArm.r = Arms.UpperArm.r.multiply(rightHandOffscreen ? 0 : 1);
+  		Arms.UpperArm.r.z = rightHandOffscreen ? RestingDefault.Pose.RightUpperArm.z : Arms.UpperArm.r.z;
+  		Arms.LowerArm.l = Arms.LowerArm.l.multiply(leftHandOffscreen ? 0 : 1);
+  		Arms.LowerArm.r = Arms.LowerArm.r.multiply(rightHandOffscreen ? 0 : 1);
+  		Arms.Hand.l = Arms.Hand.l.multiply(leftHandOffscreen ? 0 : 1);
+  		Arms.Hand.r = Arms.Hand.r.multiply(rightHandOffscreen ? 0 : 1);
+  		if (Legs) {
+  			Legs.UpperLeg.l = Legs.UpperLeg.l.multiply(rightFootOffscreen ? 0 : 1);
+  			Legs.UpperLeg.r = Legs.UpperLeg.r.multiply(leftFootOffscreen ? 0 : 1);
+  			Legs.LowerLeg.l = Legs.LowerLeg.l.multiply(rightFootOffscreen ? 0 : 1);
+  			Legs.LowerLeg.r = Legs.LowerLeg.r.multiply(leftFootOffscreen ? 0 : 1);
+  		}
+  		return {
+  			RightUpperArm: Arms.UpperArm.r,
+  			RightLowerArm: Arms.LowerArm.r,
+  			LeftUpperArm: Arms.UpperArm.l,
+  			LeftLowerArm: Arms.LowerArm.l,
+  			RightHand: Arms.Hand.r,
+  			LeftHand: Arms.Hand.l,
+  			RightUpperLeg: Legs ? Legs.UpperLeg.r : RestingDefault.Pose.RightUpperLeg,
+  			RightLowerLeg: Legs ? Legs.LowerLeg.r : RestingDefault.Pose.RightLowerLeg,
+  			LeftUpperLeg: Legs ? Legs.UpperLeg.l : RestingDefault.Pose.LeftUpperLeg,
+  			LeftLowerLeg: Legs ? Legs.LowerLeg.l : RestingDefault.Pose.LeftLowerLeg,
+  			Hips: Hips.Hips,
+  			Spine: Hips.Spine
+  		};
+  	}
+  };
+  /** expose arm rotation calculator as a static method */
+  PoseSolver.calcArms = calcArms;
+  /** expose hips position and rotation calculator as a static method */
+  PoseSolver.calcHips = calcHips;
+  /** expose leg rotation calculator as a static method */
+  PoseSolver.calcLegs = calcLegs;
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/FaceSolver/calcHead.js
+  /**
+  * Calculate stable plane (triangle) from 4 face landmarks
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  */
+  var createEulerPlane = (lm) => {
+  	const p1 = new Vector(lm[21]);
+  	const p2 = new Vector(lm[251]);
+  	const p3 = new Vector(lm[397]);
+  	const p4 = new Vector(lm[172]);
+  	return {
+  		vector: [
+  			p1,
+  			p2,
+  			p3.lerp(p4, .5)
+  		],
+  		points: [
+  			p1,
+  			p2,
+  			p3,
+  			p4
+  		]
+  	};
+  };
+  /**
+  * Calculate roll, pitch, yaw, centerpoint, and rough dimentions of face plane
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  */
+  var calcHead = (lm) => {
+  	const plane = createEulerPlane(lm).vector;
+  	const rotate = Vector.rollPitchYaw(plane[0], plane[1], plane[2]);
+  	const midPoint = plane[0].lerp(plane[1], .5);
+  	const width = plane[0].distance(plane[1]);
+  	const height = midPoint.distance(plane[2]);
+  	rotate.x *= -1;
+  	rotate.z *= -1;
+  	return {
+  		y: rotate.y * PI,
+  		x: rotate.x * PI,
+  		z: rotate.z * PI,
+  		width,
+  		height,
+  		position: midPoint.lerp(plane[2], .5),
+  		normalized: {
+  			y: rotate.y,
+  			x: rotate.x,
+  			z: rotate.z
+  		},
+  		degrees: {
+  			y: rotate.y * 180,
+  			x: rotate.x * 180,
+  			z: rotate.z * 180
+  		}
+  	};
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/FaceSolver/calcEyes.js
+  /**
+  * Landmark points labeled for eye, brow, and pupils
+  */
+  var points = {
+  	eye: {
+  		[LEFT]: [
+  			130,
+  			133,
+  			160,
+  			159,
+  			158,
+  			144,
+  			145,
+  			153
+  		],
+  		[RIGHT]: [
+  			263,
+  			362,
+  			387,
+  			386,
+  			385,
+  			373,
+  			374,
+  			380
+  		]
+  	},
+  	brow: {
+  		[LEFT]: [
+  			35,
+  			244,
+  			63,
+  			105,
+  			66,
+  			229,
+  			230,
+  			231
+  		],
+  		[RIGHT]: [
+  			265,
+  			464,
+  			293,
+  			334,
+  			296,
+  			449,
+  			450,
+  			451
+  		]
+  	},
+  	pupil: {
+  		[LEFT]: [
+  			468,
+  			469,
+  			470,
+  			471,
+  			472
+  		],
+  		[RIGHT]: [
+  			473,
+  			474,
+  			475,
+  			476,
+  			477
+  		]
+  	}
+  };
+  /**
+  * Calculate eye open ratios and remap to 0-1
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  * @param {Side} side : designate left or right
+  * @param {Number} high : ratio at which eye is considered open
+  * @param {Number} low : ratio at which eye is comsidered closed
+  */
+  var getEyeOpen = (lm, side = LEFT, { high = .85, low = .55 } = {}) => {
+  	const eyePoints = points.eye[side];
+  	const ratio = clamp(eyeLidRatio(lm[eyePoints[0]], lm[eyePoints[1]], lm[eyePoints[2]], lm[eyePoints[3]], lm[eyePoints[4]], lm[eyePoints[5]], lm[eyePoints[6]], lm[eyePoints[7]]) / .285, 0, 2);
+  	return {
+  		norm: remap(ratio, low, high),
+  		raw: ratio
+  	};
+  };
+  /**
+  * Calculate eyelid distance ratios based on landmarks on the face
+  */
+  var eyeLidRatio = (eyeOuterCorner, eyeInnerCorner, eyeOuterUpperLid, eyeMidUpperLid, eyeInnerUpperLid, eyeOuterLowerLid, eyeMidLowerLid, eyeInnerLowerLid) => {
+  	eyeOuterCorner = new Vector(eyeOuterCorner);
+  	eyeInnerCorner = new Vector(eyeInnerCorner);
+  	eyeOuterUpperLid = new Vector(eyeOuterUpperLid);
+  	eyeMidUpperLid = new Vector(eyeMidUpperLid);
+  	eyeInnerUpperLid = new Vector(eyeInnerUpperLid);
+  	eyeOuterLowerLid = new Vector(eyeOuterLowerLid);
+  	eyeMidLowerLid = new Vector(eyeMidLowerLid);
+  	eyeInnerLowerLid = new Vector(eyeInnerLowerLid);
+  	const eyeWidth = eyeOuterCorner.distance(eyeInnerCorner, 2);
+  	const eyeOuterLidDistance = eyeOuterUpperLid.distance(eyeOuterLowerLid, 2);
+  	const eyeMidLidDistance = eyeMidUpperLid.distance(eyeMidLowerLid, 2);
+  	const eyeInnerLidDistance = eyeInnerUpperLid.distance(eyeInnerLowerLid, 2);
+  	return (eyeOuterLidDistance + eyeMidLidDistance + eyeInnerLidDistance) / 3 / eyeWidth;
+  };
+  /**
+  * Calculate pupil position [-1,1]
+  * @param {Results} lm : array of results from tfjs or mediapipe
+  * @param {Side} side : left or right
+  */
+  var pupilPos = (lm, side = LEFT) => {
+  	const eyeOuterCorner = new Vector(lm[points.eye[side][0]]);
+  	const eyeInnerCorner = new Vector(lm[points.eye[side][1]]);
+  	const eyeWidth = eyeOuterCorner.distance(eyeInnerCorner, 2);
+  	const midPoint = eyeOuterCorner.lerp(eyeInnerCorner, .5);
+  	const pupil = new Vector(lm[points.pupil[side][0]]);
+  	const dx = midPoint.x - pupil.x;
+  	const dy = midPoint.y - eyeWidth * .075 - pupil.y;
+  	let ratioX = dx / (eyeWidth / 2);
+  	let ratioY = dy / (eyeWidth / 4);
+  	ratioX *= 4;
+  	ratioY *= 4;
+  	return {
+  		x: ratioX,
+  		y: ratioY
+  	};
+  };
+  /**
+  * Method to stabilize blink speeds to fix inconsistent eye open/close timing
+  * @param {Object} eye : object with left and right eye values
+  * @param {Number} headY : head y axis rotation in radians
+  * @param {Object} options: Options for blink stabilization
+  */
+  var stabilizeBlink = (eye, headY, { enableWink = true, maxRot = .5 } = {}) => {
+  	eye.r = clamp(eye.r, 0, 1);
+  	eye.l = clamp(eye.l, 0, 1);
+  	const blinkDiff = Math.abs(eye.l - eye.r);
+  	const blinkThresh = enableWink ? .8 : 1.2;
+  	const isClosing = eye.l < .3 && eye.r < .3;
+  	const isOpen = eye.l > .6 && eye.r > .6;
+  	if (headY > maxRot) return {
+  		l: eye.r,
+  		r: eye.r
+  	};
+  	if (headY < -maxRot) return {
+  		l: eye.l,
+  		r: eye.l
+  	};
+  	return {
+  		l: blinkDiff >= blinkThresh && !isClosing && !isOpen ? eye.l : eye.r > eye.l ? Vector.lerp(eye.r, eye.l, .95) : Vector.lerp(eye.r, eye.l, .05),
+  		r: blinkDiff >= blinkThresh && !isClosing && !isOpen ? eye.r : eye.r > eye.l ? Vector.lerp(eye.r, eye.l, .95) : Vector.lerp(eye.r, eye.l, .05)
+  	};
+  };
+  /**
+  * Calculate Eyes
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  */
+  var calcEyes = (lm, { high = .85, low = .55 } = {}) => {
+  	if (lm.length !== 478) return {
+  		l: 1,
+  		r: 1
+  	};
+  	const leftEyeLid = getEyeOpen(lm, LEFT, {
+  		high,
+  		low
+  	});
+  	const rightEyeLid = getEyeOpen(lm, RIGHT, {
+  		high,
+  		low
+  	});
+  	return {
+  		l: leftEyeLid.norm || 0,
+  		r: rightEyeLid.norm || 0
+  	};
+  };
+  /**
+  * Calculate pupil location normalized to eye bounds
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  */
+  var calcPupils = (lm) => {
+  	if (lm.length !== 478) return {
+  		x: 0,
+  		y: 0
+  	};
+  	else {
+  		const pupilL = pupilPos(lm, LEFT);
+  		const pupilR = pupilPos(lm, RIGHT);
+  		return {
+  			x: (pupilL.x + pupilR.x) * .5 || 0,
+  			y: (pupilL.y + pupilR.y) * .5 || 0
+  		};
+  	}
+  };
+  /**
+  * Calculate brow raise
+  * @param {Results} lm : array of results from tfjs or mediapipe
+  * @param {Side} side : designate left or right
+  */
+  var getBrowRaise = (lm, side = LEFT) => {
+  	const browPoints = points.brow[side];
+  	const browDistance = eyeLidRatio(lm[browPoints[0]], lm[browPoints[1]], lm[browPoints[2]], lm[browPoints[3]], lm[browPoints[4]], lm[browPoints[5]], lm[browPoints[6]], lm[browPoints[7]]);
+  	const maxBrowRatio = 1.15;
+  	const browHigh = .125;
+  	const browLow = .07;
+  	return (clamp(browDistance / maxBrowRatio - 1, browLow, browHigh) - browLow) / .05499999999999999;
+  };
+  /**
+  * Take the average of left and right eyebrow raise values
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  */
+  var calcBrow = (lm) => {
+  	if (lm.length !== 478) return 0;
+  	else return (getBrowRaise(lm, "Left") + getBrowRaise(lm, "Right")) / 2 || 0;
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/FaceSolver/calcMouth.js
+  /**
+  * Calculate Mouth Shape
+  * @param {Array} lm : array of results from tfjs or mediapipe
+  */
+  var calcMouth = (lm) => {
+  	const eyeInnerCornerL = new Vector(lm[133]);
+  	const eyeInnerCornerR = new Vector(lm[362]);
+  	const eyeOuterCornerL = new Vector(lm[130]);
+  	const eyeOuterCornerR = new Vector(lm[263]);
+  	const eyeInnerDistance = eyeInnerCornerL.distance(eyeInnerCornerR);
+  	const eyeOuterDistance = eyeOuterCornerL.distance(eyeOuterCornerR);
+  	const upperInnerLip = new Vector(lm[13]);
+  	const lowerInnerLip = new Vector(lm[14]);
+  	const mouthCornerLeft = new Vector(lm[61]);
+  	const mouthCornerRight = new Vector(lm[291]);
+  	const mouthOpen = upperInnerLip.distance(lowerInnerLip);
+  	const mouthWidth = mouthCornerLeft.distance(mouthCornerRight);
+  	let ratioY = mouthOpen / eyeInnerDistance;
+  	let ratioX = mouthWidth / eyeOuterDistance;
+  	ratioY = remap(ratioY, .15, .7);
+  	ratioX = remap(ratioX, .45, .9);
+  	ratioX = (ratioX - .3) * 2;
+  	const mouthX = ratioX;
+  	const mouthY = remap(mouthOpen / eyeInnerDistance, .17, .5);
+  	const ratioI = clamp(remap(mouthX, 0, 1) * 2 * remap(mouthY, .2, .7), 0, 1);
+  	const ratioA = mouthY * .4 + mouthY * (1 - ratioI) * .6;
+  	const ratioU = mouthY * remap(1 - ratioI, 0, .3) * .1;
+  	const ratioE = remap(ratioU, .2, 1) * (1 - ratioI) * .3;
+  	const ratioO = (1 - ratioI) * remap(mouthY, .3, 1) * .4;
+  	return {
+  		x: ratioX || 0,
+  		y: ratioY || 0,
+  		shape: {
+  			A: ratioA || 0,
+  			E: ratioE || 0,
+  			I: ratioI || 0,
+  			O: ratioO || 0,
+  			U: ratioU || 0
+  		}
+  	};
+  };
+  //#endregion
+  //#region node_modules/.pnpm/kalidokit@1.1.5/node_modules/kalidokit/dist/FaceSolver/index.js
+  /** Class representing face solver. */
+  var FaceSolver = class {
+  	/**
+  	* Combines head, eye, pupil, and eyebrow calcs into one method
+  	* @param {Results} lm : array of results from tfjs or mediapipe
+  	* @param {String} runtime: set as either "tfjs" or "mediapipe"
+  	* @param {IFaceSolveOptions} options: options for face solver
+  	*/
+  	static solve(lm, { runtime = "tfjs", video = null, imageSize = null, smoothBlink = false, blinkSettings = [] } = {}) {
+  		if (!lm) {
+  			console.error("Need Face Landmarks");
+  			return;
+  		}
+  		if (video) {
+  			const videoEl = typeof video === "string" ? document.querySelector(video) : video;
+  			imageSize = {
+  				width: videoEl.videoWidth,
+  				height: videoEl.videoHeight
+  			};
+  		}
+  		if (runtime === "mediapipe" && imageSize) for (const e of lm) {
+  			e.x *= imageSize.width;
+  			e.y *= imageSize.height;
+  			e.z *= imageSize.width;
+  		}
+  		const getHead = calcHead(lm);
+  		const getMouth = calcMouth(lm);
+  		blinkSettings = blinkSettings.length > 0 ? blinkSettings : runtime === "tfjs" ? [.55, .85] : [.35, .5];
+  		let getEye = calcEyes(lm, {
+  			high: blinkSettings[1],
+  			low: blinkSettings[0]
+  		});
+  		if (smoothBlink) getEye = stabilizeBlink(getEye, getHead.y);
+  		const getPupils = calcPupils(lm);
+  		const getBrow = calcBrow(lm);
+  		return {
+  			head: getHead,
+  			eye: getEye,
+  			brow: getBrow,
+  			pupil: getPupils,
+  			mouth: getMouth
+  		};
+  	}
+  };
+  /** expose blink stabilizer as a static method */
+  FaceSolver.stabilizeBlink = stabilizeBlink;
+  //#endregion
+  //#region src/avatar/kalidokit-adapter.ts
+  var KalidokitPoseAdapter = class {
+  	constructor(solver = PoseSolver) {
+  		this.solver = solver;
+  	}
+  	solve(worldPerson, screenPerson, imageSize) {
+  		if (!Number.isInteger(imageSize.width) || !Number.isInteger(imageSize.height) || imageSize.width <= 0 || imageSize.height <= 0) throw new Error("Kalidokit image size must contain positive integers.");
+  		rejectDegenerateWorldPose(worldPerson);
+  		const world = blazePose33(worldPerson.keypoints, "world");
+  		const screen = blazePose33(screenPerson.keypoints, "screen");
+  		const result = this.solver.solve(world, screen, {
+  			runtime: "tfjs",
+  			imageSize,
+  			enableLegs: true
+  		});
+  		if (!result) throw new Error("Kalidokit Pose.solve returned no rig.");
+  		validateRig(result);
+  		return result;
+  	}
+  };
+  function rejectDegenerateWorldPose(person) {
+  	const points = new Map(person.keypoints.map((point) => [point.id, point]));
+  	const distance = (left, right) => {
+  		const a = points.get(left);
+  		const b = points.get(right);
+  		if (!a || !b) return 0;
+  		return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  	};
+  	if (distance("left_shoulder", "right_shoulder") <= Number.EPSILON && distance("left_hip", "right_hip") <= Number.EPSILON) throw new Error("Kalidokit cannot solve a degenerate world pose.");
+  }
+  function blazePose33(source, kind) {
+  	const points = new Map(source.map((point) => [point.id, point]));
+  	const get = (id) => {
+  		const point = points.get(id);
+  		if (!point) throw new Error(`Missing ${kind} COCO-17 landmark: ${id}`);
+  		return landmark(point, kind);
+  	};
+  	const leftEye = get("left_eye");
+  	const rightEye = get("right_eye");
+  	const nose = get("nose");
+  	const faceMidpoint = midpoint(leftEye, rightEye, nose);
+  	const leftWrist = get("left_wrist");
+  	const rightWrist = get("right_wrist");
+  	const leftAnkle = get("left_ankle");
+  	const rightAnkle = get("right_ankle");
+  	const synthetic = (point) => ({
+  		...point,
+  		score: point.score * .25,
+  		visibility: point.visibility * .25
+  	});
+  	return [
+  		nose,
+  		leftEye,
+  		leftEye,
+  		leftEye,
+  		rightEye,
+  		rightEye,
+  		rightEye,
+  		get("left_ear"),
+  		get("right_ear"),
+  		faceMidpoint,
+  		faceMidpoint,
+  		get("left_shoulder"),
+  		get("right_shoulder"),
+  		get("left_elbow"),
+  		get("right_elbow"),
+  		leftWrist,
+  		rightWrist,
+  		synthetic(leftWrist),
+  		synthetic(rightWrist),
+  		synthetic(leftWrist),
+  		synthetic(rightWrist),
+  		synthetic(leftWrist),
+  		synthetic(rightWrist),
+  		get("left_hip"),
+  		get("right_hip"),
+  		get("left_knee"),
+  		get("right_knee"),
+  		leftAnkle,
+  		rightAnkle,
+  		synthetic(leftAnkle),
+  		synthetic(rightAnkle),
+  		synthetic(leftAnkle),
+  		synthetic(rightAnkle)
+  	];
+  }
+  function landmark(point, kind) {
+  	const z = kind === "world" ? point.z : 0;
+  	if (kind === "world" && typeof z !== "number") throw new Error(`Missing world z coordinate for ${point.id}.`);
+  	return {
+  		x: point.x,
+  		y: point.y,
+  		z: z ?? 0,
+  		score: point.score,
+  		visibility: point.score
+  	};
+  }
+  function midpoint(left, right, fallback) {
+  	if (left.score <= 0 || right.score <= 0) return { ...fallback };
+  	return {
+  		x: (left.x + right.x) / 2,
+  		y: (left.y + right.y) / 2,
+  		z: (left.z + right.z) / 2,
+  		score: Math.min(left.score, right.score),
+  		visibility: Math.min(left.visibility, right.visibility)
+  	};
+  }
+  function validateRig(value) {
+  	if ([
+  		value.RightUpperArm,
+  		value.RightLowerArm,
+  		value.LeftUpperArm,
+  		value.LeftLowerArm,
+  		value.RightHand,
+  		value.LeftHand,
+  		value.RightUpperLeg,
+  		value.RightLowerLeg,
+  		value.LeftUpperLeg,
+  		value.LeftLowerLeg,
+  		value.Spine,
+  		value.Hips.rotation ?? {
+  			x: 0,
+  			y: 0,
+  			z: 0
+  		},
+  		value.Hips.worldPosition ?? value.Hips.position
+  	].some(({ x, y, z }) => [
+  		x,
+  		y,
+  		z
+  	].some((coordinate) => !Number.isFinite(coordinate)))) throw new Error("Kalidokit Pose.solve returned a non-finite rig value.");
+  }
+  //#endregion
+  //#region src/avatar/types.ts
+  var KALIDOKIT_RIG_KEYS = [
+  	"RightUpperArm",
+  	"RightLowerArm",
+  	"LeftUpperArm",
+  	"LeftLowerArm",
+  	"RightHand",
+  	"LeftHand",
+  	"RightUpperLeg",
+  	"RightLowerLeg",
+  	"LeftUpperLeg",
+  	"LeftLowerLeg",
+  	"Spine",
+  	"Hips"
+  ];
+  //#endregion
+  //#region src/avatar/controller.ts
+  var identifiers = /^[A-Za-z0-9._-]{1,64}$/u;
+  var eventNames = /^[A-Za-z0-9._:-]{1,80}$/u;
+  var KALIDOKIT_RIG_KEY_SET = new Set(KALIDOKIT_RIG_KEYS);
+  var RIG_REQUIRED_JOINTS = {
+  	RightUpperArm: ["right_shoulder", "right_elbow"],
+  	RightLowerArm: ["right_elbow", "right_wrist"],
+  	LeftUpperArm: ["left_shoulder", "left_elbow"],
+  	LeftLowerArm: ["left_elbow", "left_wrist"],
+  	RightHand: ["right_wrist"],
+  	LeftHand: ["left_wrist"],
+  	RightUpperLeg: ["right_hip", "right_knee"],
+  	RightLowerLeg: ["right_knee", "right_ankle"],
+  	LeftUpperLeg: ["left_hip", "left_knee"],
+  	LeftLowerLeg: ["left_knee", "left_ankle"],
+  	Spine: [
+  		"left_shoulder",
+  		"right_shoulder",
+  		"left_hip",
+  		"right_hip"
+  	],
+  	Hips: ["left_hip", "right_hip"]
+  };
+  var AvatarRetargetController = class {
+  	constructor(runtime, solver = new KalidokitPoseAdapter()) {
+  		this.assets = /* @__PURE__ */ new Map();
+  		this.bindings = /* @__PURE__ */ new Map();
+  		this.lastState = "idle";
+  		this.lastError = "";
+  		this.lastUpdated = 0;
+  		this.runtime = runtime;
+  		this.solver = solver;
+  	}
+  	registerAsset(assetIdValue, templateJson, rigJson) {
+  		const assetId = identifier(assetIdValue, "avatar asset ID");
+  		parseJsonObject(templateJson, "Avatar template JSON");
+  		const rig = parseRigMapping(rigJson);
+  		const aframe = requireAFramePublicBlocks(this.runtime);
+  		const templateId = `twmp-avatar-${assetId}`;
+  		aframe.loadTemplate(templateId, templateJson);
+  		this.assets.set(assetId, {
+  			id: assetId,
+  			templateId,
+  			rig
+  		});
+  		this.succeed("configured");
+  	}
+  	bind(personIdValue, instanceIdValue, assetIdValue, parentSelectorValue, confidenceValue) {
+  		const personId = identifier(personIdValue, "person ID");
+  		const instanceId = identifier(instanceIdValue, "avatar instance ID");
+  		const assetId = identifier(assetIdValue, "avatar asset ID");
+  		const parentSelector = nonEmpty(parentSelectorValue, "parent selector");
+  		const confidence = threshold(confidenceValue);
+  		const asset = this.assets.get(assetId);
+  		if (!asset) throw new Error(`Unknown avatar asset: ${assetId}`);
+  		const existingPerson = this.bindings.get(personId);
+  		const existingInstance = [...this.bindings.values()].find((binding) => binding.instanceId === instanceId);
+  		if (existingInstance && existingInstance.personId !== personId) throw new Error(`Avatar instance is already bound: ${instanceId}`);
+  		if (!existingPerson && this.bindings.size >= 6) throw new Error("Avatar retargeting supports at most six people.");
+  		const aframe = requireAFramePublicBlocks(this.runtime);
+  		if (instanceId !== existingPerson?.instanceId && aframe.countSelector(`#${instanceId}`) > 0) throw new Error(`A-Frame node already exists: ${instanceId}`);
+  		if (existingPerson) this.removeBinding(aframe, existingPerson);
+  		if (aframe.countSelector(`#${instanceId}`) > 0) throw new Error(`A-Frame node already exists: ${instanceId}`);
+  		aframe.createFromTemplate(asset.templateId, instanceId, parentSelector);
+  		this.bindings.set(personId, {
+  			personId,
+  			instanceId,
+  			assetId,
+  			confidence,
+  			recognized: false
+  		});
+  		this.succeed("bound");
+  	}
+  	unbind(personIdValue) {
+  		const personId = identifier(personIdValue, "person ID");
+  		const binding = this.bindings.get(personId);
+  		if (!binding) return;
+  		this.removeBinding(requireAFramePublicBlocks(this.runtime), binding);
+  		this.succeed("configured");
+  	}
+  	apply(frameJson, pose2dJson) {
+  		this.lastUpdated = 0;
+  		this.lastError = "";
+  		let frame;
+  		let pose2d;
+  		let aframe;
+  		try {
+  			frame = parseFrame(frameJson);
+  			pose2d = parsePoseFrame2D(pose2dJson);
+  			aframe = requireAFramePublicBlocks(this.runtime);
+  		} catch (error) {
+  			this.lastState = "error";
+  			this.lastError = message(error);
+  			throw error;
+  		}
+  		const people = new Map(frame.persons.map((person) => [person.personId, person]));
+  		const screenPeople = new Map(pose2d.persons.map((person) => [person.trackingId, person]));
+  		const errors = [];
+  		for (const binding of [...this.bindings.values()]) try {
+  			if (aframe.countSelector(`#${binding.instanceId}`) !== 1) {
+  				this.bindings.delete(binding.personId);
+  				errors.push(`${binding.personId}: avatar instance is missing after scene reset`);
+  				continue;
+  			}
+  			const person = people.get(binding.personId);
+  			const screenPerson = screenPeople.get(binding.personId);
+  			if (!person || !screenPerson || person.score < binding.confidence || screenPerson.score < binding.confidence) {
+  				this.setRecognized(aframe, binding, false, frame.timestampUs);
+  				continue;
+  			}
+  			this.applyPerson(aframe, binding, person, screenPerson, pose2d);
+  			this.setRecognized(aframe, binding, true, frame.timestampUs);
+  			this.lastUpdated += 1;
+  		} catch (error) {
+  			errors.push(`${binding.personId}: ${message(error)}`);
+  		}
+  		if (errors.length > 0) {
+  			this.lastState = "partial";
+  			this.lastError = errors.join("; ");
+  		} else this.lastState = "ready";
+  	}
+  	reset() {
+  		const candidate = this.runtime.turbowarpAFrameCapability;
+  		if (typeof candidate === "object" && candidate !== null) try {
+  			const aframe = requireAFramePublicBlocks(this.runtime);
+  			for (const binding of [...this.bindings.values()]) this.removeBinding(aframe, binding);
+  		} catch {
+  			this.bindings.clear();
+  		}
+  		else this.bindings.clear();
+  		this.assets.clear();
+  		this.lastUpdated = 0;
+  		this.succeed("idle");
+  	}
+  	bindingCount() {
+  		return this.bindings.size;
+  	}
+  	state() {
+  		return this.lastState;
+  	}
+  	error() {
+  		return this.lastError;
+  	}
+  	updatedCount() {
+  		return this.lastUpdated;
+  	}
+  	applyPerson(aframe, binding, person, screenPerson, pose2d) {
+  		const asset = this.assets.get(binding.assetId);
+  		if (!asset) throw new Error(`Unknown avatar asset: ${binding.assetId}`);
+  		const rig = this.solver.solve(person, screenPerson, {
+  			width: pose2d.frameWidth,
+  			height: pose2d.frameHeight
+  		});
+  		const worldKeypoints = new Map(person.keypoints.map((point) => [point.id, point]));
+  		const screenKeypoints = new Map(screenPerson.keypoints.map((point) => [point.id, point]));
+  		const rootConfident = requiredJoints("Hips").every((id) => (worldKeypoints.get(id)?.score ?? 0) >= binding.confidence && (screenKeypoints.get(id)?.score ?? 0) >= binding.confidence);
+  		const root = rig.Hips.worldPosition ?? rig.Hips.position;
+  		if (rootConfident) {
+  			const [offsetX, offsetY, offsetZ] = asset.rig.rootOffset;
+  			aframe.setPosition(`#${binding.instanceId}`, root.x * asset.rig.rootScale + offsetX, root.y * asset.rig.rootScale + offsetY, root.z * asset.rig.rootScale + offsetZ);
+  		}
+  		for (const bone of asset.rig.bones) this.applyBone(aframe, binding, bone, rig, worldKeypoints, screenKeypoints);
+  	}
+  	applyBone(aframe, binding, bone, rig, worldKeypoints, screenKeypoints) {
+  		if (!requiredJoints(bone.rig).every((id) => (worldKeypoints.get(id)?.score ?? 0) >= binding.confidence && (screenKeypoints.get(id)?.score ?? 0) >= binding.confidence)) return;
+  		const selector = expandSelector(bone.selector, binding.instanceId);
+  		if (aframe.countSelector(selector) !== 1) throw new Error(`Rig selector must match exactly one node: ${selector}`);
+  		const rotation = rotationForRig(rig, bone.rig);
+  		const [offsetX, offsetY, offsetZ] = bone.offsetDegrees;
+  		aframe.setRotation(selector, radiansToDegrees(rotation.x) + offsetX, radiansToDegrees(rotation.y) + offsetY, radiansToDegrees(rotation.z) + offsetZ);
+  	}
+  	setRecognized(aframe, binding, recognized, timestampUs) {
+  		if (binding.recognized === recognized) return;
+  		const asset = this.assets.get(binding.assetId);
+  		if (!asset) return;
+  		binding.recognized = recognized;
+  		aframe.emitEvent(recognized ? asset.rig.recognitionStartEvent : asset.rig.recognitionEndEvent, `#${binding.instanceId}`, JSON.stringify({
+  			personId: binding.personId,
+  			avatarInstanceId: binding.instanceId,
+  			...timestampUs === void 0 ? {} : { timestampUs }
+  		}));
+  	}
+  	removeBinding(aframe, binding, timestampUs) {
+  		this.setRecognized(aframe, binding, false, timestampUs);
+  		aframe.deleteSelector(`#${binding.instanceId}`);
+  		this.bindings.delete(binding.personId);
+  	}
+  	succeed(state) {
+  		this.lastState = state;
+  		this.lastError = "";
+  	}
+  };
+  function parseFrame(source) {
+  	const value = parseJsonObject(source, "PoseFrame3D JSON");
+  	if (!Check(PoseFrame3DSchema, value)) {
+  		const first = Errors(PoseFrame3DSchema, value).First();
+  		throw new Error(`Invalid PoseFrame3D v1 at ${first?.path || "/"}: ${first?.message ?? "schema mismatch"}`);
+  	}
+  	return value;
+  }
+  function parsePoseFrame2D(source) {
+  	const value = parseJsonObject(source, "PoseFrame2D JSON");
+  	if (!Check(PoseFrame2DSchema, value)) {
+  		const first = Errors(PoseFrame2DSchema, value).First();
+  		throw new Error(`Invalid PoseFrame2D v1 at ${first?.path || "/"}: ${first?.message ?? "schema mismatch"}`);
+  	}
+  	return value;
+  }
+  function parseRigMapping(source) {
+  	const value = parseJsonObject(source, "Avatar rig mapping JSON");
+  	rejectUnknownKeys(value, /* @__PURE__ */ new Set([
+  		"rootScale",
+  		"rootOffset",
+  		"recognitionStartEvent",
+  		"recognitionEndEvent",
+  		"bones"
+  	]), "rig mapping");
+  	const rootScale = finite(value.rootScale ?? 1, "rootScale");
+  	if (rootScale <= 0) throw new Error("rootScale must be greater than zero.");
+  	const rootOffset = vector3(value.rootOffset ?? [
+  		0,
+  		0,
+  		0
+  	], "rootOffset");
+  	const recognitionStartEvent = eventName(value.recognitionStartEvent ?? "twmp-recognition-start", "recognitionStartEvent");
+  	const recognitionEndEvent = eventName(value.recognitionEndEvent ?? "twmp-recognition-end", "recognitionEndEvent");
+  	if (!Array.isArray(value.bones) || value.bones.length === 0 || value.bones.length > 32) throw new Error("Rig mapping bones must contain between 1 and 32 entries.");
+  	return {
+  		rootScale,
+  		rootOffset,
+  		recognitionStartEvent,
+  		recognitionEndEvent,
+  		bones: value.bones.map((entry, index) => parseBone(entry, index))
+  	};
+  }
+  function parseBone(value, index) {
+  	const bone = record(value, `bones[${index}]`);
+  	rejectUnknownKeys(bone, /* @__PURE__ */ new Set([
+  		"selector",
+  		"rig",
+  		"offsetDegrees"
+  	]), `bones[${index}]`);
+  	const selector = nonEmpty(bone.selector, `bones[${index}].selector`);
+  	if (!selector.includes("{avatar}")) throw new Error(`bones[${index}].selector must contain {avatar}.`);
+  	return {
+  		selector,
+  		rig: rigKey(bone.rig, `bones[${index}].rig`),
+  		offsetDegrees: vector3(bone.offsetDegrees ?? [
+  			0,
+  			0,
+  			0
+  		], `bones[${index}].offsetDegrees`)
+  	};
+  }
+  function parseJsonObject(source, label) {
+  	if (source.length > 1048576) throw new Error(`${label} exceeds 1 MiB.`);
+  	try {
+  		return record(JSON.parse(source), label);
+  	} catch (error) {
+  		if (error instanceof SyntaxError) throw new Error(`${label} is invalid JSON.`);
+  		throw error;
+  	}
+  }
+  function record(value, label) {
+  	if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${label} must be an object.`);
+  	return value;
+  }
+  function rejectUnknownKeys(value, allowed, label) {
+  	const unknown = Object.keys(value).find((key) => !allowed.has(key));
+  	if (unknown) throw new Error(`${label} contains unknown field: ${unknown}`);
+  }
+  function rigKey(value, label) {
+  	if (typeof value !== "string" || !KALIDOKIT_RIG_KEY_SET.has(value)) throw new Error(`${label} must be a supported Kalidokit pose rig key.`);
+  	return value;
+  }
+  function vector3(value, label) {
+  	if (!Array.isArray(value) || value.length !== 3) throw new Error(`${label} must contain exactly three numbers.`);
+  	return [
+  		finite(value[0], `${label}[0]`),
+  		finite(value[1], `${label}[1]`),
+  		finite(value[2], `${label}[2]`)
+  	];
+  }
+  function finite(value, label) {
+  	if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${label} must be a finite number.`);
+  	return value;
+  }
+  function threshold(value) {
+  	if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error("Avatar confidence threshold must be between 0 and 1.");
+  	return value;
+  }
+  function identifier(value, label) {
+  	const normalized = value.trim();
+  	if (!identifiers.test(normalized)) throw new Error(`Invalid ${label}.`);
+  	return normalized;
+  }
+  function nonEmpty(value, label) {
+  	if (typeof value !== "string" || value.trim().length === 0) throw new Error(`${label} must not be empty.`);
+  	return value.trim();
+  }
+  function eventName(value, label) {
+  	const normalized = nonEmpty(value, label);
+  	if (!eventNames.test(normalized)) throw new Error(`Invalid ${label}.`);
+  	return normalized;
+  }
+  function expandSelector(selector, instanceId) {
+  	return selector.replaceAll("{avatar}", instanceId);
+  }
+  function radiansToDegrees(value) {
+  	return value * 180 / Math.PI;
+  }
+  function rotationForRig(rig, key) {
+  	if (key === "Hips") return rig.Hips.rotation ?? {
+  		x: 0,
+  		y: 0,
+  		z: 0
+  	};
+  	return rig[key];
+  }
+  function requiredJoints(key) {
+  	return RIG_REQUIRED_JOINTS[key];
+  }
+  function message(error) {
+  	return error instanceof Error ? error.message : String(error);
+  }
+  //#endregion
   //#region src/extension.ts
   var blockDefinitions = block_definitions_default.blocks;
   var MultiviewPoseExtension = class {
@@ -77153,6 +79168,7 @@
   			this.endOfferQrDisplay();
   			this.pose.stop();
   			this.calibration.cancel();
+  			this.avatar.reset();
   		};
   		this.disposeListener = () => this.dispose();
   		this.targetRemovedListener = (target) => {
@@ -77162,6 +79178,7 @@
   		this.poseEnabled = options.poseEnabled ?? featureFlags.webgpuMoveNetMultiPose;
   		this.protocolEnabled = options.protocolEnabled ?? featureFlags.protocolV1Codec;
   		this.calibrationEnabled = options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
+  		this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
   		this.errorCorrectionLevel = options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.skins = new TemporarySpriteSkinManager(this.runtime);
@@ -77175,6 +79192,7 @@
   			backend: options.calibrationBackend ?? new OpenCvChessboardCalibrationBackend(),
   			...options.nowMilliseconds ? { nowMilliseconds: options.nowMilliseconds } : {}
   		});
+  		this.avatar = new AvatarRetargetController(this.runtime, options.avatarPoseSolver);
   		this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
   		this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
   		this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -77392,10 +79410,42 @@
   	cameraCalibrationJson() {
   		return this.calibration.profileJson();
   	}
+  	registerAvatarAsset(args) {
+  		this.requireAvatarEnabled();
+  		this.avatar.registerAsset(Scratch.Cast.toString(args.ASSET_ID), Scratch.Cast.toString(args.TEMPLATE_JSON), Scratch.Cast.toString(args.RIG_JSON));
+  	}
+  	bindAvatarPerson(args) {
+  		this.requireAvatarEnabled();
+  		this.avatar.bind(Scratch.Cast.toString(args.PERSON_ID), Scratch.Cast.toString(args.INSTANCE_ID), Scratch.Cast.toString(args.ASSET_ID), Scratch.Cast.toString(args.PARENT), Scratch.Cast.toNumber(args.CONFIDENCE));
+  	}
+  	unbindAvatarPerson(args) {
+  		this.requireAvatarEnabled();
+  		this.avatar.unbind(Scratch.Cast.toString(args.PERSON_ID));
+  	}
+  	applyPoseFrame3DToAvatars(args) {
+  		this.requireAvatarEnabled();
+  		this.avatar.apply(Scratch.Cast.toString(args.POSE3D_JSON), Scratch.Cast.toString(args.POSE2D_JSON));
+  	}
+  	resetAvatarRetarget() {
+  		this.avatar.reset();
+  	}
+  	avatarBindingCount() {
+  		return this.avatarEnabled ? this.avatar.bindingCount() : 0;
+  	}
+  	avatarUpdatedCount() {
+  		return this.avatarEnabled ? this.avatar.updatedCount() : 0;
+  	}
+  	avatarRetargetState() {
+  		return this.avatarEnabled ? this.avatar.state() : "disabled";
+  	}
+  	avatarRetargetError() {
+  		return this.avatar.error();
+  	}
   	dispose() {
   		this.endOfferQrDisplay();
   		this.pose.stop();
   		this.calibration.cancel();
+  		this.avatar.reset();
   		this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
   		this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
   		this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -77414,11 +79464,15 @@
   	requireCalibrationEnabled() {
   		if (!this.calibrationEnabled) throw new Error("Camera calibration v1 is disabled. Enable it before the project starts.");
   	}
+  	requireAvatarEnabled() {
+  		if (!this.avatarEnabled) throw new Error("Avatar retarget v1 is disabled. Enable it before the project starts.");
+  	}
   	blockEnabled(feature) {
   		if (feature === "qrCourierPairing") return this.enabled;
   		if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
   		if (feature === "protocolV1Codec") return this.protocolEnabled;
-  		return this.calibrationEnabled;
+  		if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
+  		return this.avatarEnabled;
   	}
   	requireSession() {
   		if (!this.session) throw new Error("Prepare an offer QR before displaying a part.");

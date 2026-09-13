@@ -63,14 +63,19 @@
     "@tensorflow/tfjs-backend-webgpu": "4.22.0",
     "@tensorflow/tfjs-converter": "4.22.0",
     "@tensorflow/tfjs-core": "4.22.0",
+    "kalidokit": "1.1.5",
     "qrcode": "1.5.4"
   },
   "peerDependencies": {
+    "@kubohiroya/turbowarp-aframe": "0.2.0",
     "@kubohiroya/turbowarp-camera-source": "^0.4.0",
     "@kubohiroya/turbowarp-jsqr": "^0.3.0",
     "@kubohiroya/turbowarp-webrtc": "^0.2.0"
   },
   "peerDependenciesMeta": {
+    "@kubohiroya/turbowarp-aframe": {
+      "optional": true
+    },
     "@kubohiroya/turbowarp-camera-source": {
       "optional": true
     },
