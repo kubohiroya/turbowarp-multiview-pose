@@ -1,5 +1,6 @@
 # アーキテクチャ
 
+[利用ガイド](../README.ja.md) | [TurboWarp機能拡張API](turbowarp-extension-api.ja.md) |
 [English](architecture.md)
 
 ## ビルド出力
@@ -30,6 +31,10 @@ v1契約は次の情報を含みます。
 - 各メニューのIDとReporterブロックを受け付けるかどうか
 
 ブロック、引数、メニューは、シリアライズ前に識別子で並べ替えられます。テキスト、説明、既定値、静的メニュー項目は、保存済みプロジェクトのAPI参照を識別しないため、意図的に除外しています。そのため互換性チェッカーは、API変更とドキュメントまたはローカライズの変更を区別できます。
+
+manifestとTurboWarp blockがpackageの公開APIです。source levelのcontroller／portは内部の実装境界で、
+npm exportではありません。読み込み順、lifecycle値、error、data contractは
+[機能拡張APIリファレンス](turbowarp-extension-api.ja.md)を参照してください。
 
 ## 差分の検出
 

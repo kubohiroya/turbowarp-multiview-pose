@@ -8,19 +8,46 @@
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:900px;margin:0 auto;padding:2rem;line-height:1.6;color:#222}
     code{background:#f3f3f3;padding:.1em .3em;border-radius:.25em}
     pre{background:#f6f8fa;padding:1rem;overflow:auto;border-radius:.5rem}
+    table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:.5rem;text-align:left}
+    nav a{margin-right:1rem}
   </style>
 </head>
 <body>
   <h1>TurboWarp-Multiview-Pose</h1>
   <p>Composite blocks for the multiview-pose camera app and fusion app.</p>
 
-  <h2>Blocks</h2>
+  <nav>
+    <a href="https://github.com/kubohiroya/turbowarp-multiview-pose#readme">User guide</a>
+    <a href="https://github.com/kubohiroya/turbowarp-multiview-pose/blob/main/docs/turbowarp-extension-api.md">Extension API</a>
+    <a href="https://github.com/kubohiroya/turbowarp-multiview-pose/blob/main/docs/turbowarp-extension-api.ja.md">API（日本語）</a>
+    <a href="https://github.com/kubohiroya/turbowarp-multiview-pose/blob/main/docs/architecture.md">Architecture</a>
+  </nav>
+
+  <h2>Install and configure</h2>
+  <p>Load the provider extensions you use first, then load the version-pinned bundle as an unsandboxed custom extension:</p>
+  <pre>https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.2.0/dist/turbowarp-multiview-pose.js</pre>
+  <p>All feature groups are OFF by default. Set the complete startup configuration before loading the bundle:</p>
+  <pre><code>globalThis.__TWMP_FEATURE_FLAGS__ = {
+  qrCourierPairing: true,
+  webgpuMoveNetMultiPose: true,
+  protocolV1Codec: true,
+  cameraCalibrationV1: true,
+  avatarRetargetV1: true,
+  frameSyncPatternV1: true,
+  poseFusion3D: true,
+  glowStickMarkers: true,
+};
+globalThis.__TWMP_QR_CONFIG__ = {errorCorrectionLevel: "M"};</code></pre>
+  <p>Omit features you do not use. Reload the project and extension after changing this startup-fixed object.</p>
+
+  <h2>Offer QR blocks</h2>
   <h3><code>prepare offer QR for peer [PEER]</code></h3>
   <p>Creates a named WebRTC offer and prepares one or more QR courier parts.</p>
   <h3><code>show offer QR part [INDEX] on this sprite</code></h3>
   <p>Displays a one-based part as a temporary, lossless SVG sprite skin.</p>
   <h3><code>end offer QR display</code></h3>
   <p>Restores original skins and discards sensitive temporary session data.</p>
+  <p>The extension exposes blocks across eight independently enabled feature groups. See the <a href="https://github.com/kubohiroya/turbowarp-multiview-pose/blob/main/docs/turbowarp-extension-api.md#block-reference">generated block reference</a> for every opcode, argument, type, and default.</p>
 
   <h2>Enablement and safety</h2>
   <p>The startup-fixed <code>qrCourierPairing</code> flag is OFF by default. The extension requires the version 2 TurboWarp WebRTC runtime capability and must run unsandboxed.</p>
@@ -51,6 +78,6 @@
   <p>The fusion app maps those colors to performers with the Performance DSL palette. An identified person keeps the performer's identifier across occlusion and re-entry, views of different performers never merge, and a color seen on the mirrored keypoint tells the fusion that the camera read a back view as a front view, so that view's left and right labels are swapped before triangulation.</p>
 
   <h2>Development</h2>
-  <p>See the repository README and architecture documentation for build, test, release, and compatibility details.</p>
+  <p>The public API is the TurboWarp extension and its generated manifest. Source-level controllers are internal and are not npm exports. See the <a href="https://github.com/kubohiroya/turbowarp-multiview-pose#readme">repository README</a> and <a href="https://github.com/kubohiroya/turbowarp-multiview-pose/blob/main/docs/architecture.md">architecture documentation</a> for build, test, release, and compatibility details.</p>
 </body>
 </html>

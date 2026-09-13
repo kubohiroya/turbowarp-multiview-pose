@@ -28,21 +28,32 @@ const definitions = JSON.parse(
     "utf8",
   ),
 ) as BlockDefinitions;
-const readmeUrl = new URL("../README.md", import.meta.url);
-const readme = await readFile(readmeUrl, "utf8");
-
 const generated = definitions.blocks.map(renderBlock).join("\n\n");
-const replacement = `${START}\n\n${generated}\n\n${END}`;
+const generatedDocuments = [
+  {
+    path: "../README.md",
+    content: `${START}\n\nSee the [TurboWarp extension API](docs/turbowarp-extension-api.md) for every block.\n\n${END}`,
+  },
+  {
+    path: "../docs/turbowarp-extension-api.md",
+    content: `${START}\n\n${generated}\n\n${END}`,
+  },
+];
 
-if (!readme.includes(START) || !readme.includes(END)) {
-  throw new Error("README.md does not contain the generated block markers.");
+for (const document of generatedDocuments) {
+  const documentUrl = new URL(document.path, import.meta.url);
+  const source = await readFile(documentUrl, "utf8");
+  if (!source.includes(START) || !source.includes(END)) {
+    throw new Error(
+      `${document.path} does not contain the generated block markers.`,
+    );
+  }
+  const next = source.replace(
+    new RegExp(`${escapeRegExp(START)}[\\s\\S]*?${escapeRegExp(END)}`),
+    document.content,
+  );
+  await writeFile(documentUrl, next);
 }
-
-const next = readme.replace(
-  new RegExp(`${escapeRegExp(START)}[\\s\\S]*?${escapeRegExp(END)}`),
-  replacement,
-);
-await writeFile(readmeUrl, next);
 
 function renderBlock(block: BlockDefinition): string {
   const rows = [
