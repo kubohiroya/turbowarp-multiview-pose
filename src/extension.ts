@@ -18,6 +18,12 @@ import { OpenCvChessboardCalibrationBackend } from "./calibration/opencv-backend
 import type { CalibrationBackendPort } from "./calibration/types.js";
 import { AvatarRetargetController } from "./avatar/controller.js";
 import type { AvatarPoseSolverPort } from "./avatar/types.js";
+import { FrameSyncPatternController } from "./frame-sync/controller.js";
+import { FrameSyncPatternDisplay } from "./frame-sync/pattern-display.js";
+import { PATTERN_WRAP_US } from "./frame-sync/pattern.js";
+import { requireSynchronizedTimeSource } from "./frame-sync/time-source.js";
+import { VideoFramePump } from "./frame-sync/video-frame-pump.js";
+import type { PatternDisplayPort } from "./frame-sync/types.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -36,7 +42,8 @@ interface BlockDefinition {
     | "webgpuMoveNetMultiPose"
     | "protocolV1Codec"
     | "cameraCalibrationV1"
-    | "avatarRetargetV1";
+    | "avatarRetargetV1"
+    | "frameSyncPatternV1";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -56,15 +63,20 @@ export interface MultiviewPoseExtensionOptions {
   protocolEnabled?: boolean;
   calibrationEnabled?: boolean;
   avatarEnabled?: boolean;
+  frameSyncEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
   calibrationBackend?: CalibrationBackendPort;
   avatarPoseSolver?: AvatarPoseSolverPort;
+  frameSyncController?: FrameSyncPatternController;
+  frameSyncDisplay?: PatternDisplayPort;
   nowMilliseconds?: () => number;
 }
 
 const blockDefinitions = definitions.blocks as readonly BlockDefinition[];
+const FRAME_SYNC_ANALYSIS_WIDTH = 240;
+const FRAME_SYNC_ANALYSIS_HEIGHT = 180;
 
 export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly enabled: boolean;
@@ -72,6 +84,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly protocolEnabled: boolean;
   private readonly calibrationEnabled: boolean;
   private readonly avatarEnabled: boolean;
+  private readonly frameSyncEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
@@ -79,6 +92,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly protocol: ProtocolV1Codec;
   private readonly calibration: CameraCalibrationController;
   private readonly avatar: AvatarRetargetController;
+  private frameSync: FrameSyncPatternController | undefined;
+  private frameSyncOverlay: PatternDisplayPort | undefined;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
@@ -88,6 +103,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     void this.pose.stop();
     void this.calibration.cancel();
     this.avatar.reset();
+    void this.frameSync?.stop();
+    this.frameSyncOverlay?.hide();
   };
   private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
@@ -104,6 +121,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.calibrationEnabled =
       options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
     this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
+    this.frameSyncEnabled =
+      options.frameSyncEnabled ?? featureFlags.frameSyncPatternV1;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -125,6 +144,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       this.runtime,
       options.avatarPoseSolver,
     );
+    this.frameSync = options.frameSyncController;
+    this.frameSyncOverlay = options.frameSyncDisplay;
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -491,11 +512,123 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.avatar.error();
   }
 
+  public showFrameSyncPattern(): void {
+    this.requireFrameSyncEnabled();
+    this.requireFrameSyncDisplay().show();
+  }
+
+  public hideFrameSyncPattern(): void {
+    this.requireFrameSyncEnabled();
+    this.frameSyncOverlay?.hide();
+  }
+
+  public frameSyncPatternShown(): boolean {
+    return this.frameSyncOverlay?.visible() ?? false;
+  }
+
+  public frameSyncPatternWrapUs(): number {
+    return PATTERN_WRAP_US;
+  }
+
+  public async startFrameSyncDecoder(args: {
+    CAMERA_ID: unknown;
+    SECONDS: unknown;
+  }): Promise<void> {
+    this.requireFrameSyncEnabled();
+    await this.requireFrameSyncController().start({
+      cameraId: Scratch.Cast.toString(args.CAMERA_ID),
+      calibrationSeconds: Scratch.Cast.toNumber(args.SECONDS),
+    });
+  }
+
+  public async calibrateFrameSyncDecoder(args: {
+    SECONDS: unknown;
+  }): Promise<void> {
+    this.requireFrameSyncEnabled();
+    await this.requireFrameSyncController().recalibrate(
+      Scratch.Cast.toNumber(args.SECONDS),
+    );
+  }
+
+  public async stopFrameSyncDecoder(): Promise<void> {
+    await this.frameSync?.stop();
+  }
+
+  public frameSyncDecoderState(): string {
+    return this.frameSync?.state() ?? "idle";
+  }
+
+  public frameSyncDecoderError(): string {
+    return this.frameSync?.errorCode() ?? "";
+  }
+
+  public frameSyncDecodeRate(): number {
+    return this.frameSync?.decodeRate() ?? 0;
+  }
+
+  public frameSyncObservationAvailable(): boolean {
+    return (this.frameSync?.pendingObservations() ?? 0) > 0;
+  }
+
+  public takeFrameSyncObservation(): void {
+    this.requireFrameSyncEnabled();
+    this.requireFrameSyncController().takeObservation();
+  }
+
+  public frameSyncFrameTimestampUs(): number {
+    return this.frameSync?.currentObservation()?.frameTimestampUs ?? 0;
+  }
+
+  public frameSyncFrameAgeUs(): number {
+    return this.frameSync?.currentObservation()?.frameAgeUs ?? 0;
+  }
+
+  public frameSyncPatternTimestampUs(): number {
+    return this.frameSync?.currentObservation()?.patternTimestampUs ?? 0;
+  }
+
+  private requireFrameSyncEnabled(): void {
+    if (!this.frameSyncEnabled) {
+      throw new Error(
+        "Frame sync pattern v1 is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
+  private requireFrameSyncDisplay(): PatternDisplayPort {
+    if (!this.frameSyncOverlay) {
+      this.frameSyncOverlay = new FrameSyncPatternDisplay({
+        timeSource: requireSynchronizedTimeSource(this.runtime),
+      });
+    }
+    return this.frameSyncOverlay;
+  }
+
+  private requireFrameSyncController(): FrameSyncPatternController {
+    if (!this.frameSync) {
+      this.frameSync = new FrameSyncPatternController({
+        runtime: this.runtime,
+        timeSource: requireSynchronizedTimeSource(this.runtime),
+        analysisWidth: FRAME_SYNC_ANALYSIS_WIDTH,
+        analysisHeight: FRAME_SYNC_ANALYSIS_HEIGHT,
+        createFramePump: (lease) =>
+          new VideoFramePump(
+            lease.getFrameSource().element,
+            FRAME_SYNC_ANALYSIS_WIDTH,
+            FRAME_SYNC_ANALYSIS_HEIGHT,
+          ),
+      });
+    }
+    return this.frameSync;
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
     this.avatar.reset();
+    void this.frameSync?.stop();
+    this.frameSyncOverlay?.hide();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -548,7 +681,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
     if (feature === "protocolV1Codec") return this.protocolEnabled;
     if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
-    return this.avatarEnabled;
+    if (feature === "avatarRetargetV1") return this.avatarEnabled;
+    return this.frameSyncEnabled;
   }
 
   private requireSession(): OfferQrSession {

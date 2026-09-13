@@ -162,3 +162,37 @@ only copied into recognition event data. This extension performs no frame alignm
 retention/query, triangulation, or 3D solve. Kalidokit is deprecated upstream and expects native
 BlazePose landmarks; the deterministic COCO-17 expansion is therefore an explicit accuracy
 constraint, and intended GLTF rigs require real-browser validation before release.
+
+## Frame sync pattern vertical slice
+
+`frameSyncPatternV1` is startup-fixed and default OFF. It answers one question for the fusion
+application: how long after an event each camera computer finishes recording the frame that shows
+it.
+
+The display side paints a full-screen overlay with a 4 by 4 panel on black. Twelve cells hold a
+millisecond counter that wraps every 4096 ms; four hold check bits derived from the counter. A
+camera exposure that straddles a display refresh mixes two codes, and the check bits reject that
+reading instead of letting a wrong time through. What is drawn during one animation frame reaches
+the screen at the next refresh, so the encoded time is the current clock reading plus one measured
+refresh interval; the remaining projector delay is common to every camera and cancels out of the
+per-camera offsets.
+
+The camera side takes a named Camera Source lease and never calls `getUserMedia`. Each delivered
+frame is downscaled to a 240 by 180 luminance buffer that is reused between callbacks because the
+decoder reads it synchronously. Calibration runs in two phases on the live pattern: the first 60%
+of the window records per-pixel minimum and maximum luminance and takes the largest connected
+high-range region whose bounding box is panel shaped, and the rest learns each cell's own light and
+dark level and measures how often readings decode. Uneven projection is why levels are per cell, and
+a reading that lands between a cell's learned levels is discarded. Calibration fails with
+`panel-not-found`, `low-contrast`, or `decode-unstable` rather than returning untrusted latencies.
+The accepted window starts at 6.2 seconds, derived from the slowest cell's 2048 ms change period and
+the share of the window the levels phase gets, so a window that cannot see every cell at both levels
+is refused up front instead of failing later as low contrast. Both phases end on the shared clock, so
+a stalled camera never leaves the controller waiting, and stopping mid-calibration settles the
+pending run without recording a camera fault.
+
+Decoded frames are queued as observations. Timestamps are opaque readings from the external
+synchronized time service, taken when the frame reached the application; the browser-reported frame
+age is exposed separately for callers that want the sensor exposure moment instead. Clock probing,
+latency samples, and the aggregated per-camera report belong to the WebRTC extension, so no clock,
+offset, ping, or pong logic lives here.

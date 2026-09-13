@@ -581,6 +581,138 @@
   			"text": "avatar retarget error",
   			"description": "Returns per-person errors from the latest frame while other avatars continue updating.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "showFrameSyncPattern",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "COMMAND",
+  			"text": "show frame sync pattern",
+  			"description": "Covers the screen with the time coded pattern that cameras decode through the projector.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "hideFrameSyncPattern",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "COMMAND",
+  			"text": "hide frame sync pattern",
+  			"description": "Removes the frame sync pattern overlay.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncPatternShown",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "BOOLEAN",
+  			"text": "frame sync pattern shown?",
+  			"description": "Reports whether the frame sync pattern overlay is on screen.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncPatternWrapUs",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync pattern wrap us",
+  			"description": "Returns the period after which the encoded display time repeats, in microseconds.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "startFrameSyncDecoder",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "COMMAND",
+  			"text": "start frame sync decoder for camera [CAMERA_ID] calibrating for [SECONDS] seconds",
+  			"description": "Leases the camera, locates the projected pattern, learns its light and dark levels, and reports failure when readings do not decode often enough. The window must be at least 6.2 seconds so that every pattern cell changes at least once.",
+  			"arguments": {
+  				"CAMERA_ID": {
+  					"type": "STRING",
+  					"defaultValue": "camera-1"
+  				},
+  				"SECONDS": {
+  					"type": "NUMBER",
+  					"defaultValue": 8
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "calibrateFrameSyncDecoder",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "COMMAND",
+  			"text": "calibrate frame sync decoder for [SECONDS] seconds",
+  			"description": "Runs calibration again on the running decoder, for example after the camera or the projector moved. The window must be at least 6.2 seconds so that every pattern cell changes at least once.",
+  			"arguments": { "SECONDS": {
+  				"type": "NUMBER",
+  				"defaultValue": 8
+  			} }
+  		},
+  		{
+  			"opcode": "stopFrameSyncDecoder",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "COMMAND",
+  			"text": "stop frame sync decoder",
+  			"description": "Stops decoding and releases the camera lease.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncDecoderState",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync decoder state",
+  			"description": "Returns idle, acquiring-camera, calibrating, ready, or error.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncDecoderError",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync decoder error",
+  			"description": "Returns the last decoder error code, or an empty string when there is none.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncDecodeRate",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync decode rate",
+  			"description": "Returns the share of recent camera frames the decoder could read, between 0 and 1.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncObservationAvailable",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "BOOLEAN",
+  			"text": "frame sync observation available?",
+  			"description": "Reports whether a decoded frame is waiting to be taken.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "takeFrameSyncObservation",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "COMMAND",
+  			"text": "take next frame sync observation",
+  			"description": "Removes the oldest decoded frame from the queue and exposes it to the observation reporters.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncFrameTimestampUs",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync frame timestamp us",
+  			"description": "Returns when this computer finished recording the taken frame, read from the external synchronized time service.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncFrameAgeUs",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync frame age us",
+  			"description": "Returns how old the taken frame already was when the browser delivered it, or 0 when the browser does not report a capture time.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "frameSyncPatternTimestampUs",
+  			"feature": "frameSyncPatternV1",
+  			"blockType": "REPORTER",
+  			"text": "frame sync pattern timestamp us",
+  			"description": "Returns the display time decoded out of the taken frame, within the current pattern wrap window.",
+  			"arguments": {}
   		}
   	]
   };
@@ -593,7 +725,8 @@
   	webgpuMoveNetMultiPose: overrides?.webgpuMoveNetMultiPose === true,
   	protocolV1Codec: overrides?.protocolV1Codec === true,
   	cameraCalibrationV1: overrides?.cameraCalibrationV1 === true,
-  	avatarRetargetV1: overrides?.avatarRetargetV1 === true
+  	avatarRetargetV1: overrides?.avatarRetargetV1 === true,
+  	frameSyncPatternV1: overrides?.frameSyncPatternV1 === true
   });
   //#endregion
   //#region config/qr-config.ts
@@ -3388,7 +3521,7 @@
   		this.pipelineState = "acquiring-camera";
   		let lease;
   		try {
-  			lease = await requireCameraSource$1(this.runtime).acquireCamera({
+  			lease = await requireCameraSource$2(this.runtime).acquireCamera({
   				owner: "turbowarp-multiview-pose",
   				cameraId: options.cameraId
   			});
@@ -3459,7 +3592,7 @@
   		this.pipelineErrorMessage = "";
   	}
   };
-  function requireCameraSource$1(runtime) {
+  function requireCameraSource$2(runtime) {
   	const candidate = runtime.ext_kubohiroyacamerasource;
   	if (typeof candidate !== "object" || candidate === null || !("acquireCamera" in candidate) || typeof candidate.acquireCamera !== "function") throw new Error("TurboWarp Camera Source is not loaded.");
   	return candidate;
@@ -69411,7 +69544,7 @@
   		this.clearError();
   		let lease;
   		try {
-  			lease = await requireCameraSource(this.runtime).acquireCamera({
+  			lease = await requireCameraSource$1(this.runtime).acquireCamera({
   				owner: "turbowarp-multiview-pose-calibration",
   				cameraId: normalized.cameraId
   			});
@@ -69700,7 +69833,7 @@
   		this.code = code;
   	}
   };
-  function requireCameraSource(runtime) {
+  function requireCameraSource$1(runtime) {
   	const candidate = runtime.ext_kubohiroyacamerasource;
   	if (typeof candidate !== "object" || candidate === null || !("acquireCamera" in candidate) || typeof candidate.acquireCamera !== "function") throw new Error("TurboWarp Camera Source is not loaded.");
   	return candidate;
@@ -79156,9 +79289,741 @@
   function message(error) {
   	return error instanceof Error ? error.message : String(error);
   }
+  var PATTERN_STEP_US = 1e3;
+  var PATTERN_CODE_COUNT = 4096;
+  var PATTERN_WRAP_US = PATTERN_CODE_COUNT * PATTERN_STEP_US;
+  var CHECK_MASK = 15;
+  var CHECK_SEED = 10;
+  /** The code a display shows for a timestamp, in the display computer's clock. */
+  function patternCodeForTimestamp(timestampUs) {
+  	return (Math.floor(timestampUs / PATTERN_STEP_US) % PATTERN_CODE_COUNT + PATTERN_CODE_COUNT) % PATTERN_CODE_COUNT;
+  }
+  /** The display time a decoded code stands for, within the current wrap window. */
+  function patternTimestampUs(code) {
+  	return code * PATTERN_STEP_US;
+  }
+  function patternCheckBits(code) {
+  	return (code ^ code >> 4 ^ code >> 8) & CHECK_MASK ^ CHECK_SEED;
+  }
+  /** Cell states in row-major order. `true` is a light cell. */
+  function encodePatternCells(code) {
+  	const normalized = normalizeCode(code);
+  	const check = patternCheckBits(normalized);
+  	const cells = [];
+  	for (let index = 0; index < 12; index += 1) cells.push(bitAt(normalized, 11 - index));
+  	for (let index = 0; index < 4; index += 1) cells.push(bitAt(check, 3 - index));
+  	return cells;
+  }
+  /**
+  * Rebuilds the code from cell states. An undefined cell is one the decoder could
+  * not tell apart from its opposite, and any such cell rejects the whole reading.
+  */
+  function decodePatternCells(cells) {
+  	if (cells.length !== 16) return void 0;
+  	let code = 0;
+  	for (let index = 0; index < 12; index += 1) {
+  		const cell = cells[index];
+  		if (cell === void 0) return void 0;
+  		code = code << 1 | (cell ? 1 : 0);
+  	}
+  	let check = 0;
+  	for (let index = 0; index < 4; index += 1) {
+  		const cell = cells[12 + index];
+  		if (cell === void 0) return void 0;
+  		check = check << 1 | (cell ? 1 : 0);
+  	}
+  	return check === patternCheckBits(code) ? code : void 0;
+  }
+  function normalizeCode(code) {
+  	return (Math.trunc(code) % PATTERN_CODE_COUNT + PATTERN_CODE_COUNT) % PATTERN_CODE_COUNT;
+  }
+  function bitAt(value, bit) {
+  	return (value >> bit & 1) === 1;
+  }
+  //#endregion
+  //#region src/frame-sync/detector.ts
+  var defaultOptions = {
+  	minimumRange: 40,
+  	rangeRatio: .5,
+  	minimumCellPixels: 3,
+  	minimumFillRatio: .5,
+  	maximumAspectSkew: 2.5
+  };
+  /**
+  * Finds the projected panel by watching which pixels change over time.
+  *
+  * Every pattern cell toggles within a few seconds because the encoded counter
+  * runs through all of its bits, so the panel stands out as one connected region
+  * of high temporal range while the rest of the room stays comparatively still.
+  */
+  var PanelRangeAccumulator = class {
+  	constructor(width, height) {
+  		this.frameCount = 0;
+  		this.width = width;
+  		this.height = height;
+  		this.minimum = new Uint8Array(width * height).fill(255);
+  		this.maximum = new Uint8Array(width * height);
+  	}
+  	add(frame) {
+  		if (frame.width !== this.width || frame.height !== this.height) throw new Error("Frame size does not match the accumulator.");
+  		for (let index = 0; index < frame.data.length; index += 1) {
+  			const value = frame.data[index] ?? 0;
+  			if (value < (this.minimum[index] ?? 255)) this.minimum[index] = value;
+  			if (value > (this.maximum[index] ?? 0)) this.maximum[index] = value;
+  		}
+  		this.frameCount += 1;
+  	}
+  	frames() {
+  		return this.frameCount;
+  	}
+  	detect(options = {}) {
+  		if (this.frameCount < 2) return void 0;
+  		const settings = {
+  			...defaultOptions,
+  			...options
+  		};
+  		const pixels = this.width * this.height;
+  		let strongest = 0;
+  		for (let index = 0; index < pixels; index += 1) {
+  			const range = (this.maximum[index] ?? 0) - (this.minimum[index] ?? 0);
+  			if (range > strongest) strongest = range;
+  		}
+  		const threshold = Math.max(settings.minimumRange, strongest * settings.rangeRatio);
+  		if (strongest < settings.minimumRange) return void 0;
+  		const mask = new Uint8Array(pixels);
+  		for (let index = 0; index < pixels; index += 1) {
+  			const range = (this.maximum[index] ?? 0) - (this.minimum[index] ?? 0);
+  			mask[index] = range >= threshold ? 1 : 0;
+  		}
+  		const region = largestRegion(mask, this.width, this.height);
+  		if (!region) return void 0;
+  		const width = region.maxX - region.minX + 1;
+  		const height = region.maxY - region.minY + 1;
+  		if (width < 4 * settings.minimumCellPixels) return void 0;
+  		if (height < 4 * settings.minimumCellPixels) return void 0;
+  		const skew = width / height;
+  		if (skew > settings.maximumAspectSkew) return void 0;
+  		if (skew < 1 / settings.maximumAspectSkew) return void 0;
+  		if (region.area / (width * height) < settings.minimumFillRatio) return;
+  		return {
+  			x: region.minX,
+  			y: region.minY,
+  			width,
+  			height
+  		};
+  	}
+  };
+  /** Sampling rectangles for each cell, inset to tolerate a small misalignment. */
+  function patternCellRects(panel, insetRatio = .25) {
+  	const cellWidth = panel.width / 4;
+  	const cellHeight = panel.height / 4;
+  	const insetX = cellWidth * insetRatio;
+  	const insetY = cellHeight * insetRatio;
+  	const rects = [];
+  	for (let row = 0; row < 4; row += 1) for (let column = 0; column < 4; column += 1) {
+  		const x = Math.floor(panel.x + column * cellWidth + insetX);
+  		const y = Math.floor(panel.y + row * cellHeight + insetY);
+  		rects.push({
+  			x,
+  			y,
+  			width: Math.max(1, Math.ceil(cellWidth - insetX * 2)),
+  			height: Math.max(1, Math.ceil(cellHeight - insetY * 2))
+  		});
+  	}
+  	return rects;
+  }
+  function sampleCells(frame, rects) {
+  	return rects.map((rect) => meanLuminance(frame, rect));
+  }
+  /**
+  * Light and dark levels learned per cell.
+  *
+  * Projection is uneven, so one global threshold misreads the dim corners of the
+  * panel. Each cell keeps its own extremes and rejects readings that land in the
+  * band between them, which is where a mixed exposure shows up.
+  */
+  var CellLevels = class {
+  	constructor() {
+  		this.minimum = (/* @__PURE__ */ new Float64Array(16)).fill(Number.POSITIVE_INFINITY);
+  		this.maximum = (/* @__PURE__ */ new Float64Array(16)).fill(Number.NEGATIVE_INFINITY);
+  	}
+  	add(samples) {
+  		for (let index = 0; index < 16; index += 1) {
+  			const value = samples[index];
+  			if (value === void 0 || !Number.isFinite(value)) continue;
+  			if (value < (this.minimum[index] ?? 0)) this.minimum[index] = value;
+  			if (value > (this.maximum[index] ?? 0)) this.maximum[index] = value;
+  		}
+  	}
+  	contrast() {
+  		let smallest = Number.POSITIVE_INFINITY;
+  		for (let index = 0; index < 16; index += 1) {
+  			const span = (this.maximum[index] ?? 0) - (this.minimum[index] ?? 0);
+  			if (span < smallest) smallest = span;
+  		}
+  		return Number.isFinite(smallest) ? smallest : 0;
+  	}
+  	decodeCells(samples, marginRatio = .25) {
+  		const cells = [];
+  		for (let index = 0; index < 16; index += 1) {
+  			const value = samples[index];
+  			const low = this.minimum[index] ?? 0;
+  			const high = this.maximum[index] ?? 0;
+  			const threshold = (low + high) / 2;
+  			const margin = (high - low) * marginRatio;
+  			if (value === void 0 || Math.abs(value - threshold) < margin) cells.push(void 0);
+  			else cells.push(value > threshold);
+  		}
+  		return cells;
+  	}
+  	decode(samples, marginRatio = .25) {
+  		return decodePatternCells(this.decodeCells(samples, marginRatio));
+  	}
+  };
+  function meanLuminance(frame, rect) {
+  	const startX = Math.max(0, Math.min(frame.width - 1, rect.x));
+  	const startY = Math.max(0, Math.min(frame.height - 1, rect.y));
+  	const endX = Math.max(startX + 1, Math.min(frame.width, rect.x + rect.width));
+  	const endY = Math.max(startY + 1, Math.min(frame.height, rect.y + rect.height));
+  	let total = 0;
+  	let count = 0;
+  	for (let y = startY; y < endY; y += 1) {
+  		const row = y * frame.width;
+  		for (let x = startX; x < endX; x += 1) {
+  			total += frame.data[row + x] ?? 0;
+  			count += 1;
+  		}
+  	}
+  	return count === 0 ? 0 : total / count;
+  }
+  function largestRegion(mask, width, height) {
+  	const visited = new Uint8Array(mask.length);
+  	const stack = [];
+  	let best;
+  	for (let start = 0; start < mask.length; start += 1) {
+  		if (mask[start] !== 1 || visited[start] === 1) continue;
+  		visited[start] = 1;
+  		stack.push(start);
+  		let area = 0;
+  		let minX = width;
+  		let minY = height;
+  		let maxX = 0;
+  		let maxY = 0;
+  		while (stack.length > 0) {
+  			const index = stack.pop();
+  			const x = index % width;
+  			const y = (index - x) / width;
+  			area += 1;
+  			if (x < minX) minX = x;
+  			if (x > maxX) maxX = x;
+  			if (y < minY) minY = y;
+  			if (y > maxY) maxY = y;
+  			if (x > 0) push(index - 1);
+  			if (x + 1 < width) push(index + 1);
+  			if (y > 0) push(index - width);
+  			if (y + 1 < height) push(index + width);
+  		}
+  		if (!best || area > best.area) best = {
+  			minX,
+  			minY,
+  			maxX,
+  			maxY,
+  			area
+  		};
+  	}
+  	return best;
+  	function push(index) {
+  		if (mask[index] === 1 && visited[index] === 0) {
+  			visited[index] = 1;
+  			stack.push(index);
+  		}
+  	}
+  }
+  //#endregion
+  //#region src/frame-sync/controller.ts
+  var DEFAULT_ANALYSIS_WIDTH = 240;
+  var DEFAULT_ANALYSIS_HEIGHT = 180;
+  var DEFAULT_OBSERVATION_LIMIT = 600;
+  var DEFAULT_MINIMUM_DECODE_RATE = .2;
+  var DEFAULT_MINIMUM_CONTRAST = 24;
+  var DECODE_RATE_WINDOW = 120;
+  var RANGE_PHASE_SHARE = .6;
+  /**
+  * The slowest pattern cell changes once per half wrap period, so a calibration
+  * phase shorter than that can leave a cell at one level for the whole window.
+  * The panel would then be located from an incomplete region, or the cell would
+  * read as low contrast, and calibration would fail for a reason the operator
+  * cannot act on. The levels phase is the shorter of the two, so it sets the
+  * minimum.
+  */
+  var MINIMUM_CALIBRATION_SECONDS = Math.ceil(PATTERN_WRAP_US / 2 * 1.2 / .4 / 1e5) / 10;
+  var MAXIMUM_CALIBRATION_SECONDS = 60;
+  /**
+  * Decodes the projected frame sync pattern out of one camera.
+  *
+  * Calibration runs in two phases against the live pattern. The first watches
+  * which pixels change to locate the panel; the second learns the light and dark
+  * level of every cell and checks that readings decode often enough to be worth
+  * measuring. Both phases end on the shared clock, so a stalled camera never
+  * leaves the controller waiting on a frame that will not arrive.
+  */
+  var FrameSyncPatternController = class {
+  	constructor(options) {
+  		this.observations = [];
+  		this.recentDecodes = [];
+  		this.rects = [];
+  		this.pipelineState = "idle";
+  		this.code = "";
+  		this.message = "";
+  		this.activeCameraId = "";
+  		this.runtime = options.runtime;
+  		this.timeSource = options.timeSource;
+  		this.createFramePump = options.createFramePump;
+  		this.wait = options.wait ?? defaultWait;
+  		this.analysisWidth = options.analysisWidth ?? DEFAULT_ANALYSIS_WIDTH;
+  		this.analysisHeight = options.analysisHeight ?? DEFAULT_ANALYSIS_HEIGHT;
+  		this.observationLimit = options.observationLimit ?? DEFAULT_OBSERVATION_LIMIT;
+  		this.minimumDecodeRate = options.minimumDecodeRate ?? DEFAULT_MINIMUM_DECODE_RATE;
+  		this.minimumContrast = options.minimumContrast ?? DEFAULT_MINIMUM_CONTRAST;
+  	}
+  	analysisSize() {
+  		return {
+  			width: this.analysisWidth,
+  			height: this.analysisHeight
+  		};
+  	}
+  	state() {
+  		return this.pipelineState;
+  	}
+  	errorCode() {
+  		return this.code;
+  	}
+  	errorMessage() {
+  		return this.message;
+  	}
+  	cameraId() {
+  		return this.activeCameraId;
+  	}
+  	decodeRate() {
+  		if (this.recentDecodes.length === 0) return 0;
+  		return this.recentDecodes.filter((value) => value).length / this.recentDecodes.length;
+  	}
+  	pendingObservations() {
+  		return this.observations.length;
+  	}
+  	takeObservation() {
+  		this.observation = this.observations.shift();
+  		return this.observation;
+  	}
+  	currentObservation() {
+  		return this.observation;
+  	}
+  	async start(options) {
+  		await this.stop();
+  		const cameraId = options.cameraId.trim();
+  		const seconds = options.calibrationSeconds;
+  		if (!cameraId) this.fail("camera-unavailable", /* @__PURE__ */ new Error("Camera ID must not be empty."));
+  		this.requireCalibrationSeconds(seconds);
+  		this.pipelineState = "acquiring-camera";
+  		this.code = "";
+  		this.message = "";
+  		let lease;
+  		try {
+  			lease = await requireCameraSource(this.runtime).acquireCamera({
+  				owner: "frame-sync",
+  				cameraId
+  			});
+  		} catch (error) {
+  			this.fail("camera-unavailable", error);
+  		}
+  		this.lease = lease;
+  		this.activeCameraId = cameraId;
+  		const pump = this.createFramePump(lease);
+  		this.pump = pump;
+  		pump.start((frame) => this.consume(frame));
+  		await this.runCalibration(seconds);
+  	}
+  	async recalibrate(seconds) {
+  		if (!this.pump) this.fail("camera-unavailable", /* @__PURE__ */ new Error("Start the frame sync decoder before calibrating."));
+  		await this.runCalibration(seconds);
+  	}
+  	async stop() {
+  		const calibration = this.calibration;
+  		if (calibration) {
+  			calibration.cancelled = true;
+  			calibration.settle(/* @__PURE__ */ new Error("Frame sync decoding stopped."));
+  		}
+  		this.calibration = void 0;
+  		this.pump?.stop();
+  		this.pump = void 0;
+  		const lease = this.lease;
+  		this.lease = void 0;
+  		this.levels = void 0;
+  		this.rects = [];
+  		this.observations.length = 0;
+  		this.recentDecodes.length = 0;
+  		this.observation = void 0;
+  		this.activeCameraId = "";
+  		if (this.pipelineState !== "error") {
+  			this.pipelineState = "idle";
+  			this.code = "";
+  			this.message = "";
+  		}
+  		if (lease) await lease.release().catch(() => void 0);
+  	}
+  	requireCalibrationSeconds(seconds) {
+  		if (!Number.isFinite(seconds) || seconds < MINIMUM_CALIBRATION_SECONDS || seconds > MAXIMUM_CALIBRATION_SECONDS) this.fail("invalid-duration", /* @__PURE__ */ new Error(`Calibration must run between ${MINIMUM_CALIBRATION_SECONDS} and ${MAXIMUM_CALIBRATION_SECONDS} seconds so that every pattern cell changes at least once.`));
+  	}
+  	async runCalibration(seconds) {
+  		this.requireCalibrationSeconds(seconds);
+  		this.pipelineState = "calibrating";
+  		this.code = "";
+  		this.message = "";
+  		this.levels = void 0;
+  		this.rects = [];
+  		this.observations.length = 0;
+  		this.recentDecodes.length = 0;
+  		const startUs = this.timeSource.nowUs();
+  		const totalUs = seconds * 1e6;
+  		const finished = new Promise((resolve, reject) => {
+  			this.calibration = {
+  				phase: "range",
+  				cancelled: false,
+  				rangeDeadlineUs: startUs + totalUs * RANGE_PHASE_SHARE,
+  				levelsDeadlineUs: startUs + totalUs,
+  				range: new PanelRangeAccumulator(this.analysisWidth, this.analysisHeight),
+  				levels: new CellLevels(),
+  				rects: [],
+  				attempts: 0,
+  				decodes: 0,
+  				settle: (error) => {
+  					this.calibration = void 0;
+  					if (error) reject(error);
+  					else resolve();
+  				}
+  			};
+  		});
+  		const pending = this.calibration;
+  		this.wait(seconds * 1e3 + 2e3).then(() => {
+  			if (this.calibration !== pending) return;
+  			pending?.settle(/* @__PURE__ */ new Error("The camera stopped delivering frames while calibrating."));
+  		});
+  		try {
+  			await finished;
+  		} catch (error) {
+  			if (pending?.cancelled) return;
+  			this.fail(this.code || "camera-ended", error);
+  		}
+  	}
+  	consume(frame) {
+  		const calibration = this.calibration;
+  		if (calibration) {
+  			this.calibrateWith(calibration, frame);
+  			return;
+  		}
+  		if (this.pipelineState !== "ready") return;
+  		const levels = this.levels;
+  		if (!levels) return;
+  		const frameTimestampUs = this.timeSource.nowUs();
+  		const code = levels.decode(sampleCells(frame.luminance, this.rects));
+  		this.recordDecodeAttempt(code !== void 0);
+  		if (code === void 0) return;
+  		this.observations.push({
+  			frameTimestampUs,
+  			frameAgeUs: frame.frameAgeUs,
+  			patternTimestampUs: patternTimestampUs(code)
+  		});
+  		while (this.observations.length > this.observationLimit) this.observations.shift();
+  	}
+  	calibrateWith(calibration, frame) {
+  		const now = this.timeSource.nowUs();
+  		if (calibration.phase === "range") {
+  			calibration.range.add(frame.luminance);
+  			if (now < calibration.rangeDeadlineUs) return;
+  			const panel = calibration.range.detect();
+  			if (!panel) {
+  				this.code = "panel-not-found";
+  				calibration.settle(/* @__PURE__ */ new Error("No projected frame sync pattern was found in the camera image."));
+  				return;
+  			}
+  			calibration.rects = patternCellRects(panel);
+  			calibration.phase = "levels";
+  			return;
+  		}
+  		const samples = sampleCells(frame.luminance, calibration.rects);
+  		calibration.levels.add(samples);
+  		calibration.attempts += 1;
+  		if (calibration.levels.decode(samples) !== void 0) calibration.decodes += 1;
+  		if (now < calibration.levelsDeadlineUs) return;
+  		if (calibration.levels.contrast() < this.minimumContrast) {
+  			this.code = "low-contrast";
+  			calibration.settle(/* @__PURE__ */ new Error("The projected pattern is too dim or too washed out to read."));
+  			return;
+  		}
+  		const rate = calibration.attempts === 0 ? 0 : calibration.decodes / calibration.attempts;
+  		if (rate < this.minimumDecodeRate) {
+  			this.code = "decode-unstable";
+  			calibration.settle(/* @__PURE__ */ new Error(`Only ${Math.round(rate * 100)}% of the frames decoded during calibration.`));
+  			return;
+  		}
+  		this.levels = calibration.levels;
+  		this.rects = calibration.rects;
+  		this.recentDecodes.length = 0;
+  		this.pipelineState = "ready";
+  		this.code = "";
+  		this.message = "";
+  		calibration.settle();
+  	}
+  	recordDecodeAttempt(decoded) {
+  		this.recentDecodes.push(decoded);
+  		while (this.recentDecodes.length > DECODE_RATE_WINDOW) this.recentDecodes.shift();
+  	}
+  	fail(code, error) {
+  		this.pipelineState = "error";
+  		this.code = code;
+  		this.message = error instanceof Error ? error.message : String(error);
+  		this.pump?.stop();
+  		this.pump = void 0;
+  		const lease = this.lease;
+  		this.lease = void 0;
+  		if (lease) lease.release().catch(() => void 0);
+  		throw error instanceof Error ? error : new Error(this.message);
+  	}
+  };
+  function requireCameraSource(runtime) {
+  	const candidate = runtime.ext_kubohiroyacamerasource;
+  	if (typeof candidate !== "object" || candidate === null || !("acquireCamera" in candidate) || typeof candidate.acquireCamera !== "function") throw new Error("Camera Source is not loaded.");
+  	return candidate;
+  }
+  function defaultWait(milliseconds) {
+  	return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+  //#endregion
+  //#region src/frame-sync/pattern-display.ts
+  var REFRESH_SAMPLES = 30;
+  var MINIMUM_REFRESH_US = 4e3;
+  var MAXIMUM_REFRESH_US = 4e4;
+  var DEFAULT_PANEL_SCALE = .7;
+  var CELL_GAP_RATIO = .08;
+  var OVERLAY_STYLE = [
+  	"position:fixed",
+  	"inset:0",
+  	"width:100vw",
+  	"height:100vh",
+  	"margin:0",
+  	"padding:0",
+  	"border:0",
+  	"background:#000",
+  	"pointer-events:none",
+  	"z-index:2147483000"
+  ].join(";");
+  /**
+  * Shows the time coded pattern full screen for a projector to relay.
+  *
+  * The pattern that is drawn during one animation frame reaches the screen at the
+  * next refresh, so the encoded time is the current clock reading plus one
+  * measured refresh interval. Any remaining display or projector delay is the
+  * same for every camera and therefore cancels out of the per-camera offsets.
+  */
+  var FrameSyncPatternDisplay = class {
+  	constructor(options) {
+  		this.intervals = [];
+  		this.lastFrameUs = 0;
+  		this.timeSource = options.timeSource;
+  		this.documentRef = options.documentRef ?? document;
+  		this.panelScale = options.panelScale ?? DEFAULT_PANEL_SCALE;
+  	}
+  	visible() {
+  		return this.canvas !== void 0;
+  	}
+  	show() {
+  		if (this.canvas) return;
+  		const canvas = this.documentRef.createElement("canvas");
+  		canvas.style.cssText = OVERLAY_STYLE;
+  		const context = canvas.getContext("2d");
+  		if (!context) throw new Error("The frame sync pattern needs a 2D canvas.");
+  		this.documentRef.body.append(canvas);
+  		this.canvas = canvas;
+  		this.context = context;
+  		this.intervals.length = 0;
+  		this.lastFrameUs = 0;
+  		this.scheduleFrame();
+  	}
+  	hide() {
+  		if (this.animationHandle !== void 0) {
+  			cancelAnimationFrame(this.animationHandle);
+  			this.animationHandle = void 0;
+  		}
+  		this.canvas?.remove();
+  		this.canvas = void 0;
+  		this.context = void 0;
+  		this.intervals.length = 0;
+  		this.lastFrameUs = 0;
+  	}
+  	scheduleFrame() {
+  		if (!this.canvas) return;
+  		this.animationHandle = requestAnimationFrame(() => {
+  			this.animationHandle = void 0;
+  			this.renderFrame();
+  			this.scheduleFrame();
+  		});
+  	}
+  	renderFrame() {
+  		const canvas = this.canvas;
+  		const context = this.context;
+  		if (!canvas || !context) return;
+  		const nowUs = this.timeSource.nowUs();
+  		const refreshUs = this.measureRefresh(nowUs);
+  		this.resize(canvas);
+  		const cells = encodePatternCells(patternCodeForTimestamp(nowUs + refreshUs));
+  		drawPattern(context, canvas.width, canvas.height, cells, this.panelScale);
+  	}
+  	measureRefresh(nowUs) {
+  		if (this.lastFrameUs > 0) {
+  			const interval = nowUs - this.lastFrameUs;
+  			if (interval >= MINIMUM_REFRESH_US && interval <= MAXIMUM_REFRESH_US) {
+  				this.intervals.push(interval);
+  				while (this.intervals.length > REFRESH_SAMPLES) this.intervals.shift();
+  			}
+  		}
+  		this.lastFrameUs = nowUs;
+  		if (this.intervals.length === 0) return MINIMUM_REFRESH_US;
+  		const sorted = [...this.intervals].sort((left, right) => left - right);
+  		return sorted[Math.floor(sorted.length / 2)] ?? MINIMUM_REFRESH_US;
+  	}
+  	resize(canvas) {
+  		const ratio = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
+  		const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  		const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  		if (canvas.width !== width) canvas.width = width;
+  		if (canvas.height !== height) canvas.height = height;
+  	}
+  };
+  function drawPattern(context, width, height, cells, panelScale) {
+  	context.fillStyle = "#000000";
+  	context.fillRect(0, 0, width, height);
+  	const panel = Math.min(width, height) * panelScale;
+  	const originX = (width - panel) / 2;
+  	const originY = (height - panel) / 2;
+  	const cellWidth = panel / 4;
+  	const cellHeight = panel / 4;
+  	const gapX = cellWidth * CELL_GAP_RATIO;
+  	const gapY = cellHeight * CELL_GAP_RATIO;
+  	for (let row = 0; row < 4; row += 1) for (let column = 0; column < 4; column += 1) {
+  		if (cells[row * 4 + column] !== true) continue;
+  		context.fillStyle = "#ffffff";
+  		context.fillRect(originX + column * cellWidth + gapX / 2, originY + row * cellHeight + gapY / 2, cellWidth - gapX, cellHeight - gapY);
+  	}
+  }
+  //#endregion
+  //#region src/frame-sync/time-source.ts
+  var WEBRTC_EXTENSION_KEY = "ext_kubohiroyawebrtc";
+  /**
+  * Reads the shared clock from the WebRTC extension.
+  *
+  * The WebRTC extension owns clock probing between peers; this extension only
+  * needs the resulting timestamp, so it calls the published reporter and keeps no
+  * clock of its own.
+  */
+  function requireSynchronizedTimeSource(runtime) {
+  	const candidate = runtime[WEBRTC_EXTENSION_KEY];
+  	if (typeof candidate !== "object" || candidate === null || !("localTime" in candidate) || typeof candidate.localTime !== "function") throw new Error("TurboWarp WebRTC does not provide the synchronized time reporter.");
+  	const source = candidate;
+  	return { nowUs() {
+  		const value = Number(source.localTime());
+  		if (!Number.isFinite(value)) throw new Error("Synchronized time service returned no timestamp.");
+  		return value;
+  	} };
+  }
+  //#endregion
+  //#region src/frame-sync/video-frame-pump.ts
+  /**
+  * Delivers downscaled camera frames to the decoder.
+  *
+  * `requestVideoFrameCallback` fires once per delivered camera frame and reports
+  * when the browser captured it, which is the only part of the latency this
+  * computer can observe on its own. The frame buffer is reused between callbacks
+  * because the decoder reads it before returning.
+  */
+  var VideoFramePump = class {
+  	constructor(element, width, height, documentRef = document) {
+  		this.element = element;
+  		this.width = width;
+  		this.height = height;
+  		this.canvas = documentRef.createElement("canvas");
+  		this.canvas.width = width;
+  		this.canvas.height = height;
+  		const context = this.canvas.getContext("2d", { willReadFrequently: true });
+  		if (!context) throw new Error("The frame sync decoder needs a 2D canvas.");
+  		this.context = context;
+  		this.luminance = new Uint8Array(width * height);
+  	}
+  	start(handler) {
+  		this.stop();
+  		this.handler = handler;
+  		this.schedule();
+  	}
+  	stop() {
+  		this.handler = void 0;
+  		if (this.videoFrameHandle !== void 0) {
+  			this.element.cancelVideoFrameCallback(this.videoFrameHandle);
+  			this.videoFrameHandle = void 0;
+  		}
+  		if (this.animationHandle !== void 0) {
+  			cancelAnimationFrame(this.animationHandle);
+  			this.animationHandle = void 0;
+  		}
+  	}
+  	schedule() {
+  		if (!this.handler) return;
+  		if (typeof this.element.requestVideoFrameCallback === "function") {
+  			this.videoFrameHandle = this.element.requestVideoFrameCallback((now, metadata) => {
+  				this.videoFrameHandle = void 0;
+  				this.deliver(frameAgeUs(now, metadata));
+  			});
+  			return;
+  		}
+  		this.animationHandle = requestAnimationFrame(() => {
+  			this.animationHandle = void 0;
+  			this.deliver(0);
+  		});
+  	}
+  	deliver(ageUs) {
+  		const handler = this.handler;
+  		if (!handler) return;
+  		try {
+  			this.context.drawImage(this.element, 0, 0, this.width, this.height);
+  			const pixels = this.context.getImageData(0, 0, this.width, this.height).data;
+  			for (let index = 0; index < this.luminance.length; index += 1) {
+  				const offset = index * 4;
+  				const red = pixels[offset] ?? 0;
+  				const green = pixels[offset + 1] ?? 0;
+  				const blue = pixels[offset + 2] ?? 0;
+  				this.luminance[index] = (red * 299 + green * 587 + blue * 114) / 1e3;
+  			}
+  			handler({
+  				luminance: {
+  					width: this.width,
+  					height: this.height,
+  					data: this.luminance
+  				},
+  				frameAgeUs: ageUs
+  			});
+  		} finally {
+  			this.schedule();
+  		}
+  	}
+  };
+  function frameAgeUs(now, metadata) {
+  	const captured = metadata.captureTime ?? metadata.presentationTime;
+  	if (captured === void 0 || !Number.isFinite(captured)) return 0;
+  	return Math.max(0, Math.round((now - captured) * 1e3));
+  }
   //#endregion
   //#region src/extension.ts
   var blockDefinitions = block_definitions_default.blocks;
+  var FRAME_SYNC_ANALYSIS_WIDTH = 240;
+  var FRAME_SYNC_ANALYSIS_HEIGHT = 180;
   var MultiviewPoseExtension = class {
   	constructor(options = {}) {
   		this.state = "idle";
@@ -79169,6 +80034,8 @@
   			this.pose.stop();
   			this.calibration.cancel();
   			this.avatar.reset();
+  			this.frameSync?.stop();
+  			this.frameSyncOverlay?.hide();
   		};
   		this.disposeListener = () => this.dispose();
   		this.targetRemovedListener = (target) => {
@@ -79179,6 +80046,7 @@
   		this.protocolEnabled = options.protocolEnabled ?? featureFlags.protocolV1Codec;
   		this.calibrationEnabled = options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
   		this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
+  		this.frameSyncEnabled = options.frameSyncEnabled ?? featureFlags.frameSyncPatternV1;
   		this.errorCorrectionLevel = options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.skins = new TemporarySpriteSkinManager(this.runtime);
@@ -79193,6 +80061,8 @@
   			...options.nowMilliseconds ? { nowMilliseconds: options.nowMilliseconds } : {}
   		});
   		this.avatar = new AvatarRetargetController(this.runtime, options.avatarPoseSolver);
+  		this.frameSync = options.frameSyncController;
+  		this.frameSyncOverlay = options.frameSyncDisplay;
   		this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
   		this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
   		this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -79441,11 +80311,83 @@
   	avatarRetargetError() {
   		return this.avatar.error();
   	}
+  	showFrameSyncPattern() {
+  		this.requireFrameSyncEnabled();
+  		this.requireFrameSyncDisplay().show();
+  	}
+  	hideFrameSyncPattern() {
+  		this.requireFrameSyncEnabled();
+  		this.frameSyncOverlay?.hide();
+  	}
+  	frameSyncPatternShown() {
+  		return this.frameSyncOverlay?.visible() ?? false;
+  	}
+  	frameSyncPatternWrapUs() {
+  		return PATTERN_WRAP_US;
+  	}
+  	async startFrameSyncDecoder(args) {
+  		this.requireFrameSyncEnabled();
+  		await this.requireFrameSyncController().start({
+  			cameraId: Scratch.Cast.toString(args.CAMERA_ID),
+  			calibrationSeconds: Scratch.Cast.toNumber(args.SECONDS)
+  		});
+  	}
+  	async calibrateFrameSyncDecoder(args) {
+  		this.requireFrameSyncEnabled();
+  		await this.requireFrameSyncController().recalibrate(Scratch.Cast.toNumber(args.SECONDS));
+  	}
+  	async stopFrameSyncDecoder() {
+  		await this.frameSync?.stop();
+  	}
+  	frameSyncDecoderState() {
+  		return this.frameSync?.state() ?? "idle";
+  	}
+  	frameSyncDecoderError() {
+  		return this.frameSync?.errorCode() ?? "";
+  	}
+  	frameSyncDecodeRate() {
+  		return this.frameSync?.decodeRate() ?? 0;
+  	}
+  	frameSyncObservationAvailable() {
+  		return (this.frameSync?.pendingObservations() ?? 0) > 0;
+  	}
+  	takeFrameSyncObservation() {
+  		this.requireFrameSyncEnabled();
+  		this.requireFrameSyncController().takeObservation();
+  	}
+  	frameSyncFrameTimestampUs() {
+  		return this.frameSync?.currentObservation()?.frameTimestampUs ?? 0;
+  	}
+  	frameSyncFrameAgeUs() {
+  		return this.frameSync?.currentObservation()?.frameAgeUs ?? 0;
+  	}
+  	frameSyncPatternTimestampUs() {
+  		return this.frameSync?.currentObservation()?.patternTimestampUs ?? 0;
+  	}
+  	requireFrameSyncEnabled() {
+  		if (!this.frameSyncEnabled) throw new Error("Frame sync pattern v1 is disabled. Enable it before the project starts.");
+  	}
+  	requireFrameSyncDisplay() {
+  		if (!this.frameSyncOverlay) this.frameSyncOverlay = new FrameSyncPatternDisplay({ timeSource: requireSynchronizedTimeSource(this.runtime) });
+  		return this.frameSyncOverlay;
+  	}
+  	requireFrameSyncController() {
+  		if (!this.frameSync) this.frameSync = new FrameSyncPatternController({
+  			runtime: this.runtime,
+  			timeSource: requireSynchronizedTimeSource(this.runtime),
+  			analysisWidth: FRAME_SYNC_ANALYSIS_WIDTH,
+  			analysisHeight: FRAME_SYNC_ANALYSIS_HEIGHT,
+  			createFramePump: (lease) => new VideoFramePump(lease.getFrameSource().element, FRAME_SYNC_ANALYSIS_WIDTH, FRAME_SYNC_ANALYSIS_HEIGHT)
+  		});
+  		return this.frameSync;
+  	}
   	dispose() {
   		this.endOfferQrDisplay();
   		this.pose.stop();
   		this.calibration.cancel();
   		this.avatar.reset();
+  		this.frameSync?.stop();
+  		this.frameSyncOverlay?.hide();
   		this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
   		this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
   		this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -79472,7 +80414,8 @@
   		if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
   		if (feature === "protocolV1Codec") return this.protocolEnabled;
   		if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
-  		return this.avatarEnabled;
+  		if (feature === "avatarRetargetV1") return this.avatarEnabled;
+  		return this.frameSyncEnabled;
   	}
   	requireSession() {
   		if (!this.session) throw new Error("Prepare an offer QR before displaying a part.");

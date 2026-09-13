@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MultiviewPoseExtension } from "../src/extension.js";
 import { WEBRTC_CAPABILITY_KEY } from "../src/webrtc-capability.js";
 import { AFRAME_CAPABILITY_KEY } from "../src/avatar/aframe-port.js";
+import { PATTERN_WRAP_US } from "../src/frame-sync/pattern.js";
+import type { FrameSyncPatternController } from "../src/frame-sync/controller.js";
+import type { FrameSyncObservation } from "../src/frame-sync/types.js";
 
 interface FakeRenderer extends TurboWarpRenderer {
   created: Map<number, string>;
@@ -152,6 +155,105 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(avatarOpcodes).toContain("registerAvatarAsset");
     expect(avatarOpcodes).toContain("applyPoseFrame3DToAvatars");
     expect(avatarOpcodes).not.toContain("startCameraCalibration");
+  });
+
+  it("keeps frame sync pattern blocks behind their own startup flag", () => {
+    setup();
+    const frameSyncOnly = new MultiviewPoseExtension({
+      enabled: false,
+      poseEnabled: false,
+      protocolEnabled: false,
+      calibrationEnabled: false,
+      frameSyncEnabled: true,
+    });
+    const opcodes = (
+      frameSyncOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(opcodes).toContain("showFrameSyncPattern");
+    expect(opcodes).toContain("startFrameSyncDecoder");
+    expect(opcodes).toContain("frameSyncPatternTimestampUs");
+    expect(opcodes).not.toContain("prepareOfferQr");
+    expect(opcodes).not.toContain("startCameraCalibration");
+    expect(opcodes).not.toContain("registerAvatarAsset");
+
+    const allOff = new MultiviewPoseExtension({});
+    const offOpcodes = (
+      allOff.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(offOpcodes).not.toContain("showFrameSyncPattern");
+    expect(() => allOff.showFrameSyncPattern()).toThrow(
+      "Frame sync pattern v1 is disabled",
+    );
+  });
+
+  it("drives the frame sync decoder and reports the taken observation", async () => {
+    const { runtime, listeners } = setup();
+    const observation: FrameSyncObservation = {
+      frameTimestampUs: 1_700_000_000_123_456,
+      frameAgeUs: 21_000,
+      patternTimestampUs: 2_024_000,
+    };
+    let taken: FrameSyncObservation | undefined;
+    const controller = {
+      start: vi.fn(async () => undefined),
+      recalibrate: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+      state: vi.fn(() => "ready" as const),
+      errorCode: vi.fn(() => "" as const),
+      decodeRate: vi.fn(() => 0.75),
+      pendingObservations: vi.fn(() => (taken ? 0 : 1)),
+      takeObservation: vi.fn(() => {
+        taken = observation;
+        return observation;
+      }),
+      currentObservation: vi.fn(() => taken),
+    } as unknown as FrameSyncPatternController;
+    const display = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      visible: vi.fn(() => true),
+    };
+    const extension = new MultiviewPoseExtension({
+      runtime,
+      frameSyncEnabled: true,
+      frameSyncController: controller,
+      frameSyncDisplay: display,
+    });
+
+    extension.showFrameSyncPattern();
+    expect(display.show).toHaveBeenCalledOnce();
+    expect(extension.frameSyncPatternShown()).toBe(true);
+    expect(extension.frameSyncPatternWrapUs()).toBe(PATTERN_WRAP_US);
+
+    await extension.startFrameSyncDecoder({
+      CAMERA_ID: "camera-1",
+      SECONDS: 6,
+    });
+    expect(controller.start).toHaveBeenCalledWith({
+      cameraId: "camera-1",
+      calibrationSeconds: 6,
+    });
+    await extension.calibrateFrameSyncDecoder({ SECONDS: 4 });
+    expect(controller.recalibrate).toHaveBeenCalledWith(4);
+
+    expect(extension.frameSyncDecoderState()).toBe("ready");
+    expect(extension.frameSyncDecodeRate()).toBe(0.75);
+    expect(extension.frameSyncObservationAvailable()).toBe(true);
+    expect(extension.frameSyncFrameTimestampUs()).toBe(0);
+
+    extension.takeFrameSyncObservation();
+    expect(extension.frameSyncFrameTimestampUs()).toBe(
+      observation.frameTimestampUs,
+    );
+    expect(extension.frameSyncFrameAgeUs()).toBe(observation.frameAgeUs);
+    expect(extension.frameSyncPatternTimestampUs()).toBe(
+      observation.patternTimestampUs,
+    );
+    expect(extension.frameSyncObservationAvailable()).toBe(false);
+
+    listeners.get("PROJECT_STOP_ALL")?.();
+    expect(controller.stop).toHaveBeenCalled();
+    expect(display.hide).toHaveBeenCalled();
   });
 
   it("exposes protocol round-trip and diagnostic reporters", () => {
