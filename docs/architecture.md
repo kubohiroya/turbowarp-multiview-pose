@@ -128,61 +128,37 @@ the same exact v1 schema and recursively rejects pairing-secret keys. The 11 MB 
 increase is accepted to keep the sole production backend available on an offline venue LAN; real
 camera/board geometry and WebAssembly startup remain browser E2E responsibilities.
 
-## Multi-camera 3D pose fusion
+## PoseFrame3D avatar retargeting
 
-`poseFusion3D` is an independent startup-fixed, default-OFF flag. The fusion app feeds the buffer
-with PoseFrame2D JSON received over WebRTC data channels; this extension owns neither the transport
-nor the clock.
+`avatarRetargetV1` is an independent startup-fixed, default-OFF flag. It requires runtime key
+`turbowarpAFrameCapability`, calls `requireVersion(1)`, and uses only the seven public synchronous
+scene operations from the TurboWarp-A-Frame capability. The consumer never accesses A-Frame DOM,
+Three.js `object3D`, or GLTF bone internals. Capability v1 is published in
+`@kubohiroya/turbowarp-aframe@0.3.0`.
 
-Every camera gets its own timestamp-ordered ring buffer. Slot count is derived from the configured
-delay and jitter window, bounded to 16 to 600 frames, and at most 16 cameras are buffered. An
-in-window reorder is inserted at its timestamp position by shifting the shorter side of the ring, so
-the common in-order append stays O(1). A duplicate timestamp, an arrival older than the newest frame
-minus the jitter window, and an arrival older than the oldest retained frame of a full ring are
-counted as dropped instead of buffered. None of this estimates a per-camera clock offset: capture
-timestamps stay opaque values from the separate synchronized local time service.
+An asset registration sends declarative template JSON to A-Frame and retains a validated rig map.
+Each bone maps one supported Kalidokit pose rig output to a selector containing `{avatar}`, plus
+optional Euler offset degrees. Applying a frame requires corresponding exact-v1 PoseFrame3D and
+PoseFrame2D values. A person is joined only by PoseFrame3D `personId` equal to PoseFrame2D
+`trackingId`; this is not temporal alignment.
 
-A frame is only buffered when a calibration profile for its `cameraId` is loaded and that profile
-describes it: a mismatched `calibrationId` or frame size would otherwise be triangulated silently
-with the wrong intrinsics. Such frames, like duplicates and late arrivals, are counted as dropped
-rather than thrown, because ingest runs on the data-channel hot path and one misconfigured peer must
-not break a running project script. Because only calibrated cameras are buffered, stray camera IDs
-cannot occupy the ring buffers either.
+The adapter maps both COCO-17 records deterministically to the 33 positions required by
+exact-pinned `kalidokit@1.1.5`. Screen coordinates use PoseFrame2D `frameWidth` and `frameHeight`;
+world coordinates retain the external service coordinate values. Missing BlazePose face, hand, and
+foot points are midpoint-interpolated or duplicated with reduced visibility. Kalidokit `Pose.solve`
+with `runtime: "tfjs"` and `enableLegs: true` is the sole rotation solver. Its radians are converted
+to A-Frame degrees, and its hips result drives the configured root scale and offset. There is no
+custom rotation fallback. Joint or person confidence below the binding threshold skips only that
+transform and preserves its prior value.
 
-`fuse PoseFrame3D at buffered delay` resolves the newest buffered timestamp minus the configured
-delay, and every camera is resampled at that single past instant. A keypoint bracketed by two frames
-is interpolated linearly; a keypoint that is occluded on one side of the bracket keeps the visible
-observation instead of blending a low-confidence estimate into it; a camera without a bracket, or
-with a bracket wider than twice the jitter window, holds its nearest frame for at most one jitter
-window and otherwise contributes nothing.
+At most six person IDs bind to unique template instances. Recognition transitions use configurable
+A-Frame events, allowing the application to connect Performance DSL start/end effects without this
+adapter owning effect execution. Per-person capability failures are collected as `partial` state so
+other avatars continue. Rebind, explicit reset, project lifecycle reset, and disposal emit end when
+possible, delete created instances, and clear temporary state.
 
-Cross-camera association scores every pair of tracked persons from different cameras by the mean
-two-view reprojection error over their shared confident keypoints, requiring at least four shared
-keypoints and stopping at twelve. Pairs are merged greedily from the lowest cost, and a merge that
-would place two views of the same camera in one person is rejected. Two-view triangulation uses the
-closed-form midpoint of both viewing rays, which keeps this quadratic stage off the iterative
-solver; the general case still uses the score-weighted linear solver with a relative Jacobi
-convergence threshold. One fusion at the 16 camera by 6 person limit measures about 80 ms, against
-about 1 ms for four cameras and two performers.
-
-Each cluster covered by at least two cameras is triangulated per keypoint with a cheirality check
-and a reprojection check. When the full view set does not agree, every two-view seed is scored by
-how many views fall inside the reprojection threshold, and the largest consensus set is
-re-triangulated; a minority of wrong detections is therefore discarded instead of dragging the
-keypoint away from the truth, while views split evenly between two consistent answers stay
-ambiguous. Pixel observations are undistorted with the OpenCV rational model of the profile, so 0,
-4, 5, or 8 coefficients are supported and anything else is rejected when the profile is loaded.
-
-A registry keeps stable `person-N` identifiers by camera and tracking-ID overlap, and keeps the last
-triangulated position of every keypoint. A keypoint left with fewer than two confident views holds
-that last position and reports score `0`, so consumers can distinguish measured from held values.
-The assembled frame is checked against the pinned PoseFrame3D v1 schema before it is retained.
-
-Empty buffers, fewer than two covering cameras, and an instant with no multi-camera person are
-expected transient states: they report `false`, keep the last fused frame, and expose an error code.
-Invalid JSON, a foreign schema, and an invalid calibration profile throw. The stop button, project
-reload, and extension disposal clear buffers and fused results; explicit cleanup also clears the
-loaded calibration profiles. `PROJECT_RUN_STOP` deliberately does not: the runtime emits it whenever
-the thread queue empties, and an event-driven fusion project that buffers frames from hat scripts
-would otherwise lose its jitter buffer between messages. Camera leases and temporary skins are still
-released there.
+PoseFrame3D is exact v1 boundary data from a separate 3D service. Its `timestampUs` is opaque and is
+only copied into recognition event data. This extension performs no frame alignment, history
+retention/query, triangulation, or 3D solve. Kalidokit is deprecated upstream and expects native
+BlazePose landmarks; the deterministic COCO-17 expansion is therefore an explicit accuracy
+constraint, and intended GLTF rigs require real-browser validation before release.

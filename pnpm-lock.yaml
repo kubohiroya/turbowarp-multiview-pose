@@ -8,15 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@kubohiroya/turbowarp-aframe':
+        specifier: 0.3.0
+        version: 0.3.0
       '@kubohiroya/turbowarp-camera-source':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: 0.5.0
+        version: 0.5.0
       '@kubohiroya/turbowarp-jsqr':
-        specifier: ^0.3.0
-        version: 0.3.0(@kubohiroya/turbowarp-camera-source@0.4.0)
+        specifier: 0.3.0
+        version: 0.3.0(@kubohiroya/turbowarp-camera-source@0.5.0)
       '@kubohiroya/turbowarp-webrtc':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: 0.3.0
+        version: 0.3.0
       '@sinclair/typebox':
         specifier: 0.34.52
         version: 0.34.52
@@ -35,6 +38,9 @@ importers:
       '@tensorflow/tfjs-core':
         specifier: 4.22.0
         version: 4.22.0
+      kalidokit:
+        specifier: 1.1.5
+        version: 1.1.5
       qrcode:
         specifier: 1.5.4
         version: 1.5.4
@@ -295,8 +301,12 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
-  '@kubohiroya/turbowarp-camera-source@0.4.0':
-    resolution: {integrity: sha512-MMfV1IU0eO2L1+xlANinDUEZ235yV21XjCgv+iWT/pP4Brp5rJAcD5AMvWVS4kDKytHCy3+NUeLUxXMn4upqrQ==}
+  '@kubohiroya/turbowarp-aframe@0.3.0':
+    resolution: {integrity: sha512-GIaqEkJTabqd9d3HIG07Gz1uX5bbewen/gvMzvJor6VUBObqIm+RkeCkf4HIASmqOtdSQLDeMNV0slIXKHp7Mw==}
+    engines: {node: '>=22.18.0'}
+
+  '@kubohiroya/turbowarp-camera-source@0.5.0':
+    resolution: {integrity: sha512-0Ji1iL/HSl2PijGjcuPMOTN3cnc73oxGdmiiT9UIHL3BIUUPjaLDf3HCyoHyFaawdSIXQ8sspQt8gezlkv57uw==}
     engines: {node: '>=22.18.0'}
 
   '@kubohiroya/turbowarp-extension-template@0.4.0':
@@ -312,8 +322,8 @@ packages:
       '@kubohiroya/turbowarp-camera-source':
         optional: true
 
-  '@kubohiroya/turbowarp-webrtc@0.2.0':
-    resolution: {integrity: sha512-qj4EXfYrsl5AuvMxvt7osYkrxA6BU/RudSBeuCSDNWjVkSfGcChPLym9AIENneAKHCHDsJzjX+lomgVrT8AWtQ==}
+  '@kubohiroya/turbowarp-webrtc@0.3.0':
+    resolution: {integrity: sha512-ftnJNOtR3BZhEpu6OPWMiMF8CwWQiFuqpJQqEkScvZRyJ2eal2cSamnz6Oc/rZdwew+Clsnan0Df67gcVurNRw==}
     engines: {node: '>=22.18.0'}
 
   '@kubohiroya/vite-plugin-turbowarp-extension@0.4.0':
@@ -889,6 +899,9 @@ packages:
 
   jsqr@1.4.0:
     resolution: {integrity: sha512-dxLob7q65Xg2DvstYkRpkYtmKm2sPJ9oFhrhmudT1dZvNFFTlroai3AWSpLey/w5vMcLBXRgOJsbXpdN9HzU/A==}
+
+  kalidokit@1.1.5:
+    resolution: {integrity: sha512-cLaPfCK5UB1QUesFSF12s1/ZsOz4FMcaZDqfFoIYYAzouAjzreishAKIMuoN4zhz2KLuJudGKYWVjI+VVb0W1Q==}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -1493,17 +1506,19 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@kubohiroya/turbowarp-camera-source@0.4.0': {}
+  '@kubohiroya/turbowarp-aframe@0.3.0': {}
+
+  '@kubohiroya/turbowarp-camera-source@0.5.0': {}
 
   '@kubohiroya/turbowarp-extension-template@0.4.0': {}
 
-  '@kubohiroya/turbowarp-jsqr@0.3.0(@kubohiroya/turbowarp-camera-source@0.4.0)':
+  '@kubohiroya/turbowarp-jsqr@0.3.0(@kubohiroya/turbowarp-camera-source@0.5.0)':
     dependencies:
       jsqr: 1.4.0
     optionalDependencies:
-      '@kubohiroya/turbowarp-camera-source': 0.4.0
+      '@kubohiroya/turbowarp-camera-source': 0.5.0
 
-  '@kubohiroya/turbowarp-webrtc@0.2.0': {}
+  '@kubohiroya/turbowarp-webrtc@0.3.0': {}
 
   '@kubohiroya/vite-plugin-turbowarp-extension@0.4.0(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1))':
     dependencies:
@@ -2069,6 +2084,8 @@ snapshots:
   json-stable-stringify-without-jsonify@1.0.1: {}
 
   jsqr@1.4.0: {}
+
+  kalidokit@1.1.5: {}
 
   keyv@4.5.4:
     dependencies:

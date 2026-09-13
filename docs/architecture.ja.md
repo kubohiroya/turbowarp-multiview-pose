@@ -111,54 +111,32 @@ controllerはCamera Sourceから`{cameraId: "pose"}`のleaseを取得し、media
 TensorFlow.js backendはprocess全体で共有されるためresetせず、本機能が所有するmodel resourceは
 detectorのdisposeで解放します。
 
-## 多視点3D pose fusion
+## PoseFrame3D avatar retarget
 
-`poseFusion3D`は独立した起動時固定・既定OFF flagです。bufferへ入力するPoseFrame2D JSONは
-fusion appがWebRTC data channelで受信したものであり、本機能拡張はtransportもclockも所有しません。
+`avatarRetargetV1`は独立した起動時固定・既定OFF flagです。runtime key
+`turbowarpAFrameCapability`へ`requireVersion(1)`を呼び、TurboWarp-A-Frame capabilityの公開同期
+scene操作7種だけを利用します。A-Frame DOM、Three.js `object3D`、GLTF内部boneへはアクセス
+しません。capability v1は`@kubohiroya/turbowarp-aframe@0.3.0`で公開済みです。
 
-cameraごとにtimestamp順のring bufferを持ちます。slot数は設定delayとjitter windowから算出し、
-16〜600 frameに制限します。buffer対象cameraは最大16台です。jitter window内で順序が入れ替わった
-frameは、ringの短い側をずらしてtimestamp位置へ挿入するため、通常の順序どおりの追加はO(1)の
-ままです。timestampの重複、最新frameからjitter windowより古い到着、満杯ringの最古frameより
-古い到着はdropとして計上し、bufferしません。ここではcameraごとのclock offsetを推定しません。
-capture timestampは別実装の同期済みlocal time serviceが与える不透明値のまま扱います。
+asset登録では宣言的template JSONをA-Frameへ送り、検証済みrig mappingを保持します。各boneは
+対応するKalidokit pose rig出力、`{avatar}`を含むselector、任意Euler offset degreeで定義します。
+適用時は対応するexact-v1 PoseFrame3DとPoseFrame2Dの両方を要求します。PoseFrame3Dの`personId`と
+PoseFrame2Dの`trackingId`が一致するpersonだけを結合しますが、これは時刻alignmentではありません。
 
-frameをbufferするのは、その`cameraId`のcalibration profileが読み込み済みで、かつそのprofileが
-frameを説明できる場合だけです。`calibrationId`や解像度が一致しないframeは、誤ったintrinsicで
-そのまま三角測量されてしまうため拒否します。これらは重複や遅延到着と同様にdropとして計上し、
-throwしません。ingestはdata channelのhot pathであり、設定を誤ったpeer 1台で実行中のscriptを
-止めるべきではないからです。calibration済みcameraしかbufferしないので、未知のcamera IDが
-ring bufferを占有することもありません。
+adapterは両方のCOCO-17 recordを、exact pinした`kalidokit@1.1.5`が要求する33 positionへ
+決定論的に変換します。screen座標にはPoseFrame2Dの`frameWidth`／`frameHeight`を使い、world座標は
+外部serviceの値を維持します。不足するBlazePose face／hand／foot pointは低visibilityで中点補間
+または複製します。`runtime: "tfjs"`、`enableLegs: true`のKalidokit `Pose.solve`だけをrotation
+solverとし、radian出力をA-Frame degreeへ変換します。hips結果にroot scale／offsetを適用し、
+自前rotation fallbackは持ちません。joint／personがbinding threshold未満なら該当transformだけを
+skipし、直前値を維持します。
 
-`fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayを引いた1つの過去の
-瞬間を解決し、全cameraをその瞬間で再sampleします。前後のframeで挟めたkeypointは線形補間し、
-片側がocclusionのkeypointは低信頼値を混ぜず見えている側の観測を採用します。挟めないcamera、
-またはjitter windowの2倍より広い間隔しかないcameraは、最大1 jitter windowだけ直近frameを保持し、
-それを超える場合は寄与しません。
+最大6 person IDを一意なtemplate instanceへbindします。recognition遷移は設定可能なA-Frame
+eventで通知し、application側がPerformance DSLのstart／end effectへ接続できます。1人の
+capability失敗は`partial`診断へ集約し、他avatarを継続します。rebind、明示reset、project
+lifecycle reset、disposeでは可能ならend eventを送り、生成instanceと一時状態をcleanupします。
 
-camera間の対応付けは、異なるcameraの追跡人物のすべての組について、共有する確信のあるkeypoint
-での2視点reprojection誤差の平均をcostとし、共有keypointは4点以上・最大12点で打ち切ります。costの
-小さい組から貪欲にmergeし、同一cameraの2視点が1人になるmergeは拒否します。2視点の三角測量は
-2本の視線の最短距離の中点を閉形式で求め、この二乗オーダーの段を反復解法から外します。3視点
-以上はscore重み付き線形解法（Jacobiは相対収束判定）を使います。16 camera×6人の上限で1回の統合
-は約80 ms、4 camera×2人では約1 msです。
-
-2台以上のcameraが覆うclusterは、keypointごとにcheirality判定とreprojection判定付きで三角測量
-します。全視点が一致しない場合は、2視点ごとの仮解に対してreprojection閾値内に収まる視点数を
-数え、最大の一致集合で三角測量し直します。これにより少数の誤検出はkeypointを引きずらずに
-捨てられます（視点が2つの解に均等に割れる場合は原理的に区別できません）。pixel観測はprofileの
-OpenCV rational modelで歪み補正するため、係数0／4／5／8個に対応し、それ以外はprofile読み込み時
-に拒否します。
-
-registryはcameraとtracking IDの重なりから`person-N`のidentityを維持し、keypointごとに最後に
-三角測量できた位置を保持します。確信のある視点が2つ未満のkeypointはその位置を保持してscore `0`
-を返し、実測値と保持値を利用側が区別できるようにします。組み立てたframeは保持する前に、
-pinnedのPoseFrame3D v1 schemaで検証します。
-
-bufferが空、覆うcameraが2台未満、多視点で見えた人物がいない場合は想定内の一時状態として
-`false`を返し、直前の統合結果を保持したままerror codeを公開します。不正なJSON、他contractの
-schema、不正なcalibration profileはerrorになります。停止ボタン、project reload、extension dispose
-ではbufferと統合結果を解放し、明示cleanupでは読み込み済みcalibration profileも解放します。
-`PROJECT_RUN_STOP`では解放しません。runtimeはthread queueが空になるたびにこのeventを出すため、
-hat scriptでframeをbufferするevent駆動のprojectがmessageの合間にjitter bufferを失ってしまいます。
-camera leaseと一時skinはこのeventでも解放します。
+PoseFrame3Dは別実装の3D serviceから届くexact v1境界dataです。`timestampUs`は不透明値として
+recognition event dataへcopyするだけです。frame alignment、履歴保持／query、triangulation、
+3D solveは行いません。Kalidokitは上流でdeprecatedでありnative BlazePose landmarkを想定するため、
+このCOCO-17拡張は明示的な精度制約です。release前に対象GLTF rigを実browserで検証します。

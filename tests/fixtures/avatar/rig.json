@@ -1,0 +1,17 @@
+{
+  "rootScale": 2,
+  "rootOffset": [1, 2, 3],
+  "recognitionStartEvent": "actor-recognition-start",
+  "recognitionEndEvent": "actor-recognition-end",
+  "bones": [
+    {
+      "selector": "#{avatar}-left-upper-arm",
+      "rig": "LeftUpperArm",
+      "offsetDegrees": [10, 20, 30]
+    },
+    {
+      "selector": "#{avatar}-right-upper-arm",
+      "rig": "RightUpperArm"
+    }
+  ]
+}

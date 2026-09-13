@@ -16,7 +16,8 @@ import { ProtocolV1Codec } from "./protocol/codec.js";
 import { CameraCalibrationController } from "./calibration/controller.js";
 import { OpenCvChessboardCalibrationBackend } from "./calibration/opencv-backend.js";
 import type { CalibrationBackendPort } from "./calibration/types.js";
-import { PoseFusionController } from "./fusion/controller.js";
+import { AvatarRetargetController } from "./avatar/controller.js";
+import type { AvatarPoseSolverPort } from "./avatar/types.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -35,7 +36,7 @@ interface BlockDefinition {
     | "webgpuMoveNetMultiPose"
     | "protocolV1Codec"
     | "cameraCalibrationV1"
-    | "poseFusion3D";
+    | "avatarRetargetV1";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -54,11 +55,12 @@ export interface MultiviewPoseExtensionOptions {
   poseEnabled?: boolean;
   protocolEnabled?: boolean;
   calibrationEnabled?: boolean;
-  fusionEnabled?: boolean;
+  avatarEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
   calibrationBackend?: CalibrationBackendPort;
+  avatarPoseSolver?: AvatarPoseSolverPort;
   nowMilliseconds?: () => number;
 }
 
@@ -69,32 +71,23 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly poseEnabled: boolean;
   private readonly protocolEnabled: boolean;
   private readonly calibrationEnabled: boolean;
-  private readonly fusionEnabled: boolean;
+  private readonly avatarEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
   private readonly pose: PosePipelineController;
   private readonly protocol: ProtocolV1Codec;
   private readonly calibration: CameraCalibrationController;
-  private readonly fusion: PoseFusionController;
+  private readonly avatar: AvatarRetargetController;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
   private operation = 0;
-  /**
-   * Runs whenever the thread queue empties, which releases camera leases and
-   * temporary skins but must keep buffered fusion state alive: event-driven
-   * projects buffer frames from hat scripts that finish between messages.
-   */
-  private readonly runStopListener = () => {
+  private readonly stopListener = () => {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
-  };
-  /** The stop button and project reload also discard buffered fusion state. */
-  private readonly stopListener = () => {
-    this.runStopListener();
-    this.fusion.stop();
+    this.avatar.reset();
   };
   private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
@@ -110,7 +103,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       options.protocolEnabled ?? featureFlags.protocolV1Codec;
     this.calibrationEnabled =
       options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
-    this.fusionEnabled = options.fusionEnabled ?? featureFlags.poseFusion3D;
+    this.avatarEnabled = options.avatarEnabled ?? featureFlags.avatarRetargetV1;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -128,9 +121,12 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
         ? { nowMilliseconds: options.nowMilliseconds }
         : {}),
     });
-    this.fusion = new PoseFusionController();
+    this.avatar = new AvatarRetargetController(
+      this.runtime,
+      options.avatarPoseSolver,
+    );
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
-    this.runtime.on?.("PROJECT_RUN_STOP", this.runStopListener);
+    this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
     this.runtime.on?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.on?.("targetWasRemoved", this.targetRemovedListener);
@@ -429,102 +425,79 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.calibration.profileJson();
   }
 
-  public startPoseFusion(args: {
-    DELAY_MS: unknown;
-    JITTER_MS: unknown;
-    MIN_SCORE: unknown;
+  public registerAvatarAsset(args: {
+    ASSET_ID: unknown;
+    TEMPLATE_JSON: unknown;
+    RIG_JSON: unknown;
   }): void {
-    this.requireFusionEnabled();
-    this.fusion.start({
-      delayMilliseconds: Scratch.Cast.toNumber(args.DELAY_MS),
-      jitterMilliseconds: Scratch.Cast.toNumber(args.JITTER_MS),
-      minKeypointScore: Scratch.Cast.toNumber(args.MIN_SCORE),
-    });
+    this.requireAvatarEnabled();
+    this.avatar.registerAsset(
+      Scratch.Cast.toString(args.ASSET_ID),
+      Scratch.Cast.toString(args.TEMPLATE_JSON),
+      Scratch.Cast.toString(args.RIG_JSON),
+    );
   }
 
-  public stopPoseFusion(): void {
-    this.fusion.stop();
+  public bindAvatarPerson(args: {
+    PERSON_ID: unknown;
+    INSTANCE_ID: unknown;
+    ASSET_ID: unknown;
+    PARENT: unknown;
+    CONFIDENCE: unknown;
+  }): void {
+    this.requireAvatarEnabled();
+    this.avatar.bind(
+      Scratch.Cast.toString(args.PERSON_ID),
+      Scratch.Cast.toString(args.INSTANCE_ID),
+      Scratch.Cast.toString(args.ASSET_ID),
+      Scratch.Cast.toString(args.PARENT),
+      Scratch.Cast.toNumber(args.CONFIDENCE),
+    );
   }
 
-  public cleanupPoseFusion(): void {
-    this.fusion.cleanup();
+  public unbindAvatarPerson(args: { PERSON_ID: unknown }): void {
+    this.requireAvatarEnabled();
+    this.avatar.unbind(Scratch.Cast.toString(args.PERSON_ID));
   }
 
-  public loadFusionCameraCalibration(args: { JSON: unknown }): void {
-    this.requireFusionEnabled();
-    this.fusion.loadCalibration(Scratch.Cast.toString(args.JSON));
+  public applyPoseFrame3DToAvatars(args: {
+    POSE3D_JSON: unknown;
+    POSE2D_JSON: unknown;
+  }): void {
+    this.requireAvatarEnabled();
+    this.avatar.apply(
+      Scratch.Cast.toString(args.POSE3D_JSON),
+      Scratch.Cast.toString(args.POSE2D_JSON),
+    );
   }
 
-  public bufferPoseFrame2D(args: { JSON: unknown }): void {
-    this.requireFusionEnabled();
-    this.fusion.ingestFrame(Scratch.Cast.toString(args.JSON));
+  public resetAvatarRetarget(): void {
+    this.avatar.reset();
   }
 
-  public fuseBufferedPoseFrame3D(): void {
-    this.requireFusionEnabled();
-    this.fusion.fuseBufferedInstant();
+  public avatarBindingCount(): number {
+    return this.avatarEnabled ? this.avatar.bindingCount() : 0;
   }
 
-  public fusePoseFrame3DAt(args: { TIMESTAMP_US: unknown }): void {
-    this.requireFusionEnabled();
-    this.fusion.fuseAt(Scratch.Cast.toNumber(args.TIMESTAMP_US));
+  public avatarUpdatedCount(): number {
+    return this.avatarEnabled ? this.avatar.updatedCount() : 0;
   }
 
-  public latestPoseFrame3D(): string {
-    return this.fusionEnabled ? this.fusion.latestFrameJson() : "";
+  public avatarRetargetState(): string {
+    return this.avatarEnabled ? this.avatar.state() : "disabled";
   }
 
-  public synchronizedPoseSet2D(): string {
-    return this.fusionEnabled ? this.fusion.synchronizedSampleJson() : "";
-  }
-
-  public poseFusionState(): string {
-    return this.fusionEnabled ? this.fusion.state() : "disabled";
-  }
-
-  public poseFusionReady(): boolean {
-    return this.fusionEnabled && this.fusion.ready();
-  }
-
-  public poseFusionCameraCount(): number {
-    return this.fusion.cameraCount();
-  }
-
-  public poseFusionBufferedFrameCount(): number {
-    return this.fusion.bufferedFrameCount();
-  }
-
-  public poseFusionDroppedFrameCount(): number {
-    return this.fusion.droppedFrameCount();
-  }
-
-  public poseFusionPersonCount(): number {
-    return this.fusion.personCount();
-  }
-
-  public poseFusionTimestampUs(): number {
-    return this.fusion.fusedTimestampUs();
-  }
-
-  public poseFusionReprojectionErrorPx(): number {
-    return this.fusion.meanReprojectionErrorPx();
-  }
-
-  public poseFusionErrorCode(): string {
-    return this.fusion.errorCode();
-  }
-
-  public poseFusionError(): string {
-    return this.fusion.errorMessage();
+  public avatarRetargetError(): string {
+    return this.avatar.error();
   }
 
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
-    this.fusion.stop();
+    this.avatar.reset();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
-    this.runtime.off?.("PROJECT_RUN_STOP", this.runStopListener);
+    this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
     this.runtime.off?.("RUNTIME_DISPOSED", this.disposeListener);
     this.runtime.off?.("targetWasRemoved", this.targetRemovedListener);
@@ -554,18 +527,18 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     }
   }
 
-  private requireFusionEnabled(): void {
-    if (!this.fusionEnabled) {
-      throw new Error(
-        "Pose fusion 3D is disabled. Enable it before the project starts.",
-      );
-    }
-  }
-
   private requireCalibrationEnabled(): void {
     if (!this.calibrationEnabled) {
       throw new Error(
         "Camera calibration v1 is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
+  private requireAvatarEnabled(): void {
+    if (!this.avatarEnabled) {
+      throw new Error(
+        "Avatar retarget v1 is disabled. Enable it before the project starts.",
       );
     }
   }
@@ -575,7 +548,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
     if (feature === "protocolV1Codec") return this.protocolEnabled;
     if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
-    return this.fusionEnabled;
+    return this.avatarEnabled;
   }
 
   private requireSession(): OfferQrSession {

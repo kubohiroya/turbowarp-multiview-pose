@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MultiviewPoseExtension } from "../src/extension.js";
 import { WEBRTC_CAPABILITY_KEY } from "../src/webrtc-capability.js";
-import {
-  lookAtCalibration,
-  poseFrame2D,
-  projectPerson,
-  skeleton,
-} from "./fusion-fixtures.js";
+import { AFRAME_CAPABILITY_KEY } from "../src/avatar/aframe-port.js";
 
 interface FakeRenderer extends TurboWarpRenderer {
   created: Map<number, string>;
@@ -78,7 +73,7 @@ function setup(code = "offer-code") {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MultiviewPoseExtension offer QR blocks", () => {
-  it("keeps the QR, pose, protocol, and calibration feature flags independent", () => {
+  it("keeps all five feature flags independent", () => {
     setup();
     const poseModel = {
       initializeWebGpu: vi.fn(async () => undefined),
@@ -143,102 +138,20 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(calibrationOpcodes).toContain("startCameraCalibration");
     expect(calibrationOpcodes).toContain("cameraCalibrationJson");
     expect(calibrationOpcodes).not.toContain("decodeProtocolJson");
-    expect(calibrationOpcodes).not.toContain("startPoseFusion");
 
-    const fusionOnly = new MultiviewPoseExtension({
+    const avatarOnly = new MultiviewPoseExtension({
       enabled: false,
       poseEnabled: false,
       protocolEnabled: false,
       calibrationEnabled: false,
-      fusionEnabled: true,
+      avatarEnabled: true,
     });
-    const fusionOpcodes = (
-      fusionOnly.getInfo().blocks as Array<{ opcode: string }>
+    const avatarOpcodes = (
+      avatarOnly.getInfo().blocks as Array<{ opcode: string }>
     ).map(({ opcode }) => opcode);
-    expect(fusionOpcodes).toContain("startPoseFusion");
-    expect(fusionOpcodes).toContain("latestPoseFrame3D");
-    expect(fusionOpcodes).not.toContain("startCameraCalibration");
-  });
-
-  it("keeps pose fusion blocks hidden while the startup flag is off", () => {
-    setup();
-    const extension = new MultiviewPoseExtension({ fusionEnabled: false });
-    const opcodes = (
-      extension.getInfo().blocks as Array<{ opcode: string }>
-    ).map(({ opcode }) => opcode);
-    expect(opcodes).not.toContain("startPoseFusion");
-    expect(extension.poseFusionState()).toBe("disabled");
-    expect(extension.poseFusionReady()).toBe(false);
-    expect(() =>
-      extension.startPoseFusion({
-        DELAY_MS: 100,
-        JITTER_MS: 80,
-        MIN_SCORE: 0.3,
-      }),
-    ).toThrow(/disabled/u);
-  });
-
-  it("fuses buffered 2D frames into PoseFrame3D and stops with the project", () => {
-    const { listeners } = setup();
-    const extension = new MultiviewPoseExtension({ fusionEnabled: true });
-    const calibrations = [
-      lookAtCalibration("camera-1", { x: 3.4, y: 1.7, z: 3.1 }),
-      lookAtCalibration("camera-2", { x: -3.2, y: 1.8, z: 2.9 }),
-    ];
-    for (const calibration of calibrations) {
-      extension.loadFusionCameraCalibration({
-        JSON: JSON.stringify(calibration),
-      });
-    }
-    extension.startPoseFusion({
-      DELAY_MS: 50,
-      JITTER_MS: 80,
-      MIN_SCORE: 0.3,
-    });
-    const points = skeleton({ x: 0.2, y: 0, z: -0.1 });
-    for (const [index, calibration] of calibrations.entries()) {
-      for (const timestampUs of [100_000, 133_000, 166_000]) {
-        extension.bufferPoseFrame2D({
-          JSON: JSON.stringify(
-            poseFrame2D(calibration.cameraId, timestampUs + index * 5_000, [
-              projectPerson(calibration, "movenet-1", points),
-            ]),
-          ),
-        });
-      }
-    }
-    expect(extension.poseFusionReady()).toBe(true);
-    expect(extension.poseFusionCameraCount()).toBe(2);
-    expect(extension.poseFusionBufferedFrameCount()).toBe(6);
-    extension.fuseBufferedPoseFrame3D();
-    expect(extension.poseFusionState()).toBe("ready");
-    expect(extension.poseFusionPersonCount()).toBe(1);
-    expect(extension.poseFusionTimestampUs()).toBe(121_000);
-    expect(extension.poseFusionReprojectionErrorPx()).toBeLessThan(1);
-    expect(extension.poseFusionErrorCode()).toBe("");
-    expect(extension.poseFusionError()).toBe("");
-    expect(JSON.parse(extension.latestPoseFrame3D())).toMatchObject({
-      schema: "twmp/pose-frame-3d",
-      version: 1,
-    });
-    expect(JSON.parse(extension.synchronizedPoseSet2D())).toMatchObject({
-      timestampUs: 121_000,
-    });
-
-    // Hat-driven projects idle between messages; PROJECT_RUN_STOP must not
-    // discard what the jitter buffer has accumulated.
-    listeners.get("PROJECT_RUN_STOP")?.();
-    expect(extension.poseFusionState()).toBe("ready");
-    expect(extension.poseFusionBufferedFrameCount()).toBe(6);
-    expect(extension.latestPoseFrame3D()).not.toBe("");
-
-    listeners.get("PROJECT_STOP_ALL")?.();
-    expect(extension.poseFusionState()).toBe("idle");
-    expect(extension.poseFusionBufferedFrameCount()).toBe(0);
-    expect(extension.latestPoseFrame3D()).toBe("");
-    expect(extension.poseFusionCameraCount()).toBe(2);
-    extension.cleanupPoseFusion();
-    expect(extension.poseFusionCameraCount()).toBe(0);
+    expect(avatarOpcodes).toContain("registerAvatarAsset");
+    expect(avatarOpcodes).toContain("applyPoseFrame3DToAvatars");
+    expect(avatarOpcodes).not.toContain("startCameraCalibration");
   });
 
   it("exposes protocol round-trip and diagnostic reporters", () => {
@@ -267,6 +180,50 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(extension.protocolJsonValid({ JSON: "{" })).toBe(false);
     expect(extension.protocolErrorPath()).toBe("/");
     expect(extension.protocolErrorMessage()).toMatch(/Invalid JSON/u);
+  });
+
+  it("cleans avatar instances through A-Frame capability v1 on disposal", () => {
+    const { runtime, listeners } = setup();
+    const nodes = new Set<string>();
+    const deleteSelector = vi.fn((selector: string) =>
+      nodes.delete(selector.replace(/^#/u, "")),
+    );
+    runtime[AFRAME_CAPABILITY_KEY] = {
+      version: 1,
+      requireVersion() {
+        return this;
+      },
+      loadTemplate: vi.fn(),
+      createFromTemplate: vi.fn(
+        (_template: string, instance: string) => void nodes.add(instance),
+      ),
+      setPosition: vi.fn(),
+      setRotation: vi.fn(),
+      emitEvent: vi.fn(),
+      deleteSelector,
+      countSelector: vi.fn((selector: string) =>
+        nodes.has(selector.replace(/^#/u, "")) ? 1 : 0,
+      ),
+    };
+    const extension = new MultiviewPoseExtension({
+      runtime,
+      avatarEnabled: true,
+    });
+    extension.registerAvatarAsset({
+      ASSET_ID: "actor",
+      TEMPLATE_JSON: '{"type":"group"}',
+      RIG_JSON: '{"bones":[{"selector":"#{avatar}-arm","rig":"LeftUpperArm"}]}',
+    });
+    extension.bindAvatarPerson({
+      PERSON_ID: "performer-1",
+      INSTANCE_ID: "avatar-1",
+      ASSET_ID: "actor",
+      PARENT: "#scene",
+      CONFIDENCE: 0.3,
+    });
+    listeners.get("RUNTIME_DISPOSED")?.();
+    expect(deleteSelector).toHaveBeenCalledWith("#avatar-1");
+    expect(extension.avatarBindingCount()).toBe(0);
   });
 
   it("keeps QR courier blocks hidden while the startup flag is off", async () => {

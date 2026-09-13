@@ -16,17 +16,20 @@ as a temporary sprite skin.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
 - Validates and round-trips all five pinned multiview-pose v1 application contracts.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
-- Buffers jittered PoseFrame2D streams per camera and resamples every camera at one past instant.
-- Triangulates the synchronized 2D sets into `twmp/pose-frame-3d` version 1 poses.
+- Retargets external PoseFrame3D v1 data onto up to six declarative A-Frame avatar rigs.
 
 ## Requirements and safety
 
 - TurboWarp with custom unsandboxed extensions enabled.
-- `@kubohiroya/turbowarp-webrtc` with runtime capability v2, loaded first.
-- `@kubohiroya/turbowarp-camera-source` 0.4 or later, loaded before pose startup.
+- `@kubohiroya/turbowarp-webrtc` 0.3.0 with runtime capability v2, loaded first.
+- `@kubohiroya/turbowarp-camera-source` 0.5.0, loaded before pose startup.
 - A browser and GPU combination supported by TensorFlow.js WebGPU.
 - WebAssembly support for the bundled OpenCV.js 4.12 calibration backend.
+- `@kubohiroya/turbowarp-aframe` 0.3.0 with scene capability v1, loaded before avatar setup.
 - The startup-fixed feature flags are independently OFF by default.
+
+Scene capability v1 is published in `@kubohiroya/turbowarp-aframe@0.3.0`. The consumer fails closed
+when capability v1 is absent.
 
 Set the flag before loading the extension:
 
@@ -53,10 +56,10 @@ Enable camera calibration independently:
 globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
 ```
 
-Enable multi-camera 3D pose fusion independently:
+Enable avatar retargeting independently:
 
 ```js
-globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
+globalThis.__TWMP_FEATURE_FLAGS__ = {avatarRetargetV1: true};
 ```
 
 Pose startup explicitly selects `webgpu` and fails closed if TensorFlow.js reports any other
@@ -130,49 +133,31 @@ grid, quality at least 0.2, and normalized corner displacement at least 0.015 fr
 sample. Between 8 and 40 samples are retained. A solve above the configured reprojection RMS is
 rejected without replacing the last validated profile.
 
-The fusion app pipeline consumes PoseFrame2D JSON that WebRTC data channels deliver from every
-camera peer, and needs one CameraCalibration v1 profile per camera:
+The avatar retarget vertical slice is:
 
 ```text
-load fusion camera calibration [(camera-1 profile JSON)]
-load fusion camera calibration [(camera-2 profile JSON)]
-start pose fusion delay [120] ms jitter [80] ms min keypoint score [0.3]
+register avatar asset [actor] template JSON [(templateJson)] rig JSON [(rigJson)]
+bind person [performer-1] to avatar [avatar-1] asset [actor] under [#scene] confidence [0.3]
 forever:
-  buffer PoseFrame2D JSON [(received data channel message)]
-  fuse PoseFrame3D at buffered delay
-  set [poseJson] to (latest PoseFrame3D JSON)
-stop pose fusion
+  apply PoseFrame3D [(externalPoseFrame3D)] with PoseFrame2D [(matchingPoseFrame2D)] to avatars
 ```
 
-Each camera keeps its own timestamp-ordered ring buffer. A frame that arrives out of order inside
-the jitter window is inserted at its timestamp position. A frame is counted by
-`dropped pose frame count` instead of being buffered when its camera has no loaded profile
-(`unknown-camera`), when its `calibrationId` or frame size does not match that profile
-(`calibration-mismatch`), when its timestamp is already buffered, when it is older than the jitter
-window, and when it is older than the retained window of a full ring. Load every camera profile
-before the frames of that camera start arriving.
+Rig JSON maps Kalidokit pose outputs to declarative A-Frame template selectors containing
+`{avatar}`. The controller matches PoseFrame3D `personId` to PoseFrame2D `trackingId`, adapts both
+COCO-17 records deterministically to BlazePose-33, and uses exact-pinned `kalidokit@1.1.5`
+`Pose.solve` as its only rotation solver. PoseFrame2D coordinates are normalized using its declared
+frame size. Missing hand, foot, and face landmarks are duplicated or interpolated with deliberately
+low visibility; this compatibility adapter is less precise than native BlazePose-33 input. The root
+uses Kalidokit's hips result plus the configured scale and offset. A low-confidence or missing joint
+preserves that bone's last transform; one missing or invalid performer does not stop other bindings.
+Recognition transitions emit configurable A-Frame events (default
+`twmp-recognition-start` and `twmp-recognition-end`) from the avatar root.
 
-`fuse PoseFrame3D at buffered delay` fuses the instant one configured delay behind the newest
-buffered timestamp, which is why the delay must cover the slowest camera's jitter. Every camera is
-resampled at that shared instant: a bracketed keypoint is interpolated linearly, a keypoint that is
-occluded on one side of the bracket keeps the visible observation, and a camera without a bracket
-holds its nearest frame for at most one jitter window. Use `fuse PoseFrame3D at timestamp [] us` to
-fuse an explicit past instant instead.
-
-The synchronized 2D sets are associated across cameras by two-view reprojection error, so one person
-never takes two views from the same camera. Each cluster seen by at least two cameras is triangulated
-per keypoint with score weighting and a cheirality check, and keeps a stable `person-N` identifier.
-When the views of a keypoint disagree, the largest set of views that agree on one point within the
-reprojection threshold wins, so a minority of wrong detections is discarded rather than pulling the
-keypoint away from the truth. A keypoint left with fewer than two confident views holds its last
-triangulated position and reports score `0`.
-
-Transient shortages do not throw and do not replace the last fused frame: `fuse` reports `false`,
-`pose fusion state` returns `buffering`, and `pose fusion error code` returns `empty-buffer`,
-`insufficient-cameras`, or `no-fused-person`. Frames that cannot be buffered report
-`unknown-camera`, `calibration-mismatch`, or `frame-dropped` without throwing, so one misconfigured
-peer cannot break a running project script. Invalid JSON, a foreign schema, and an invalid
-calibration profile throw.
+PoseFrame3D is boundary data produced by a separate 3D service. This extension carries its opaque
+`timestampUs` into recognition events only; it does not align frames, retain/query history,
+triangulate observations, or solve 3D coordinates. Kalidokit is deprecated upstream and was designed
+for BlazePose landmarks, so release validation must include the intended GLTF rigs and real browser
+motion; no custom solver fallback is provided.
 
 ## Block reference
 
@@ -576,182 +561,97 @@ Exports the last validated exact v1 profile, or an empty string when none exists
 | Type | Reporter |
 | Opcode | `cameraCalibrationJson` |
 
-### `start pose fusion delay [DELAY_MS] ms jitter [JITTER_MS] ms min keypoint score [MIN_SCORE]`
+### `register avatar asset [ASSET_ID] template JSON [TEMPLATE_JSON] rig JSON [RIG_JSON]`
 
-Starts the multi-camera jitter buffer that fuses one past instant behind the newest frame.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `startPoseFusion` |
-| `DELAY_MS` | Number, default: `120` |
-| `JITTER_MS` | Number, default: `80` |
-| `MIN_SCORE` | Number, default: `0.3` |
-
-### `stop pose fusion`
-
-Clears every buffered frame and fused result while keeping loaded calibration profiles.
+Registers an A-Frame 0.3.0 template and its Kalidokit rig-output selector mapping.
 
 | Property | Value |
 |---|---|
 | Type | Command |
-| Opcode | `stopPoseFusion` |
+| Opcode | `registerAvatarAsset` |
+| `ASSET_ID` | String, default: `actor` |
+| `TEMPLATE_JSON` | String, default: `{"type":"group","children":[]}` |
+| `RIG_JSON` | String, default: `{"bones":[{"selector":"#{avatar}-left-arm","rig":"LeftUpperArm"}]}` |
 
-### `cleanup pose fusion`
+### `bind person [PERSON_ID] to avatar [INSTANCE_ID] asset [ASSET_ID] under [PARENT] confidence [CONFIDENCE]`
 
-Clears buffered frames, fused results, and every loaded fusion calibration profile.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `cleanupPoseFusion` |
-
-### `load fusion camera calibration [JSON]`
-
-Loads one CameraCalibration v1 profile and derives its world-to-camera projection.
+Creates an avatar instance and binds one PoseFrame3D person ID to it.
 
 | Property | Value |
 |---|---|
 | Type | Command |
-| Opcode | `loadFusionCameraCalibration` |
-| `JSON` | String, default: `{}` |
+| Opcode | `bindAvatarPerson` |
+| `PERSON_ID` | String, default: `performer-1` |
+| `INSTANCE_ID` | String, default: `avatar-1` |
+| `ASSET_ID` | String, default: `actor` |
+| `PARENT` | String, default: `#scene` |
+| `CONFIDENCE` | Number, default: `0.3` |
 
-### `buffer PoseFrame2D JSON [JSON]`
+### `unbind avatar for person [PERSON_ID]`
 
-Validates one PoseFrame2D v1 and inserts it into its camera ring buffer in timestamp order.
-
-| Property | Value |
-|---|---|
-| Type | Command |
-| Opcode | `bufferPoseFrame2D` |
-| `JSON` | String, default: `{}` |
-
-### `fuse PoseFrame3D at buffered delay`
-
-Fuses the instant one configured delay behind the newest buffered timestamp.
+Emits recognition end, removes the created avatar instance, and clears its binding.
 
 | Property | Value |
 |---|---|
 | Type | Command |
-| Opcode | `fuseBufferedPoseFrame3D` |
+| Opcode | `unbindAvatarPerson` |
+| `PERSON_ID` | String, default: `performer-1` |
 
-### `fuse PoseFrame3D at timestamp [TIMESTAMP_US] us`
+### `apply PoseFrame3D [POSE3D_JSON] with PoseFrame2D [POSE2D_JSON] to avatars`
 
-Fuses one explicit past instant expressed in the synchronized microsecond time base.
+Adapts corresponding exact v1 frames to BlazePose-33, solves only with Kalidokit, and applies up to six rigs.
 
 | Property | Value |
 |---|---|
 | Type | Command |
-| Opcode | `fusePoseFrame3DAt` |
-| `TIMESTAMP_US` | Number, default: `0` |
+| Opcode | `applyPoseFrame3DToAvatars` |
+| `POSE3D_JSON` | String, default: `{}` |
+| `POSE2D_JSON` | String, default: `{}` |
 
-### `latest PoseFrame3D JSON`
+### `reset avatar retarget state`
 
-Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.
+Removes retarget-created instances and clears assets, bindings, effects, and diagnostics after a scene reset.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `resetAvatarRetarget` |
+
+### `avatar binding count`
+
+Returns the current person-to-avatar binding count, at most six.
 
 | Property | Value |
 |---|---|
 | Type | Reporter |
-| Opcode | `latestPoseFrame3D` |
+| Opcode | `avatarBindingCount` |
 
-### `synchronized 2D pose set JSON`
+### `avatars updated by last frame`
 
-Returns the last resampled per-camera 2D keypoint set used for triangulation.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `synchronizedPoseSet2D` |
-
-### `pose fusion state`
-
-Returns idle, buffering, fusing, ready, or error.
+Returns how many bound avatars accepted the last PoseFrame3D.
 
 | Property | Value |
 |---|---|
 | Type | Reporter |
-| Opcode | `poseFusionState` |
+| Opcode | `avatarUpdatedCount` |
 
-### `pose fusion ready?`
+### `avatar retarget state`
 
-Returns true when fusion is started and at least two cameras are calibrated.
-
-| Property | Value |
-|---|---|
-| Type | Boolean |
-| Opcode | `poseFusionReady` |
-
-### `fusion calibrated camera count`
-
-Returns how many camera calibration profiles are loaded for fusion.
+Returns disabled, idle, configured, bound, ready, partial, or error.
 
 | Property | Value |
 |---|---|
 | Type | Reporter |
-| Opcode | `poseFusionCameraCount` |
+| Opcode | `avatarRetargetState` |
 
-### `buffered pose frame count`
+### `avatar retarget error`
 
-Returns how many PoseFrame2D frames are currently retained across all ring buffers.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionBufferedFrameCount` |
-
-### `dropped pose frame count`
-
-Returns how many frames were rejected as duplicates or as arrivals past the jitter window.
+Returns per-person errors from the latest frame while other avatars continue updating.
 
 | Property | Value |
 |---|---|
 | Type | Reporter |
-| Opcode | `poseFusionDroppedFrameCount` |
-
-### `fused person count`
-
-Returns how many people the last successful fusion produced.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionPersonCount` |
-
-### `fused timestamp us`
-
-Returns the synchronized timestamp of the last successful fusion in microseconds.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionTimestampUs` |
-
-### `fused mean reprojection error px`
-
-Returns the mean reprojection error of the last successful fusion in pixels.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionReprojectionErrorPx` |
-
-### `pose fusion error code`
-
-Returns the latest fusion error code, or an empty string.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionErrorCode` |
-
-### `pose fusion error`
-
-Returns the latest fusion error message.
-
-| Property | Value |
-|---|---|
-| Type | Reporter |
-| Opcode | `poseFusionError` |
+| Opcode | `avatarRetargetError` |
 
 <!-- END GENERATED BLOCKS -->
 
@@ -775,13 +675,6 @@ Returns the latest fusion error message.
 | Resolution changes mid-session | The sample is rejected with `resolution-mismatch`. |
 | Weak or duplicate board view | The sample is rejected without entering the solve set. |
 | Cancel/reload/disposal | Camera lease and temporary samples are released; the last valid profile remains. |
-| Fusion flag OFF | Fusion blocks are hidden; the other vertical slices remain independent. |
-| Late or duplicate 2D frame | The frame is counted by `dropped pose frame count` and never enters a ring buffer. |
-| Instant without two cameras | Fusion reports `insufficient-cameras`, keeps the last fused frame, and does not throw. |
-| Keypoint with fewer than two views | Its last triangulated position is held and its score is reported as `0`. |
-| Frame without a matching profile | The frame is dropped with `unknown-camera` or `calibration-mismatch`; it never reaches a ring buffer. |
-| Scripts finish running | Buffered frames survive; only the stop button, project reload, and disposal clear them. |
-| Fusion stop/reload/disposal | Buffers and fused results are cleared; loaded calibration profiles survive until cleanup. |
 
 The envelope format is `twmp-qr/1`. It includes session, peer, kind, message, zero-based part index,
 part count, source length, and SHA-256 metadata. Inputs are capped at 128 KiB and 64 parts.
@@ -828,6 +721,11 @@ the uncompressed extension bundle by about 11 MB. Unit tests inject the backend 
 real camera, printed-board, OpenCV WASM initialization, and geometric accuracy require browser E2E
 validation on deployment hardware.
 
+Avatar tests inject A-Frame scene capability v1 and exercise exact PoseFrame3D validation, root and
+bone transforms, confidence handling, six-person limits, per-person failure isolation, recognition
+events, rebind, scene-reset detection, and cleanup. A real A-Frame scene, GLTF asset, and avatar rig
+still require browser E2E validation.
+
 ## Rollback
 
 Set `qrCourierPairing` to `false` before extension startup, stop the project to release temporary
@@ -839,6 +737,8 @@ Set `protocolV1Codec` to `false` to remove the high-level codec blocks; unsuppor
 rejected rather than falling back to v1.
 Set `cameraCalibrationV1` to `false` to stop new calibration sessions. Cancel before reload to release
 temporary samples; retain and use only a previously validated exact v1 profile.
+Set `avatarRetargetV1` to `false` before startup to remove retarget blocks while preserving the
+generic A-Frame scene graph and static avatars.
 
 ## License
 

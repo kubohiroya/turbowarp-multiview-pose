@@ -1,0 +1,7 @@
+{
+  "type": "group",
+  "children": [
+    { "type": "group", "id": "left-upper-arm" },
+    { "type": "group", "id": "right-upper-arm" }
+  ]
+}
