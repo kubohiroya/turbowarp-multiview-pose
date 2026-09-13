@@ -321,10 +321,10 @@ function checkAvatarPolicy() {
   }
   if (
     packageMetadata.peerDependencies?.["@kubohiroya/turbowarp-aframe"] !==
-    "0.2.0"
+    "0.3.0"
   ) {
     errors.push(
-      "package.json must pin the TurboWarp-A-Frame peer exactly to 0.2.0",
+      "package.json must pin the TurboWarp-A-Frame peer exactly to 0.3.0",
     );
   }
   if (!featureFlagSource.includes("avatarRetargetV1")) {
