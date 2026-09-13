@@ -110,3 +110,38 @@ controllerはCamera Sourceから`{cameraId: "pose"}`のleaseを取得し、media
 停止時は実行中の初期化／推論を待ち、detectorをdisposeし、camera leaseと最新frameを解放します。
 TensorFlow.js backendはprocess全体で共有されるためresetせず、本機能が所有するmodel resourceは
 detectorのdisposeで解放します。
+
+## 多視点3D pose fusion
+
+`poseFusion3D`は独立した起動時固定・既定OFF flagです。bufferへ入力するPoseFrame2D JSONは
+fusion appがWebRTC data channelで受信したものであり、本機能拡張はtransportもclockも所有しません。
+
+cameraごとにtimestamp順のring bufferを持ちます。slot数は設定delayとjitter windowから算出し、
+16〜600 frameに制限します。buffer対象cameraは最大16台です。jitter window内で順序が入れ替わった
+frameは、ringの短い側をずらしてtimestamp位置へ挿入するため、通常の順序どおりの追加はO(1)の
+ままです。timestampの重複、最新frameからjitter windowより古い到着、満杯ringの最古frameより
+古い到着はdropとして計上し、bufferしません。ここではcameraごとのclock offsetを推定しません。
+capture timestampは別実装の同期済みlocal time serviceが与える不透明値のまま扱います。
+
+`fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayを引いた1つの過去の
+瞬間を解決し、全cameraをその瞬間で再sampleします。前後のframeで挟めたkeypointは線形補間し、
+片側がocclusionのkeypointは低信頼値を混ぜず見えている側の観測を採用します。挟めないcamera、
+またはjitter windowの2倍より広い間隔しかないcameraは、最大1 jitter windowだけ直近frameを保持し、
+それを超える場合は寄与しません。
+
+camera間の対応付けは、異なるcameraの追跡人物のすべての組について、共有する確信のあるkeypoint
+での2視点reprojection誤差の平均をcostとし、共有keypointが4点以上あることを要求します。costの
+小さい組から貪欲にmergeし、同一cameraの2視点が1人になるmergeは拒否します。2台以上のcameraが
+覆うclusterは、keypointごとにscore重み付き線形解法、cheirality判定、最悪視点を1回だけ除外する
+reprojection判定で三角測量します。pixel観測はprofileのOpenCV rational modelで歪み補正するため、
+係数0／4／5／8個に対応し、それ以外はprofile読み込み時に拒否します。
+
+registryはcameraとtracking IDの重なりから`person-N`のidentityを維持し、keypointごとに最後に
+三角測量できた位置を保持します。確信のある視点が2つ未満のkeypointはその位置を保持してscore `0`
+を返し、実測値と保持値を利用側が区別できるようにします。組み立てたframeは保持する前に、
+pinnedのPoseFrame3D v1 schemaで検証します。
+
+bufferが空、覆うcameraが2台未満、多視点で見えた人物がいない場合は想定内の一時状態として
+`false`を返し、直前の統合結果を保持したままerror codeを公開します。不正なJSON、他contractの
+schema、不正なcalibration profileはerrorになります。project停止、project reload、extension dispose
+ではbufferと統合結果を解放し、明示cleanupでは読み込み済みcalibration profileも解放します。

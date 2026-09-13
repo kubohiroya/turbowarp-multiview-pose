@@ -127,3 +127,44 @@ keeping the last validated profile in memory. Explicit cleanup clears that profi
 the same exact v1 schema and recursively rejects pairing-secret keys. The 11 MB uncompressed bundle
 increase is accepted to keep the sole production backend available on an offline venue LAN; real
 camera/board geometry and WebAssembly startup remain browser E2E responsibilities.
+
+## Multi-camera 3D pose fusion
+
+`poseFusion3D` is an independent startup-fixed, default-OFF flag. The fusion app feeds the buffer
+with PoseFrame2D JSON received over WebRTC data channels; this extension owns neither the transport
+nor the clock.
+
+Every camera gets its own timestamp-ordered ring buffer. Slot count is derived from the configured
+delay and jitter window, bounded to 16 to 600 frames, and at most 16 cameras are buffered. An
+in-window reorder is inserted at its timestamp position by shifting the shorter side of the ring, so
+the common in-order append stays O(1). A duplicate timestamp, an arrival older than the newest frame
+minus the jitter window, and an arrival older than the oldest retained frame of a full ring are
+counted as dropped instead of buffered. None of this estimates a per-camera clock offset: capture
+timestamps stay opaque values from the separate synchronized local time service.
+
+`fuse PoseFrame3D at buffered delay` resolves the newest buffered timestamp minus the configured
+delay, and every camera is resampled at that single past instant. A keypoint bracketed by two frames
+is interpolated linearly; a keypoint that is occluded on one side of the bracket keeps the visible
+observation instead of blending a low-confidence estimate into it; a camera without a bracket, or
+with a bracket wider than twice the jitter window, holds its nearest frame for at most one jitter
+window and otherwise contributes nothing.
+
+Cross-camera association scores every pair of tracked persons from different cameras by the mean
+two-view reprojection error over their shared confident keypoints, requiring at least four shared
+keypoints. Pairs are merged greedily from the lowest cost, and a merge that would place two views of
+the same camera in one person is rejected. Each cluster covered by at least two cameras is
+triangulated per keypoint with a score-weighted linear solver, a cheirality check, and a
+reprojection check that drops the worst view once before giving up. Pixel observations are
+undistorted with the OpenCV rational model of the profile, so 0, 4, 5, or 8 coefficients are
+supported and anything else is rejected when the profile is loaded.
+
+A registry keeps stable `person-N` identifiers by camera and tracking-ID overlap, and keeps the last
+triangulated position of every keypoint. A keypoint left with fewer than two confident views holds
+that last position and reports score `0`, so consumers can distinguish measured from held values.
+The assembled frame is checked against the pinned PoseFrame3D v1 schema before it is retained.
+
+Empty buffers, fewer than two covering cameras, and an instant with no multi-camera person are
+expected transient states: they report `false`, keep the last fused frame, and expose an error code.
+Invalid JSON, a foreign schema, and an invalid calibration profile throw. Project stop, project
+reload, and extension disposal clear buffers and fused results; explicit cleanup also clears the
+loaded calibration profiles.

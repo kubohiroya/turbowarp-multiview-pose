@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MultiviewPoseExtension } from "../src/extension.js";
 import { WEBRTC_CAPABILITY_KEY } from "../src/webrtc-capability.js";
+import {
+  lookAtCalibration,
+  poseFrame2D,
+  projectPerson,
+  skeleton,
+} from "./fusion-fixtures.js";
 
 interface FakeRenderer extends TurboWarpRenderer {
   created: Map<number, string>;
@@ -137,6 +143,95 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(calibrationOpcodes).toContain("startCameraCalibration");
     expect(calibrationOpcodes).toContain("cameraCalibrationJson");
     expect(calibrationOpcodes).not.toContain("decodeProtocolJson");
+    expect(calibrationOpcodes).not.toContain("startPoseFusion");
+
+    const fusionOnly = new MultiviewPoseExtension({
+      enabled: false,
+      poseEnabled: false,
+      protocolEnabled: false,
+      calibrationEnabled: false,
+      fusionEnabled: true,
+    });
+    const fusionOpcodes = (
+      fusionOnly.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(fusionOpcodes).toContain("startPoseFusion");
+    expect(fusionOpcodes).toContain("latestPoseFrame3D");
+    expect(fusionOpcodes).not.toContain("startCameraCalibration");
+  });
+
+  it("keeps pose fusion blocks hidden while the startup flag is off", () => {
+    setup();
+    const extension = new MultiviewPoseExtension({ fusionEnabled: false });
+    const opcodes = (
+      extension.getInfo().blocks as Array<{ opcode: string }>
+    ).map(({ opcode }) => opcode);
+    expect(opcodes).not.toContain("startPoseFusion");
+    expect(extension.poseFusionState()).toBe("disabled");
+    expect(extension.poseFusionReady()).toBe(false);
+    expect(() =>
+      extension.startPoseFusion({
+        DELAY_MS: 100,
+        JITTER_MS: 80,
+        MIN_SCORE: 0.3,
+      }),
+    ).toThrow(/disabled/u);
+  });
+
+  it("fuses buffered 2D frames into PoseFrame3D and stops with the project", () => {
+    const { listeners } = setup();
+    const extension = new MultiviewPoseExtension({ fusionEnabled: true });
+    const calibrations = [
+      lookAtCalibration("camera-1", { x: 3.4, y: 1.7, z: 3.1 }),
+      lookAtCalibration("camera-2", { x: -3.2, y: 1.8, z: 2.9 }),
+    ];
+    for (const calibration of calibrations) {
+      extension.loadFusionCameraCalibration({
+        JSON: JSON.stringify(calibration),
+      });
+    }
+    extension.startPoseFusion({
+      DELAY_MS: 50,
+      JITTER_MS: 80,
+      MIN_SCORE: 0.3,
+    });
+    const points = skeleton({ x: 0.2, y: 0, z: -0.1 });
+    for (const [index, calibration] of calibrations.entries()) {
+      for (const timestampUs of [100_000, 133_000, 166_000]) {
+        extension.bufferPoseFrame2D({
+          JSON: JSON.stringify(
+            poseFrame2D(calibration.cameraId, timestampUs + index * 5_000, [
+              projectPerson(calibration, "movenet-1", points),
+            ]),
+          ),
+        });
+      }
+    }
+    expect(extension.poseFusionReady()).toBe(true);
+    expect(extension.poseFusionCameraCount()).toBe(2);
+    expect(extension.poseFusionBufferedFrameCount()).toBe(6);
+    extension.fuseBufferedPoseFrame3D();
+    expect(extension.poseFusionState()).toBe("ready");
+    expect(extension.poseFusionPersonCount()).toBe(1);
+    expect(extension.poseFusionTimestampUs()).toBe(121_000);
+    expect(extension.poseFusionReprojectionErrorPx()).toBeLessThan(1);
+    expect(extension.poseFusionErrorCode()).toBe("");
+    expect(extension.poseFusionError()).toBe("");
+    expect(JSON.parse(extension.latestPoseFrame3D())).toMatchObject({
+      schema: "twmp/pose-frame-3d",
+      version: 1,
+    });
+    expect(JSON.parse(extension.synchronizedPoseSet2D())).toMatchObject({
+      timestampUs: 121_000,
+    });
+
+    listeners.get("PROJECT_STOP_ALL")?.();
+    expect(extension.poseFusionState()).toBe("idle");
+    expect(extension.poseFusionBufferedFrameCount()).toBe(0);
+    expect(extension.latestPoseFrame3D()).toBe("");
+    expect(extension.poseFusionCameraCount()).toBe(2);
+    extension.cleanupPoseFusion();
+    expect(extension.poseFusionCameraCount()).toBe(0);
   });
 
   it("exposes protocol round-trip and diagnostic reporters", () => {

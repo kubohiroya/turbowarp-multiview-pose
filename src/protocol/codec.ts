@@ -28,6 +28,99 @@ export interface ProtocolCodecResult {
   diagnostic: ProtocolDiagnostic | undefined;
 }
 
+export interface ProtocolDecodeResult extends ProtocolCodecResult {
+  value: Record<string, unknown> | undefined;
+}
+
+/**
+ * Parses one pinned v1 contract without retaining state. The result carries the
+ * schema and version recognized so far even when validation fails.
+ */
+export function decodeProtocolJson(
+  json: string,
+  nowMilliseconds: number,
+): ProtocolDecodeResult {
+  let schemaId = "";
+  let schemaVersion: number | undefined;
+  const failure = (path: string, message: string): ProtocolDecodeResult => ({
+    ok: false,
+    json: "",
+    schema: schemaId,
+    version: schemaVersion,
+    diagnostic: { path, message },
+    value: undefined,
+  });
+
+  if (new TextEncoder().encode(json).byteLength > MAX_JSON_BYTES) {
+    return failure("/", `JSON exceeds ${MAX_JSON_BYTES} bytes.`);
+  }
+
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return failure("/", `Invalid JSON: ${message}`);
+  }
+  if (!isRecord(value)) {
+    return failure("/", "Protocol value must be a JSON object.");
+  }
+
+  if (typeof value.schema !== "string") {
+    return failure("/schema", "Schema identifier must be a string.");
+  }
+  schemaId = value.schema;
+  if (!isProtocolSchemaId(value.schema)) {
+    return failure("/schema", `Unsupported schema identifier: ${value.schema}`);
+  }
+  if (value.version !== 1) {
+    schemaVersion =
+      typeof value.version === "number" ? value.version : undefined;
+    return failure(
+      "/version",
+      `Unsupported ${value.schema} version: ${String(value.version)}`,
+    );
+  }
+  schemaVersion = 1;
+
+  const credential = findForbiddenPairingKey(value);
+  if (credential) {
+    return failure(
+      credential,
+      "WebRTC pairing credentials are forbidden in persistent protocol contracts.",
+    );
+  }
+
+  const schema = protocolSchemas[value.schema];
+  if (!Value.Check(schema, value)) {
+    const first = Value.Errors(schema, value).First();
+    return failure(
+      first?.path || "/",
+      first?.message ?? "Protocol value does not match its v1 schema.",
+    );
+  }
+  if (value.schema === "twmp/session-policy") {
+    const timeError = validateSessionPolicyWindow(value, nowMilliseconds);
+    if (timeError) return failure(timeError.path, timeError.message);
+  }
+
+  return {
+    ok: true,
+    json: JSON.stringify(value),
+    schema: schemaId,
+    version: schemaVersion,
+    diagnostic: undefined,
+    value,
+  };
+}
+
+export function formatProtocolDiagnostic(
+  diagnostic: ProtocolDiagnostic | undefined,
+): string {
+  if (!diagnostic) return "Protocol validation failed.";
+  return `${diagnostic.path || "/"}: ${diagnostic.message}`;
+}
+
 export class ProtocolV1Codec {
   private decoded: unknown;
   private encoded = "";
@@ -46,12 +139,14 @@ export class ProtocolV1Codec {
 
   public decode(json: string): void {
     const result = this.process(json, true);
-    if (!result.ok) throw new Error(formatDiagnostic(result.diagnostic));
+    if (!result.ok)
+      throw new Error(formatProtocolDiagnostic(result.diagnostic));
   }
 
   public encode(json: string): string {
     const result = this.process(json, true);
-    if (!result.ok) throw new Error(formatDiagnostic(result.diagnostic));
+    if (!result.ok)
+      throw new Error(formatProtocolDiagnostic(result.diagnostic));
     return result.json;
   }
 
@@ -76,99 +171,25 @@ export class ProtocolV1Codec {
   }
 
   private process(json: string, retain: boolean): ProtocolCodecResult {
-    this.resetAttempt();
     if (retain) {
       this.decoded = undefined;
       this.encoded = "";
     }
-    if (new TextEncoder().encode(json).byteLength > MAX_JSON_BYTES) {
-      return this.failure("/", `JSON exceeds ${MAX_JSON_BYTES} bytes.`);
-    }
-
-    let value: unknown;
-    try {
-      value = JSON.parse(json);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return this.failure("/", `Invalid JSON: ${message}`);
-    }
-    if (!isRecord(value)) {
-      return this.failure("/", "Protocol value must be a JSON object.");
-    }
-
-    if (typeof value.schema !== "string") {
-      return this.failure("/schema", "Schema identifier must be a string.");
-    }
-    this.schemaId = value.schema;
-    if (!isProtocolSchemaId(value.schema)) {
-      return this.failure(
-        "/schema",
-        `Unsupported schema identifier: ${value.schema}`,
-      );
-    }
-    if (value.version !== 1) {
-      this.schemaVersion =
-        typeof value.version === "number" ? value.version : undefined;
-      return this.failure(
-        "/version",
-        `Unsupported ${value.schema} version: ${String(value.version)}`,
-      );
-    }
-    this.schemaVersion = 1;
-
-    const credential = findForbiddenPairingKey(value);
-    if (credential) {
-      return this.failure(
-        credential,
-        "WebRTC pairing credentials are forbidden in persistent protocol contracts.",
-      );
-    }
-
-    const schema = protocolSchemas[value.schema];
-    if (!Value.Check(schema, value)) {
-      const first = Value.Errors(schema, value).First();
-      return this.failure(
-        first?.path || "/",
-        first?.message ?? "Protocol value does not match its v1 schema.",
-      );
-    }
-    if (value.schema === "twmp/session-policy") {
-      const timeError = validateSessionPolicyWindow(
-        value,
-        this.nowMilliseconds(),
-      );
-      if (timeError) return this.failure(timeError.path, timeError.message);
-    }
-
-    const encoded = JSON.stringify(value);
-    if (retain) {
-      this.decoded = value;
-      this.encoded = encoded;
+    const result = decodeProtocolJson(json, this.nowMilliseconds());
+    this.schemaId = result.schema;
+    this.schemaVersion = result.version;
+    this.diagnostic = result.diagnostic;
+    if (result.ok && retain) {
+      this.decoded = result.value;
+      this.encoded = result.json;
     }
     return {
-      ok: true,
-      json: encoded,
-      schema: this.schemaId,
-      version: this.schemaVersion,
-      diagnostic: undefined,
+      ok: result.ok,
+      json: result.json,
+      schema: result.schema,
+      version: result.version,
+      diagnostic: result.diagnostic,
     };
-  }
-
-  private failure(path: string, message: string): ProtocolCodecResult {
-    this.diagnostic = { path, message };
-    return {
-      ok: false,
-      json: "",
-      schema: this.schemaId,
-      version: this.schemaVersion,
-      diagnostic: this.diagnostic,
-    };
-  }
-
-  private resetAttempt(): void {
-    this.schemaId = "";
-    this.schemaVersion = undefined;
-    this.diagnostic = undefined;
   }
 }
 
@@ -219,9 +240,4 @@ function escapeJsonPointer(value: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function formatDiagnostic(diagnostic: ProtocolDiagnostic | undefined): string {
-  if (!diagnostic) return "Protocol validation failed.";
-  return `${diagnostic.path || "/"}: ${diagnostic.message}`;
 }

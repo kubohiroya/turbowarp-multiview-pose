@@ -16,6 +16,8 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - COCO-17観測を`twmp/pose-frame-2d` version 1 JSONとして取得できます。
 - multiview-poseの5種類のv1 application contractを検証し、JSONをround-tripします。
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
+- jitterを含むPoseFrame2D streamをcameraごとにbufferingし、過去の同一瞬間で再sampleします。
+- 同期した2D setを三角測量し、`twmp/pose-frame-3d` version 1の3D poseへ統合します。
 
 ## 要件と安全性
 
@@ -46,6 +48,12 @@ camera calibrationも独立して有効化します。
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {cameraCalibrationV1: true};
+```
+
+多視点3D pose fusionも独立して有効化します。
+
+```js
+globalThis.__TWMP_FEATURE_FLAGS__ = {poseFusion3D: true};
 ```
 
 起動時にTensorFlow.js backendとして`webgpu`を明示選択し、それ以外なら
@@ -108,6 +116,40 @@ intrinsic sampleごとにboardを移動・傾斜させ、最後のsampleではbo
 解像度を固定し、途中変更を拒否します。完全なinner corner grid、quality 0.2以上、保持sample
 すべてに対する正規化corner変位0.015以上を要求し、8〜40 sampleでsolveします。設定した
 reprojection RMSを超える解は拒否し、最後の検証済みprofileを置き換えません。
+
+fusion appのpipelineは、各camera peerがWebRTC data channelで送るPoseFrame2D JSONと、
+camera 1台につき1件のCameraCalibration v1 profileを使います。
+
+```text
+load fusion camera calibration [(camera-1のprofile JSON)]
+load fusion camera calibration [(camera-2のprofile JSON)]
+start pose fusion delay [120] ms jitter [80] ms min keypoint score [0.3]
+forever:
+  buffer PoseFrame2D JSON [(data channelで受信したmessage)]
+  fuse PoseFrame3D at buffered delay
+  set [poseJson] to (latest PoseFrame3D JSON)
+stop pose fusion
+```
+
+cameraごとにtimestamp順のring bufferを持ちます。jitter window内で順序が入れ替わって届いた
+frameはtimestamp位置へ挿入し、timestampの重複、jitter windowより古い到着、満杯のring
+より古い到着は`dropped pose frame count`へ計上してbufferしません。
+
+`fuse PoseFrame3D at buffered delay`は、最新のbuffered timestampから設定delayだけ過去の瞬間を
+統合します。delayは最も遅いcameraのjitterを吸収できる値にしてください。その共通の瞬間で
+全cameraを再sampleし、前後のframeで挟めたkeypointは線形補間、片側がocclusionのkeypointは
+見えている側の観測を採用し、前後で挟めないcameraは最大1 jitter window分だけ直近frameを保持
+します。明示した過去の瞬間を統合する場合は`fuse PoseFrame3D at timestamp [] us`を使います。
+
+同期した2D setは2視点のreprojection誤差でcamera間対応付けし、1人が同じcameraから2視点を
+取ることはありません。2台以上のcameraが観測したclusterをkeypointごとに、score重み付け、
+cheirality判定、reprojection判定付きで三角測量し、`person-N`のidentityを維持します。
+確信のある視点が2つ未満のkeypointは、最後に三角測量できた位置を保持しscore `0`を返します。
+
+一時的な不足ではerrorをthrowせず、直前の統合結果も置き換えません。`fuse`は`false`を返し、
+`pose fusion state`は`buffering`、`pose fusion error code`は`empty-buffer`、
+`insufficient-cameras`、`no-fused-person`のいずれかを返します。不正なJSON、他contractのschema、
+不正なcalibration profileはerrorになります。
 
 ## 開発
 

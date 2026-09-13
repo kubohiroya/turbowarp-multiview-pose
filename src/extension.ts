@@ -16,6 +16,7 @@ import { ProtocolV1Codec } from "./protocol/codec.js";
 import { CameraCalibrationController } from "./calibration/controller.js";
 import { OpenCvChessboardCalibrationBackend } from "./calibration/opencv-backend.js";
 import type { CalibrationBackendPort } from "./calibration/types.js";
+import { PoseFusionController } from "./fusion/controller.js";
 
 type BlockTypeName = "COMMAND" | "REPORTER" | "BOOLEAN" | "HAT";
 type ArgumentTypeName = "STRING" | "NUMBER" | "BOOLEAN";
@@ -33,7 +34,8 @@ interface BlockDefinition {
     | "qrCourierPairing"
     | "webgpuMoveNetMultiPose"
     | "protocolV1Codec"
-    | "cameraCalibrationV1";
+    | "cameraCalibrationV1"
+    | "poseFusion3D";
   blockType: BlockTypeName;
   text: string;
   description: string;
@@ -52,6 +54,7 @@ export interface MultiviewPoseExtensionOptions {
   poseEnabled?: boolean;
   protocolEnabled?: boolean;
   calibrationEnabled?: boolean;
+  fusionEnabled?: boolean;
   errorCorrectionLevel?: QrErrorCorrectionLevel;
   runtime?: TurboWarpRuntime;
   poseModel?: PoseModelPort;
@@ -66,12 +69,14 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
   private readonly poseEnabled: boolean;
   private readonly protocolEnabled: boolean;
   private readonly calibrationEnabled: boolean;
+  private readonly fusionEnabled: boolean;
   private readonly errorCorrectionLevel: QrErrorCorrectionLevel;
   private readonly runtime: TurboWarpRuntime;
   private readonly skins: TemporarySpriteSkinManager;
   private readonly pose: PosePipelineController;
   private readonly protocol: ProtocolV1Codec;
   private readonly calibration: CameraCalibrationController;
+  private readonly fusion: PoseFusionController;
   private session: OfferQrSession | undefined;
   private state: OfferQrState = "idle";
   private lastError = "";
@@ -80,6 +85,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
+    this.fusion.stop();
   };
   private readonly disposeListener = () => this.dispose();
   private readonly targetRemovedListener = (target: unknown) => {
@@ -95,6 +101,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
       options.protocolEnabled ?? featureFlags.protocolV1Codec;
     this.calibrationEnabled =
       options.calibrationEnabled ?? featureFlags.cameraCalibrationV1;
+    this.fusionEnabled = options.fusionEnabled ?? featureFlags.poseFusion3D;
     this.errorCorrectionLevel =
       options.errorCorrectionLevel ?? qrConfig.errorCorrectionLevel;
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
@@ -112,6 +119,7 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
         ? { nowMilliseconds: options.nowMilliseconds }
         : {}),
     });
+    this.fusion = new PoseFusionController();
     this.runtime.on?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.on?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.on?.("PROJECT_LOADED", this.stopListener);
@@ -412,10 +420,100 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     return this.calibration.profileJson();
   }
 
+  public startPoseFusion(args: {
+    DELAY_MS: unknown;
+    JITTER_MS: unknown;
+    MIN_SCORE: unknown;
+  }): void {
+    this.requireFusionEnabled();
+    this.fusion.start({
+      delayMilliseconds: Scratch.Cast.toNumber(args.DELAY_MS),
+      jitterMilliseconds: Scratch.Cast.toNumber(args.JITTER_MS),
+      minKeypointScore: Scratch.Cast.toNumber(args.MIN_SCORE),
+    });
+  }
+
+  public stopPoseFusion(): void {
+    this.fusion.stop();
+  }
+
+  public cleanupPoseFusion(): void {
+    this.fusion.cleanup();
+  }
+
+  public loadFusionCameraCalibration(args: { JSON: unknown }): void {
+    this.requireFusionEnabled();
+    this.fusion.loadCalibration(Scratch.Cast.toString(args.JSON));
+  }
+
+  public bufferPoseFrame2D(args: { JSON: unknown }): void {
+    this.requireFusionEnabled();
+    this.fusion.ingestFrame(Scratch.Cast.toString(args.JSON));
+  }
+
+  public fuseBufferedPoseFrame3D(): void {
+    this.requireFusionEnabled();
+    this.fusion.fuseBufferedInstant();
+  }
+
+  public fusePoseFrame3DAt(args: { TIMESTAMP_US: unknown }): void {
+    this.requireFusionEnabled();
+    this.fusion.fuseAt(Scratch.Cast.toNumber(args.TIMESTAMP_US));
+  }
+
+  public latestPoseFrame3D(): string {
+    return this.fusionEnabled ? this.fusion.latestFrameJson() : "";
+  }
+
+  public synchronizedPoseSet2D(): string {
+    return this.fusionEnabled ? this.fusion.synchronizedSampleJson() : "";
+  }
+
+  public poseFusionState(): string {
+    return this.fusionEnabled ? this.fusion.state() : "disabled";
+  }
+
+  public poseFusionReady(): boolean {
+    return this.fusionEnabled && this.fusion.ready();
+  }
+
+  public poseFusionCameraCount(): number {
+    return this.fusion.cameraCount();
+  }
+
+  public poseFusionBufferedFrameCount(): number {
+    return this.fusion.bufferedFrameCount();
+  }
+
+  public poseFusionDroppedFrameCount(): number {
+    return this.fusion.droppedFrameCount();
+  }
+
+  public poseFusionPersonCount(): number {
+    return this.fusion.personCount();
+  }
+
+  public poseFusionTimestampUs(): number {
+    return this.fusion.fusedTimestampUs();
+  }
+
+  public poseFusionReprojectionErrorPx(): number {
+    return this.fusion.meanReprojectionErrorPx();
+  }
+
+  public poseFusionErrorCode(): string {
+    return this.fusion.errorCode();
+  }
+
+  public poseFusionError(): string {
+    return this.fusion.errorMessage();
+  }
+
   public dispose(): void {
     this.endOfferQrDisplay();
     void this.pose.stop();
     void this.calibration.cancel();
+    this.fusion.stop();
     this.runtime.off?.("PROJECT_STOP_ALL", this.stopListener);
     this.runtime.off?.("PROJECT_RUN_STOP", this.stopListener);
     this.runtime.off?.("PROJECT_LOADED", this.stopListener);
@@ -447,6 +545,14 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     }
   }
 
+  private requireFusionEnabled(): void {
+    if (!this.fusionEnabled) {
+      throw new Error(
+        "Pose fusion 3D is disabled. Enable it before the project starts.",
+      );
+    }
+  }
+
   private requireCalibrationEnabled(): void {
     if (!this.calibrationEnabled) {
       throw new Error(
@@ -459,7 +565,8 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     if (feature === "qrCourierPairing") return this.enabled;
     if (feature === "webgpuMoveNetMultiPose") return this.poseEnabled;
     if (feature === "protocolV1Codec") return this.protocolEnabled;
-    return this.calibrationEnabled;
+    if (feature === "cameraCalibrationV1") return this.calibrationEnabled;
+    return this.fusionEnabled;
   }
 
   private requireSession(): OfferQrSession {
