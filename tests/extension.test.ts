@@ -97,7 +97,6 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
       enabled: false,
       poseEnabled: true,
       poseModel,
-      clockId: "clock-1",
     });
     const poseOpcodes = (
       poseOnly.getInfo().blocks as Array<{ opcode: string }>
@@ -288,7 +287,6 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
       runtime,
       poseEnabled: true,
       poseModel,
-      clockId: "clock-1",
     });
     await extension.startWebGpuMoveNetMultiPose({
       CAMERA_ID: "pose",

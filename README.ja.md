@@ -14,7 +14,7 @@ multiview-poseの`camera app`と`fusion app`を構築するための複合TurboW
 - 終了時に元のskinを復元し、一時skinとpairing情報を破棄します。
 - TensorFlow.js WebGPU限定でMoveNet MultiPose Lightningを実行し、最大6人を追跡します。
 - COCO-17観測を`twmp/pose-frame-2d` version 1 JSONとして取得できます。
-- multiview-poseの6種類のv1 application contractを検証し、JSONをround-tripします。
+- multiview-poseの5種類のv1 application contractを検証し、JSONをround-tripします。
 - 共有cameraによるchessboardのintrinsic／world-extrinsic calibration workflowを提供します。
 
 ## 要件と安全性
@@ -36,7 +36,7 @@ globalThis.__TWMP_QR_CONFIG__ = {errorCorrectionLevel: "M"}; // L, M, Q, H
 globalThis.__TWMP_FEATURE_FLAGS__ = {webgpuMoveNetMultiPose: true};
 ```
 
-6契約codecも独立した既定OFF flagで有効化します。
+5契約codecも独立した既定OFF flagで有効化します。
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {protocolV1Codec: true};
@@ -74,7 +74,7 @@ block上のpart番号は1始まり、wire envelopeの`partIndex`は0始まりで
 ```text
 start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
 forever:
-  infer latest pose frame
+  infer latest pose frame timestamp [(同期済みtimestamp us)] us
   set [poseJson] to (latest PoseFrame2D JSON)
 stop WebGPU MoveNet MultiPose
 ```
@@ -83,10 +83,14 @@ stop WebGPU MoveNet MultiPose
 stop、project reload、dispose時にはdetectorとcamera leaseを解放します。
 
 protocol codecはpayloadの`schema`と`version`から、SessionPolicy、CameraCalibration、
-PoseFrame2D、PoseFrame3D、ClockProbe、Performance DSLの明示対応v1へdispatchします。
+PoseFrame2D、PoseFrame3D、Performance DSLの明示対応v1へdispatchします。
 unknown field／versionはfail closedし、診断をJSON Pointer pathとmessageで取得できます。
 offer、answer、SDP、ICE、DTLS、credentialに相当するkeyは再帰的に拒否し、pairing secretを
 永続application contractへ混入させません。
+
+`captureTimestampUs`とPoseFrame3Dの`timestampUs`は、別実装の同期済みlocal time serviceが
+与える不透明値です。本機能拡張は値を変更せず運び、clock初期化、offset推定、probe、ping、
+pongのlogicを持ちません。
 
 camera app／fusion app共用のcalibration workflowは次のとおりです。
 
@@ -120,7 +124,7 @@ unit testではmodel／camera portを注入し、protocol、6人上限、trackin
 backend fail closed、cleanupを検証します。実WebGPU adapterとproduction model downloadは
 test環境では実行しないため、実機browser／GPUで互換性とthroughputを別途検証します。
 
-`schemas/protocol-v1-integrity.json`は上流source commitと6 schemaのcanonical SHA-256を
+`schemas/protocol-v1-integrity.json`は上流source commitと5 schemaのcanonical SHA-256を
 固定します。repository checkはruntime TypeBox定義との一致を常時検証し、隣接する
 multiview-pose checkoutまたは`MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`があれば上流作業copyの
 driftも検出します。上流fixtureのcopyはschemaとblock向けcodecの両方でcross-checkします。

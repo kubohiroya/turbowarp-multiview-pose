@@ -53,12 +53,12 @@ QR skinへ切り替えます。明示終了、project停止、extension dispose�
 ## 固定version application contract codec
 
 `protocolV1Codec`は独立した起動時固定・既定OFF flagです。最大1 MiBのJSONをparseし、rootの
-`schema`と`version`から明示対応した6種類のv1 TypeBox schemaだけへdispatchします。
+`schema`と`version`から明示対応した5種類のv1 TypeBox schemaだけへdispatchします。
 version推測やfallbackは行いません。decode成功時はcompact JSONを1件保持し、失敗時は保持値を
 消去して、最初の診断をJSON Pointer pathとmessageとして公開します。
 
 schema定義は`schemas/protocol-v1-integrity.json`に記録したcommit時点の
-`@multiview-pose/protocol`を反映します。6 runtime定義すべてをcanonical JSON SHA-256で固定し、
+`@multiview-pose/protocol`を反映します。5 runtime定義すべてをcanonical JSON SHA-256で固定し、
 利用可能な上流working checkoutともrepository checkで比較します。schema変更時はpin、実装、
 fixture、compatibility判断を同時に更新しない限りcheckが失敗します。
 
@@ -66,6 +66,10 @@ TypeBoxのtuple／array制約でCOCO-17順序、6人上限、matrix size、各�
 別の再帰key guardにより、WebRTC offer／answer、SDP、ICE／DTLS material、credential fieldを
 永続化前に拒否します。SessionPolicyはapplication validationとして`expiresAt > issuedAt`と
 未期限切れも検証します。
+
+PoseFrame2Dの`captureTimestampUs`とPoseFrame3Dの`timestampUs`は、別実装の同期済みlocal
+time serviceから受け取る不透明値です。この機能拡張はclock同期、offset推定、probe、ping、
+pongを実装せず、受け取ったtimestampを変更せずprotocolへ格納します。
 
 ## camera calibration workflow
 

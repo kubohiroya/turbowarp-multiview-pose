@@ -65,7 +65,6 @@ const validValues = [
     peerId: "source-1",
     sequence: 42,
     captureTimestampUs: 123_456_789,
-    clockId: "clock-1",
     frameWidth: 1920,
     frameHeight: 1080,
     calibrationId: "calibration-1",
@@ -85,15 +84,6 @@ const validValues = [
         keypoints: keypoints3d,
       },
     ],
-  },
-  {
-    schema: "twmp/clock-probe",
-    version: 1,
-    kind: "pong",
-    sequence: 9,
-    t0Us: 1000,
-    t1Us: 1100,
-    t2Us: 1150,
   },
   {
     schema: "twmp/performance-dsl",
@@ -116,7 +106,7 @@ function codec(): ProtocolV1Codec {
 }
 
 describe("ProtocolV1Codec", () => {
-  it("dispatches and round-trips all six pinned v1 contracts", () => {
+  it("dispatches and round-trips all five pinned v1 contracts", () => {
     for (const value of validValues) {
       const instance = codec();
       const source = JSON.stringify(value, null, 2);
@@ -164,20 +154,20 @@ describe("ProtocolV1Codec", () => {
     expect(instance.errorMessage()).toMatch(/Unsupported schema/u);
 
     expect(
-      instance.validate(JSON.stringify({ ...validValues[5], version: 2 })),
+      instance.validate(JSON.stringify({ ...validValues[4], version: 2 })),
     ).toBe(false);
     expect(instance.errorPath()).toBe("/version");
 
     expect(
       instance.validate(
-        JSON.stringify({ ...validValues[5], unexpected: true }),
+        JSON.stringify({ ...validValues[4], unexpected: true }),
       ),
     ).toBe(false);
     expect(instance.errorPath()).toBe("/unexpected");
 
     const missingPerformers = {
-      schema: validValues[5].schema,
-      version: validValues[5].version,
+      schema: validValues[4].schema,
+      version: validValues[4].version,
     };
     expect(instance.validate(JSON.stringify(missingPerformers))).toBe(false);
     expect(instance.errorPath()).toBe("/performers");
@@ -216,7 +206,7 @@ describe("ProtocolV1Codec", () => {
 
   it("rejects expired policy windows and clears retained values after failed decoding", () => {
     const instance = codec();
-    instance.decode(JSON.stringify(validValues[5]));
+    instance.decode(JSON.stringify(validValues[4]));
     expect(instance.decodedJson()).not.toBe("");
     expect(() =>
       instance.decode(

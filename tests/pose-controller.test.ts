@@ -54,8 +54,6 @@ function setup(
   const controller = new PosePipelineController({
     runtime,
     model,
-    nowMilliseconds: () => 1234.5,
-    clockId: "clock-1",
   });
   return {
     controller,
@@ -89,12 +87,11 @@ describe("PosePipelineController", () => {
       owner: "turbowarp-multiview-pose",
       cameraId: "pose",
     });
-    await controller.inferLatestFrame();
-    expect(estimatePoses).toHaveBeenCalledWith(
-      expect.anything(),
-      { maxPoses: 6, flipHorizontal: false },
-      1234.5,
-    );
+    await controller.inferLatestFrame(1_234_500);
+    expect(estimatePoses).toHaveBeenCalledWith(expect.anything(), {
+      maxPoses: 6,
+      flipHorizontal: false,
+    });
     const frame = JSON.parse(controller.latestFrameJson()) as Record<
       string,
       unknown
@@ -105,7 +102,6 @@ describe("PosePipelineController", () => {
       cameraId: "pose",
       peerId: "source-1",
       calibrationId: "calibration-1",
-      clockId: "clock-1",
       sequence: 0,
       captureTimestampUs: 1234500,
       frameWidth: 1920,
@@ -118,7 +114,7 @@ describe("PosePipelineController", () => {
     expect(
       (persons[0]?.keypoints as Array<{ id: string }>).map(({ id }) => id),
     ).toEqual(COCO_17_KEYPOINT_IDS);
-    await controller.inferLatestFrame();
+    await controller.inferLatestFrame(1_234_600);
     expect(JSON.parse(controller.latestFrameJson()).sequence).toBe(1);
   });
 
@@ -129,12 +125,29 @@ describe("PosePipelineController", () => {
       () => new Promise<ModelPose[]>((resolve) => (finish = resolve)),
     );
     await controller.start(startOptions);
-    const first = controller.inferLatestFrame();
-    const second = controller.inferLatestFrame();
+    const first = controller.inferLatestFrame(1_234_500);
+    const second = controller.inferLatestFrame(1_234_600);
     expect(first).toBe(second);
     expect(estimatePoses).toHaveBeenCalledOnce();
     finish?.([pose(1)]);
     await Promise.all([first, second]);
+    expect(estimatePoses).toHaveBeenCalledOnce();
+  });
+
+  it("carries an externally synchronized timestamp unchanged and rejects invalid values", async () => {
+    const { controller, estimatePoses } = setup();
+    await controller.start(startOptions);
+    await controller.inferLatestFrame(Number.MAX_SAFE_INTEGER);
+    expect(JSON.parse(controller.latestFrameJson()).captureTimestampUs).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
+    expect(estimatePoses).toHaveBeenCalledOnce();
+    expect(() => controller.inferLatestFrame(-1)).toThrow(
+      /externally synchronized non-negative integer/u,
+    );
+    expect(() => controller.inferLatestFrame(1.5)).toThrow(
+      /externally synchronized non-negative integer/u,
+    );
     expect(estimatePoses).toHaveBeenCalledOnce();
   });
 
@@ -169,7 +182,7 @@ describe("PosePipelineController", () => {
 
     const ended = setup({ frameError: new Error("camera is not active") });
     await ended.controller.start(startOptions);
-    await expect(ended.controller.inferLatestFrame()).rejects.toThrow(
+    await expect(ended.controller.inferLatestFrame(1_234_500)).rejects.toThrow(
       /camera-ended/u,
     );
     expect(ended.controller.errorCode()).toBe("camera-ended");
@@ -180,7 +193,7 @@ describe("PosePipelineController", () => {
     delete invalid.id;
     const { controller, dispose, release } = setup({ poses: [invalid] });
     await controller.start(startOptions);
-    await expect(controller.inferLatestFrame()).rejects.toThrow(
+    await expect(controller.inferLatestFrame(1_234_500)).rejects.toThrow(
       /invalid-output/u,
     );
     expect(controller.errorCode()).toBe("invalid-output");
@@ -196,7 +209,7 @@ describe("PosePipelineController", () => {
     invalid.keypoints[0]!.x = 1_000_001;
     const { controller } = setup({ poses: [invalid] });
     await controller.start(startOptions);
-    await expect(controller.inferLatestFrame()).rejects.toThrow(
+    await expect(controller.inferLatestFrame(1_234_500)).rejects.toThrow(
       /invalid-output/u,
     );
   });
@@ -205,7 +218,7 @@ describe("PosePipelineController", () => {
     const { controller, estimatePoses } = setup();
     estimatePoses.mockRejectedValue(new Error("device lost"));
     await controller.start(startOptions);
-    await expect(controller.inferLatestFrame()).rejects.toThrow(
+    await expect(controller.inferLatestFrame(1_234_500)).rejects.toThrow(
       /inference-failed/u,
     );
     expect(controller.errorCode()).toBe("inference-failed");

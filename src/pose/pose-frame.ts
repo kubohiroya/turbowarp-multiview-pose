@@ -9,7 +9,6 @@ export interface PoseFrameContext {
   cameraId: string;
   peerId: string;
   calibrationId: string;
-  clockId: string;
   sequence: number;
   captureTimestampUs: number;
   frameWidth: number;
@@ -30,7 +29,6 @@ export function createPoseFrame2D(
       context.captureTimestampUs,
       "capture timestamp",
     ),
-    clockId: identifier(context.clockId, "clock ID"),
     frameWidth: dimension(context.frameWidth, "frame width"),
     frameHeight: dimension(context.frameHeight, "frame height"),
     calibrationId: identifier(context.calibrationId, "calibration ID"),

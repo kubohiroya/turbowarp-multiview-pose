@@ -30,8 +30,9 @@
   <p>No CPU, WASM, or WebGL inference fallback is provided. The first model load generally requires network access; prepare the browser cache before an offline venue run.</p>
 
   <h2>Pinned protocol v1 codec</h2>
-  <p>The independent <code>protocolV1Codec</code> flag is OFF by default. When enabled, blocks validate and round-trip SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, ClockProbe, and Performance DSL JSON using schemas pinned by source commit and SHA-256.</p>
+  <p>The independent <code>protocolV1Codec</code> flag is OFF by default. When enabled, blocks validate and round-trip SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, and Performance DSL JSON using schemas pinned by source commit and SHA-256.</p>
   <p>Unknown schemas, versions, fields, malformed COCO-17 tuples, and pairing credential keys fail closed. Diagnostic reporters expose the JSON Pointer path and message.</p>
+  <p>Pose timestamps are opaque values supplied by a separate synchronized local time service. This extension carries them unchanged and implements no clock probes, offset estimation, ping, or pong logic.</p>
 
   <h2>Camera calibration</h2>
   <p>The independent <code>cameraCalibrationV1</code> flag is OFF by default. A high-level state machine leases the named Camera Source stream, fixes its real resolution, accepts diverse chessboard samples, and exports an exact CameraCalibration v1 profile.</p>

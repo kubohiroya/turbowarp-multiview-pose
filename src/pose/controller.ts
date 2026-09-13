@@ -35,15 +35,11 @@ export interface PoseStartOptions {
 export interface PosePipelineControllerOptions {
   runtime: TurboWarpRuntime;
   model: PoseModelPort;
-  nowMilliseconds?: () => number;
-  clockId?: string;
 }
 
 export class PosePipelineController {
   private readonly runtime: TurboWarpRuntime;
   private readonly model: PoseModelPort;
-  private readonly nowMilliseconds: () => number;
-  private readonly clockId: string;
   private detector: PoseDetectorPort | undefined;
   private lease: CameraLeasePort | undefined;
   private startOptions: PoseStartOptions | undefined;
@@ -59,10 +55,6 @@ export class PosePipelineController {
   public constructor(options: PosePipelineControllerOptions) {
     this.runtime = options.runtime;
     this.model = options.model;
-    this.nowMilliseconds =
-      options.nowMilliseconds ??
-      (() => performance.timeOrigin + performance.now());
-    this.clockId = options.clockId ?? `clock-${crypto.randomUUID()}`;
   }
 
   public async start(options: PoseStartOptions): Promise<void> {
@@ -78,13 +70,18 @@ export class PosePipelineController {
     }
   }
 
-  public inferLatestFrame(): Promise<void> {
+  public inferLatestFrame(captureTimestampUs: number): Promise<void> {
+    if (!Number.isSafeInteger(captureTimestampUs) || captureTimestampUs < 0) {
+      throw new Error(
+        "Capture timestamp must be an externally synchronized non-negative integer in microseconds.",
+      );
+    }
     if (this.inference) return this.inference;
     if (!this.detector || !this.lease || !this.startOptions) {
       throw new Error("WebGPU MoveNet MultiPose is not ready.");
     }
     const operation = this.operation;
-    const inference = this.runInference(operation);
+    const inference = this.runInference(operation, captureTimestampUs);
     this.inference = inference;
     const clear = () => {
       if (this.inference === inference) this.inference = undefined;
@@ -198,7 +195,10 @@ export class PosePipelineController {
     this.pipelineState = "ready";
   }
 
-  private async runInference(operation: number): Promise<void> {
+  private async runInference(
+    operation: number,
+    captureTimestampUs: number,
+  ): Promise<void> {
     const detector = this.detector;
     const lease = this.lease;
     const options = this.startOptions;
@@ -215,14 +215,12 @@ export class PosePipelineController {
     } catch (error) {
       this.fail("camera-ended", error);
     }
-    const timestampMs = this.nowMilliseconds();
     let poses;
     try {
-      poses = await detector.estimatePoses(
-        frame.element,
-        { maxPoses: 6, flipHorizontal: false },
-        timestampMs,
-      );
+      poses = await detector.estimatePoses(frame.element, {
+        maxPoses: 6,
+        flipHorizontal: false,
+      });
     } catch (error) {
       this.fail("inference-failed", error);
     }
@@ -232,9 +230,8 @@ export class PosePipelineController {
         cameraId: options.cameraId,
         peerId: options.peerId,
         calibrationId: options.calibrationId,
-        clockId: this.clockId,
         sequence: this.sequence,
-        captureTimestampUs: Math.round(timestampMs * 1000),
+        captureTimestampUs,
         frameWidth: frame.width,
         frameHeight: frame.height,
       });

@@ -14,7 +14,7 @@ as a temporary sprite skin.
 - Restores the sprite's original skin and discards sensitive temporary data on cleanup.
 - Runs MoveNet MultiPose Lightning for up to six tracked people through TensorFlow.js WebGPU only.
 - Reports COCO-17 observations as `twmp/pose-frame-2d` version 1 JSON.
-- Validates and round-trips all six pinned multiview-pose v1 application contracts.
+- Validates and round-trips all five pinned multiview-pose v1 application contracts.
 - Runs a shared-camera chessboard workflow for intrinsic and world-extrinsic calibration.
 
 ## Requirements and safety
@@ -39,7 +39,7 @@ Enable pose inference independently when needed:
 globalThis.__TWMP_FEATURE_FLAGS__ = {webgpuMoveNetMultiPose: true};
 ```
 
-Enable the six-contract codec independently:
+Enable the five-contract codec independently:
 
 ```js
 globalThis.__TWMP_FEATURE_FLAGS__ = {protocolV1Codec: true};
@@ -86,7 +86,7 @@ The pose vertical slice is:
 ```text
 start WebGPU MoveNet MultiPose camera [pose] peer [source-1] calibration [calibration-1]
 forever:
-  infer latest pose frame
+  infer latest pose frame timestamp [(synchronized timestamp us)] us
   set [poseJson] to (latest PoseFrame2D JSON)
 stop WebGPU MoveNet MultiPose
 ```
@@ -95,10 +95,14 @@ Concurrent inference requests share one in-flight operation. Calls do not build 
 the next call after completion reads the latest frame from the shared Camera Source video.
 
 The protocol codec dispatches by the payload's `schema` and `version`, and only accepts the pinned
-v1 SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, ClockProbe, and Performance DSL
+v1 SessionPolicy, CameraCalibration, PoseFrame2D, PoseFrame3D, and Performance DSL
 contracts. Use `protocol error path` and `protocol error message` after a failed validation. Unknown
 fields and versions fail closed; WebRTC offer, answer, SDP, ICE, DTLS, and credential keys are
 forbidden recursively because pairing secrets must not enter persistent application contracts.
+
+`captureTimestampUs` and PoseFrame3D `timestampUs` are opaque values supplied by the separate
+synchronized local time service. This extension carries them unchanged and intentionally provides
+no clock initialization, offset estimation, probe, ping, or pong logic.
 
 The shared camera/fusion calibration workflow is:
 
@@ -229,14 +233,15 @@ Stops inference and releases the detector and camera lease.
 | Type | Command |
 | Opcode | `stopWebGpuMoveNetMultiPose` |
 
-### `infer latest pose frame`
+### `infer latest pose frame timestamp [CAPTURE_TIMESTAMP_US] us`
 
-Runs at most one inference and coalesces concurrent requests into that latest-frame operation.
+Runs at most one inference and carries an opaque synchronized timestamp supplied by the external time service.
 
 | Property | Value |
 |---|---|
 | Type | Command |
 | Opcode | `inferNextPoseFrame` |
+| `CAPTURE_TIMESTAMP_US` | Number, default: `0` |
 
 ### `WebGPU MoveNet ready?`
 
@@ -294,7 +299,7 @@ Returns the latest protocol-v1 COCO-17 pose frame as JSON, or an empty string be
 
 ### `protocol JSON [JSON] valid?`
 
-Validates and dispatches one of the six pinned multiview-pose v1 contracts without retaining it.
+Validates and dispatches one of the five pinned multiview-pose v1 contracts without retaining it.
 
 | Property | Value |
 |---|---|
@@ -573,7 +578,7 @@ real WebGPU adapter or download the production model; browser/GPU compatibility 
 must be verified separately on deployment hardware.
 
 `schemas/protocol-v1-integrity.json` pins the source repository commit and canonical SHA-256 for all
-six schemas. Repository checks always compare the runtime TypeBox definitions to those digests and,
+five schemas. Repository checks always compare the runtime TypeBox definitions to those digests and,
 when a sibling multiview-pose checkout (or `MULTIVIEW_POSE_PROTOCOL_SCHEMA_DIR`) is available, also
 fail on upstream working-copy drift. Contract fixtures are copied from that pinned package and
 cross-checked against both the schema and block-facing codec.

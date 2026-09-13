@@ -40,7 +40,6 @@ export interface PoseFrame2DV1 {
   peerId: string;
   sequence: number;
   captureTimestampUs: number;
-  clockId: string;
   frameWidth: number;
   frameHeight: number;
   calibrationId: string;
@@ -64,7 +63,6 @@ export interface PoseDetectorPort {
   estimatePoses(
     image: HTMLVideoElement,
     config: { maxPoses: 6; flipHorizontal: false },
-    timestampMs: number,
   ): Promise<ModelPose[]>;
   dispose(): void;
 }

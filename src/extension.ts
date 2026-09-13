@@ -57,7 +57,6 @@ export interface MultiviewPoseExtensionOptions {
   poseModel?: PoseModelPort;
   calibrationBackend?: CalibrationBackendPort;
   nowMilliseconds?: () => number;
-  clockId?: string;
 }
 
 const blockDefinitions = definitions.blocks as readonly BlockDefinition[];
@@ -103,10 +102,6 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     this.pose = new PosePipelineController({
       runtime: this.runtime,
       model: options.poseModel ?? new TfjsWebGpuMoveNet(),
-      ...(options.nowMilliseconds
-        ? { nowMilliseconds: options.nowMilliseconds }
-        : {}),
-      ...(options.clockId ? { clockId: options.clockId } : {}),
     });
     this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
     this.calibration = new CameraCalibrationController({
@@ -264,9 +259,13 @@ export class MultiviewPoseExtension implements TurboWarpExtension {
     await this.pose.stop();
   }
 
-  public async inferNextPoseFrame(): Promise<void> {
+  public async inferNextPoseFrame(args: {
+    CAPTURE_TIMESTAMP_US: unknown;
+  }): Promise<void> {
     this.requirePoseEnabled();
-    await this.pose.inferLatestFrame();
+    await this.pose.inferLatestFrame(
+      Scratch.Cast.toNumber(args.CAPTURE_TIMESTAMP_US),
+    );
   }
 
   public webGpuMoveNetReady(): boolean {

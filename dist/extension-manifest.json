@@ -125,7 +125,12 @@
     {
       "opcode": "inferNextPoseFrame",
       "blockType": "COMMAND",
-      "arguments": []
+      "arguments": [
+        {
+          "id": "CAPTURE_TIMESTAMP_US",
+          "type": "NUMBER"
+        }
+      ]
     },
     {
       "opcode": "latestPoseFrame2D",

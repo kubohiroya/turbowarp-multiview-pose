@@ -27,6 +27,7 @@
     "Keep camera calibration behind its independent startup-fixed default-OFF flag and retain only exact v1 profiles.",
     "Keep OpenCV.js as the single exact-pinned production calibration backend without a reference solver.",
     "Reject schema integrity drift, unknown versions, and pairing credentials in persistent contracts.",
+    "Treat pose timestamps as opaque values from an external synchronized time service; do not add clock probe, offset, ping, or pong logic.",
     "Do not add CPU, WASM, or WebGL inference fallback or direct getUserMedia calls.",
     "Run pnpm run check before publishing generated artifacts."
   ]

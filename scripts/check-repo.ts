@@ -312,6 +312,21 @@ async function checkProtocolSchemaIntegrity() {
   if (packageMetadata.dependencies?.["@sinclair/typebox"] !== "0.34.52") {
     errors.push("package.json must pin @sinclair/typebox exactly to 0.34.52");
   }
+  if (Reflect.has(protocolSchemas, "twmp/clock-probe")) {
+    errors.push("ClockProbe belongs to the external synchronized time service");
+  }
+  if (
+    JSON.stringify(protocolSchemas["twmp/pose-frame-2d"]).includes("clockId")
+  ) {
+    errors.push("PoseFrame2D must not contain clockId");
+  }
+  if (
+    /performance\.(?:timeOrigin|now)|clockId|clock-probe/u.test(poseController)
+  ) {
+    errors.push(
+      "Pose inference must carry external timestamps without implementing a clock",
+    );
+  }
   if (
     protocolIntegrity.formatVersion !== 1 ||
     protocolIntegrity.sourceRepository !==
@@ -326,7 +341,6 @@ async function checkProtocolSchemaIntegrity() {
 
   const schemaIdsByFile = {
     "camera-calibration-v1.json": "twmp/camera-calibration",
-    "clock-probe-v1.json": "twmp/clock-probe",
     "performance-dsl-v1.json": "twmp/performance-dsl",
     "pose-frame-2d-v1.json": "twmp/pose-frame-2d",
     "pose-frame-3d-v1.json": "twmp/pose-frame-3d",
@@ -336,7 +350,9 @@ async function checkProtocolSchemaIntegrity() {
     Object.keys(protocolIntegrity.schemas).sort().join("\n") !==
     Object.keys(schemaIdsByFile).sort().join("\n")
   ) {
-    errors.push("protocol integrity manifest must list exactly six v1 schemas");
+    errors.push(
+      "protocol integrity manifest must list exactly five v1 schemas",
+    );
     return;
   }
   for (const [filename, schemaId] of Object.entries(schemaIdsByFile)) {

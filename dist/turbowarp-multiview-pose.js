@@ -177,9 +177,12 @@
   			"opcode": "inferNextPoseFrame",
   			"feature": "webgpuMoveNetMultiPose",
   			"blockType": "COMMAND",
-  			"text": "infer latest pose frame",
-  			"description": "Runs at most one inference and coalesces concurrent requests into that latest-frame operation.",
-  			"arguments": {}
+  			"text": "infer latest pose frame timestamp [CAPTURE_TIMESTAMP_US] us",
+  			"description": "Runs at most one inference and carries an opaque synchronized timestamp supplied by the external time service.",
+  			"arguments": { "CAPTURE_TIMESTAMP_US": {
+  				"type": "NUMBER",
+  				"defaultValue": 0
+  			} }
   		},
   		{
   			"opcode": "webGpuMoveNetReady",
@@ -234,7 +237,7 @@
   			"feature": "protocolV1Codec",
   			"blockType": "BOOLEAN",
   			"text": "protocol JSON [JSON] valid?",
-  			"description": "Validates and dispatches one of the six pinned multiview-pose v1 contracts without retaining it.",
+  			"description": "Validates and dispatches one of the five pinned multiview-pose v1 contracts without retaining it.",
   			"arguments": { "JSON": {
   				"type": "STRING",
   				"defaultValue": "{}"
@@ -3126,7 +3129,6 @@
   		peerId: identifier$3(context.peerId, "peer ID"),
   		sequence: safeInteger(context.sequence, "sequence"),
   		captureTimestampUs: safeInteger(context.captureTimestampUs, "capture timestamp"),
-  		clockId: identifier$3(context.clockId, "clock ID"),
   		frameWidth: dimension(context.frameWidth, "frame width"),
   		frameHeight: dimension(context.frameHeight, "frame height"),
   		calibrationId: identifier$3(context.calibrationId, "calibration ID"),
@@ -3181,8 +3183,6 @@
   		this.pipelineErrorMessage = "";
   		this.runtime = options.runtime;
   		this.model = options.model;
-  		this.nowMilliseconds = options.nowMilliseconds ?? (() => performance.timeOrigin + performance.now());
-  		this.clockId = options.clockId ?? `clock-${crypto.randomUUID()}`;
   	}
   	async start(options) {
   		const normalized = normalizeStartOptions$1(options);
@@ -3196,11 +3196,12 @@
   			if (this.starting === starting) this.starting = void 0;
   		}
   	}
-  	inferLatestFrame() {
+  	inferLatestFrame(captureTimestampUs) {
+  		if (!Number.isSafeInteger(captureTimestampUs) || captureTimestampUs < 0) throw new Error("Capture timestamp must be an externally synchronized non-negative integer in microseconds.");
   		if (this.inference) return this.inference;
   		if (!this.detector || !this.lease || !this.startOptions) throw new Error("WebGPU MoveNet MultiPose is not ready.");
   		const operation = this.operation;
-  		const inference = this.runInference(operation);
+  		const inference = this.runInference(operation, captureTimestampUs);
   		this.inference = inference;
   		const clear = () => {
   			if (this.inference === inference) this.inference = void 0;
@@ -3287,7 +3288,7 @@
   		this.sequence = 0;
   		this.pipelineState = "ready";
   	}
-  	async runInference(operation) {
+  	async runInference(operation, captureTimestampUs) {
   		const detector = this.detector;
   		const lease = this.lease;
   		const options = this.startOptions;
@@ -3300,13 +3301,12 @@
   		} catch (error) {
   			this.fail("camera-ended", error);
   		}
-  		const timestampMs = this.nowMilliseconds();
   		let poses;
   		try {
   			poses = await detector.estimatePoses(frame.element, {
   				maxPoses: 6,
   				flipHorizontal: false
-  			}, timestampMs);
+  			});
   		} catch (error) {
   			this.fail("inference-failed", error);
   		}
@@ -3316,9 +3316,8 @@
   				cameraId: options.cameraId,
   				peerId: options.peerId,
   				calibrationId: options.calibrationId,
-  				clockId: this.clockId,
   				sequence: this.sequence,
-  				captureTimestampUs: Math.round(timestampMs * 1e3),
+  				captureTimestampUs,
   				frameWidth: frame.width,
   				frameHeight: frame.height
   			});
@@ -69043,7 +69042,6 @@
   	peerId: identifier$1,
   	sequence: timestampUs,
   	captureTimestampUs: timestampUs,
-  	clockId: identifier$1,
   	frameWidth: Type.Integer({
   		minimum: 1,
   		maximum: 16384
@@ -69081,21 +69079,6 @@
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-3d-v1.json" });
   var protocolSchemas = {
   	"twmp/camera-calibration": CameraCalibrationSchema,
-  	"twmp/clock-probe": Type.Union([object({
-  		schema: Type.Literal("twmp/clock-probe"),
-  		version: Type.Literal(1),
-  		kind: Type.Literal("ping"),
-  		sequence: timestampUs,
-  		t0Us: timestampUs
-  	}), object({
-  		schema: Type.Literal("twmp/clock-probe"),
-  		version: Type.Literal(1),
-  		kind: Type.Literal("pong"),
-  		sequence: timestampUs,
-  		t0Us: timestampUs,
-  		t1Us: timestampUs,
-  		t2Us: timestampUs
-  	})], { $id: "https://kubohiroya.github.io/multiview-pose/schema/clock-probe-v1.json" }),
   	"twmp/performance-dsl": object({
   		schema: Type.Literal("twmp/performance-dsl"),
   		version: Type.Literal(1),
@@ -77184,9 +77167,7 @@
   		this.skins = new TemporarySpriteSkinManager(this.runtime);
   		this.pose = new PosePipelineController({
   			runtime: this.runtime,
-  			model: options.poseModel ?? new TfjsWebGpuMoveNet(),
-  			...options.nowMilliseconds ? { nowMilliseconds: options.nowMilliseconds } : {},
-  			...options.clockId ? { clockId: options.clockId } : {}
+  			model: options.poseModel ?? new TfjsWebGpuMoveNet()
   		});
   		this.protocol = new ProtocolV1Codec(options.nowMilliseconds);
   		this.calibration = new CameraCalibrationController({
@@ -77300,9 +77281,9 @@
   	async stopWebGpuMoveNetMultiPose() {
   		await this.pose.stop();
   	}
-  	async inferNextPoseFrame() {
+  	async inferNextPoseFrame(args) {
   		this.requirePoseEnabled();
-  		await this.pose.inferLatestFrame();
+  		await this.pose.inferLatestFrame(Scratch.Cast.toNumber(args.CAPTURE_TIMESTAMP_US));
   	}
   	webGpuMoveNetReady() {
   		return this.poseEnabled && this.pose.ready();

@@ -97,9 +97,11 @@
       "opcode": "inferNextPoseFrame",
       "feature": "webgpuMoveNetMultiPose",
       "blockType": "COMMAND",
-      "text": "infer latest pose frame",
-      "description": "Runs at most one inference and coalesces concurrent requests into that latest-frame operation.",
-      "arguments": {}
+      "text": "infer latest pose frame timestamp [CAPTURE_TIMESTAMP_US] us",
+      "description": "Runs at most one inference and carries an opaque synchronized timestamp supplied by the external time service.",
+      "arguments": {
+        "CAPTURE_TIMESTAMP_US": { "type": "NUMBER", "defaultValue": 0 }
+      }
     },
     {
       "opcode": "webGpuMoveNetReady",
@@ -154,7 +156,7 @@
       "feature": "protocolV1Codec",
       "blockType": "BOOLEAN",
       "text": "protocol JSON [JSON] valid?",
-      "description": "Validates and dispatches one of the six pinned multiview-pose v1 contracts without retaining it.",
+      "description": "Validates and dispatches one of the five pinned multiview-pose v1 contracts without retaining it.",
       "arguments": {
         "JSON": { "type": "STRING", "defaultValue": "{}" }
       }

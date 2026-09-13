@@ -81,13 +81,13 @@ releases this feature's model resources.
 ## Pinned application-contract codec
 
 `protocolV1Codec` is an independent startup-fixed, default-OFF flag. The codec parses at most 1 MiB
-of JSON, reads the root `schema` and `version`, and dispatches only the six explicitly supported v1
+of JSON, reads the root `schema` and `version`, and dispatches only the five explicitly supported v1
 TypeBox schemas. It performs no version inference or fallback. A successful decode retains one
 compact JSON value; any failed decode clears it and exposes the first diagnostic as a JSON Pointer
 path and message.
 
 The schema definitions mirror `@multiview-pose/protocol` at the commit recorded in
-`schemas/protocol-v1-integrity.json`. Canonical JSON SHA-256 values bind all six runtime definitions
+`schemas/protocol-v1-integrity.json`. Canonical JSON SHA-256 values bind all five runtime definitions
 to that commit. The repository check also compares an available upstream working checkout, making
 schema edits fail until the pin, implementation, fixtures, and compatibility decision are updated
 together.
@@ -97,6 +97,10 @@ all bounded values. A separate recursive key guard rejects WebRTC offers, answer
 material, and credential fields before persistence, even if a later schema accidentally permits a
 nested extension point. SessionPolicy also enforces `expiresAt > issuedAt` and rejects expired
 policies at application-validation time.
+
+PoseFrame2D `captureTimestampUs` and PoseFrame3D `timestampUs` are opaque values from a separate
+synchronized local time service. This extension carries the supplied timestamp unchanged and does
+not implement clock initialization, offset estimation, probes, ping, or pong logic.
 
 ## Camera calibration workflow
 
