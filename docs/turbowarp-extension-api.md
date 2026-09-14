@@ -2,7 +2,7 @@
 
 [User guide](../README.md) | [日本語](turbowarp-extension-api.ja.md) | [Architecture](architecture.md)
 
-This is the public API reference for `@kubohiroya/turbowarp-multiview-pose` 0.2.0.
+This is the public API reference for `@kubohiroya/turbowarp-realtime-motion-capture` 0.2.0.
 The supported integration surface is the unsandboxed TurboWarp extension: its extension ID,
 opcodes, arguments, reporters, JSON contracts, and runtime capabilities. The TypeScript classes
 under `src/` are implementation details and are not package exports.
@@ -11,8 +11,8 @@ under `src/` are implementation details and are not package exports.
 
 | Item                 | Contract                                            |
 | -------------------- | --------------------------------------------------- |
-| Extension ID         | `kubohiroyamultiviewpose`                           |
-| Bundle               | `dist/turbowarp-multiview-pose.js`                  |
+| Extension ID         | `kubohiroyarealtimemotioncapture`                           |
+| Bundle               | `dist/turbowarp-realtime-motion-capture.js`         |
 | Machine-readable API | `dist/extension-manifest.json` (`formatVersion: 1`) |
 | Execution mode       | Unsandboxed only                                    |
 | Feature selection    | Startup-fixed; every feature is OFF by default      |
@@ -89,12 +89,12 @@ The protocol codec accepts exactly these schema/version pairs:
 
 | `schema`                  | `version` | Principal limits                                                            |
 | ------------------------- | --------: | --------------------------------------------------------------------------- |
-| `twmp/session-policy`     |         1 | 1–16 cameras; at most 6 performers                                          |
-| `twmp/camera-calibration` |         1 | 3x3 intrinsic matrix, up to 14 distortion coefficients, 4x4 world transform |
-| `twmp/pose-frame-2d`      |         1 | At most 6 persons; ordered COCO-17 tuple; pixel coordinates                 |
-| `twmp/pose-frame-2d`      |         2 | Version 1 fields plus sampled color markers                                |
-| `twmp/pose-frame-3d`      |         1 | At most 6 persons; 2–16 unique camera IDs; ordered COCO-17 tuple; meters    |
-| `twmp/performance-dsl`    |         1 | 1–6 performers and their glow-stick colors                                 |
+| `twrmc/session-policy`     |         1 | 1–16 cameras; at most 6 performers                                          |
+| `twrmc/camera-calibration` |         1 | 3x3 intrinsic matrix, up to 14 distortion coefficients, 4x4 world transform |
+| `twrmc/pose-frame-2d`      |         1 | At most 6 persons; ordered COCO-17 tuple; pixel coordinates                 |
+| `twrmc/pose-frame-2d`      |         2 | Version 1 fields plus sampled color markers                                |
+| `twrmc/pose-frame-3d`      |         1 | At most 6 persons; 2–16 unique camera IDs; ordered COCO-17 tuple; meters    |
+| `twrmc/performance-dsl`    |         1 | 1–6 performers and their glow-stick colors                                 |
 
 Unknown fields, schemas, and versions are rejected. Keys associated with WebRTC pairing secrets
 (`offer`, `answer`, SDP, ICE, DTLS, and credential forms) are rejected recursively. Timestamps are
@@ -841,7 +841,7 @@ Fuses one explicit past instant expressed in the synchronized microsecond time b
 
 ### `latest PoseFrame3D JSON`
 
-Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.
+Returns the last successfully fused twrmc/pose-frame-3d version 1 JSON, or an empty string.
 
 | Property | Value |
 |---|---|

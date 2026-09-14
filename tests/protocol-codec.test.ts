@@ -24,7 +24,7 @@ const keypoints3d = coco17KeypointIds.map((id, index) => ({
 
 const validValues = [
   {
-    schema: "twmp/session-policy",
+    schema: "twrmc/session-policy",
     version: 1,
     sessionId: "show-2026",
     revision: 1,
@@ -50,7 +50,7 @@ const validValues = [
     poseChannelHighWaterBytes: 262_144,
   },
   {
-    schema: "twmp/camera-calibration",
+    schema: "twrmc/camera-calibration",
     version: 1,
     calibrationId: "calibration-1",
     cameraId: "camera-1",
@@ -63,7 +63,7 @@ const validValues = [
     calibratedAt: "2026-09-13T12:00:00Z",
   },
   {
-    schema: "twmp/pose-frame-2d",
+    schema: "twrmc/pose-frame-2d",
     version: 1,
     cameraId: "camera-1",
     peerId: "source-1",
@@ -75,7 +75,7 @@ const validValues = [
     persons: [{ trackingId: "person-1", score: 0.9, keypoints: keypoints2d }],
   },
   {
-    schema: "twmp/pose-frame-3d",
+    schema: "twrmc/pose-frame-3d",
     version: 1,
     sequence: 42,
     timestampUs: 123_456_789,
@@ -90,7 +90,7 @@ const validValues = [
     ],
   },
   {
-    schema: "twmp/performance-dsl",
+    schema: "twrmc/performance-dsl",
     version: 1,
     performers: [
       {
@@ -128,7 +128,7 @@ describe("ProtocolV1Codec", () => {
 
   it("accepts PoseFrame2D v2 while v1 keeps rejecting it", () => {
     const frameV2 = {
-      schema: "twmp/pose-frame-2d",
+      schema: "twrmc/pose-frame-2d",
       version: 2,
       cameraId: "camera-1",
       peerId: "source-1",
@@ -150,14 +150,14 @@ describe("ProtocolV1Codec", () => {
     };
     const instance = codec();
     expect(instance.validate(JSON.stringify(frameV2))).toBe(true);
-    expect(instance.schema()).toBe("twmp/pose-frame-2d");
+    expect(instance.schema()).toBe("twrmc/pose-frame-2d");
     expect(instance.version()).toBe(2);
-    expect(Value.Check(protocolSchemas["twmp/pose-frame-2d"][1], frameV2)).toBe(
-      false,
-    );
-    expect(Value.Check(protocolSchemas["twmp/pose-frame-2d"][2], frameV2)).toBe(
-      true,
-    );
+    expect(
+      Value.Check(protocolSchemas["twrmc/pose-frame-2d"][1], frameV2),
+    ).toBe(false);
+    expect(
+      Value.Check(protocolSchemas["twrmc/pose-frame-2d"][2], frameV2),
+    ).toBe(true);
 
     // Markers stay bounded, colored, and anchored to a COCO-17 keypoint.
     const withMarkers = (markers: unknown) => ({
@@ -211,16 +211,16 @@ describe("ProtocolV1Codec", () => {
     const credential = await fixture(
       "invalid/session-policy-with-credential.json",
     );
-    expect(Value.Check(protocolSchemas["twmp/performance-dsl"][1], valid)).toBe(
-      true,
-    );
+    expect(
+      Value.Check(protocolSchemas["twrmc/performance-dsl"][1], valid),
+    ).toBe(true);
     expect(codec().validate(JSON.stringify(valid))).toBe(true);
     expect(
-      Value.Check(protocolSchemas["twmp/performance-dsl"][1], invalidVersion),
+      Value.Check(protocolSchemas["twrmc/performance-dsl"][1], invalidVersion),
     ).toBe(false);
     expect(codec().validate(JSON.stringify(invalidVersion))).toBe(false);
     expect(
-      Value.Check(protocolSchemas["twmp/session-policy"][1], credential),
+      Value.Check(protocolSchemas["twrmc/session-policy"][1], credential),
     ).toBe(false);
     const credentialCodec = codec();
     expect(credentialCodec.validate(JSON.stringify(credential))).toBe(false);

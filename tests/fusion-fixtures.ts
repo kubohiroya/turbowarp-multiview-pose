@@ -25,7 +25,7 @@ export function lookAtCalibration(
   const right = normalize(cross(forward, { x: 0, y: 1, z: 0 }));
   const down = cross(forward, right);
   return {
-    schema: "twmp/camera-calibration",
+    schema: "twrmc/camera-calibration",
     version: 1,
     calibrationId: `${cameraId}-profile`,
     cameraId,
@@ -109,7 +109,7 @@ export function poseFrame2D(
   sequence = 0,
 ): PoseFrame2DV1 {
   return {
-    schema: "twmp/pose-frame-2d",
+    schema: "twrmc/pose-frame-2d",
     version: 1,
     cameraId,
     peerId: `${cameraId}-peer`,
@@ -198,7 +198,7 @@ export function performanceDsl(
   performers: ReadonlyArray<{ performerId: string; glowStickColor: string }>,
 ): string {
   return JSON.stringify({
-    schema: "twmp/performance-dsl",
+    schema: "twrmc/performance-dsl",
     version: 1,
     performers: performers.map((performer, index) => ({
       performerId: performer.performerId,

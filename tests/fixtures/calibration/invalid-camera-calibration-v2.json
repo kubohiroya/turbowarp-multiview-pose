@@ -1,5 +1,5 @@
 {
-  "schema": "twmp/camera-calibration",
+  "schema": "twrmc/camera-calibration",
   "version": 2,
   "calibrationId": "calibration-1",
   "cameraId": "camera-1",

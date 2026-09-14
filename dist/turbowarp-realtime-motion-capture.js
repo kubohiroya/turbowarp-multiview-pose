@@ -1,6 +1,6 @@
-// Name: TurboWarp-Multiview-Pose
-// ID: kubohiroyamultiviewpose
-// Description: Composite TurboWarp blocks for multiview pose applications.
+// Name: TurboWarp Realtime Motion Capture
+// ID: kubohiroyarealtimemotioncapture
+// Description: Composite TurboWarp blocks for realtime motion capture applications.
 // By: Hiroya Kubo
 // License: MPL-2.0
 
@@ -50,18 +50,18 @@
   //#endregion
   //#region src/config.ts
   var extensionConfig = {
-  	id: "kubohiroyamultiviewpose",
-  	slug: "turbowarp-multiview-pose",
-  	name: "TurboWarp-Multiview-Pose",
-  	description: "Composite TurboWarp blocks for multiview pose applications.",
+  	id: "kubohiroyarealtimemotioncapture",
+  	slug: "turbowarp-realtime-motion-capture",
+  	name: "TurboWarp Realtime Motion Capture",
+  	description: "Composite TurboWarp blocks for realtime motion capture applications.",
   	author: "Hiroya Kubo",
   	license: "MPL-2.0",
   	unsandboxed: true,
-  	docsURI: "https://kubohiroya.github.io/turbowarp-multiview-pose/",
+  	docsURI: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/",
   	blockIconURI: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3QgeD0iNCIgeT0iOCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE0IiByeD0iMyIgZmlsbD0iIzRDOTdGRiIvPjxyZWN0IHg9IjI2IiB5PSI4IiB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIHJ4PSIzIiBmaWxsPSIjNTlDMDU5Ii8+PHJlY3QgeD0iMTUiIHk9IjI2IiB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIHJ4PSIzIiBmaWxsPSIjRkZBQjE5Ii8+PC9zdmc+"
   };
   var block_definitions_default = {
-  	extensionName: "TurboWarp-Multiview-Pose",
+  	extensionName: "TurboWarp Realtime Motion Capture",
   	blocks: [
   		{
   			"opcode": "prepareOfferQr",
@@ -797,7 +797,7 @@
   			"feature": "poseFusion3D",
   			"blockType": "REPORTER",
   			"text": "latest PoseFrame3D JSON",
-  			"description": "Returns the last successfully fused twmp/pose-frame-3d version 1 JSON, or an empty string.",
+  			"description": "Returns the last successfully fused twrmc/pose-frame-3d version 1 JSON, or an empty string.",
   			"arguments": {}
   		},
   		{
@@ -3634,7 +3634,7 @@
   */
   function createPoseFrame2D(poses, context, markersByPose) {
   	const header = {
-  		schema: "twmp/pose-frame-2d",
+  		schema: "twrmc/pose-frame-2d",
   		cameraId: identifier$4(context.cameraId, "camera ID"),
   		peerId: identifier$4(context.peerId, "peer ID"),
   		sequence: safeInteger(context.sequence, "sequence"),
@@ -4017,7 +4017,7 @@
   		let lease;
   		try {
   			lease = await requireCameraSource$2(this.runtime).acquireCamera({
-  				owner: "turbowarp-multiview-pose",
+  				owner: "turbowarp-realtime-motion-capture",
   				cameraId: options.cameraId
   			});
   		} catch (error) {
@@ -69761,7 +69761,7 @@
   	score
   })));
   var SessionPolicySchema = object({
-  	schema: Type.Literal("twmp/session-policy"),
+  	schema: Type.Literal("twrmc/session-policy"),
   	version: Type.Literal(1),
   	sessionId: identifier$2,
   	revision: Type.Integer({
@@ -69803,7 +69803,7 @@
   	})
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/session-policy-v1.json" });
   var CameraCalibrationSchema = object({
-  	schema: Type.Literal("twmp/camera-calibration"),
+  	schema: Type.Literal("twrmc/camera-calibration"),
   	version: Type.Literal(1),
   	calibrationId: identifier$2,
   	cameraId: identifier$2,
@@ -69825,7 +69825,7 @@
   	calibratedAt: utcDateTime
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/camera-calibration-v1.json" });
   var PoseFrame2DSchema = object({
-  	schema: Type.Literal("twmp/pose-frame-2d"),
+  	schema: Type.Literal("twrmc/pose-frame-2d"),
   	version: Type.Literal(1),
   	cameraId: identifier$2,
   	peerId: identifier$2,
@@ -69858,7 +69858,7 @@
   	coverage: score
   }), { maxItems: 4 });
   var PoseFrame2DV2Schema = object({
-  	schema: Type.Literal("twmp/pose-frame-2d"),
+  	schema: Type.Literal("twrmc/pose-frame-2d"),
   	version: Type.Literal(2),
   	cameraId: identifier$2,
   	peerId: identifier$2,
@@ -69881,7 +69881,7 @@
   	}), { maxItems: 6 })
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v2.json" });
   var PoseFrame3DSchema = object({
-  	schema: Type.Literal("twmp/pose-frame-3d"),
+  	schema: Type.Literal("twrmc/pose-frame-3d"),
   	version: Type.Literal(1),
   	sequence: timestampUs,
   	timestampUs,
@@ -69901,7 +69901,7 @@
   	}), { maxItems: 6 })
   }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-3d-v1.json" });
   var PerformanceDslSchema = object({
-  	schema: Type.Literal("twmp/performance-dsl"),
+  	schema: Type.Literal("twrmc/performance-dsl"),
   	version: Type.Literal(1),
   	performers: Type.Array(object({
   		performerId: identifier$2,
@@ -69924,14 +69924,14 @@
   * not mirrored from another repository.
   */
   var protocolSchemas = {
-  	"twmp/camera-calibration": { 1: CameraCalibrationSchema },
-  	"twmp/performance-dsl": { 1: PerformanceDslSchema },
-  	"twmp/pose-frame-2d": {
+  	"twrmc/camera-calibration": { 1: CameraCalibrationSchema },
+  	"twrmc/performance-dsl": { 1: PerformanceDslSchema },
+  	"twrmc/pose-frame-2d": {
   		1: PoseFrame2DSchema,
   		2: PoseFrame2DV2Schema
   	},
-  	"twmp/pose-frame-3d": { 1: PoseFrame3DSchema },
-  	"twmp/session-policy": { 1: SessionPolicySchema }
+  	"twrmc/pose-frame-3d": { 1: PoseFrame3DSchema },
+  	"twrmc/session-policy": { 1: SessionPolicySchema }
   };
   /** Returns the pinned schema for one contract version, or undefined. */
   function protocolSchemaFor(schemaId, version) {
@@ -69999,7 +69999,7 @@
   		const first = Errors(schema, value).First();
   		return failure(first?.path || "/", first?.message ?? "Protocol value does not match its v1 schema.");
   	}
-  	if (value.schema === "twmp/session-policy") {
+  	if (value.schema === "twrmc/session-policy") {
   		const timeError = validateSessionPolicyWindow(value, nowMilliseconds);
   		if (timeError) return failure(timeError.path, timeError.message);
   	}
@@ -70145,7 +70145,7 @@
   		let lease;
   		try {
   			lease = await requireCameraSource$1(this.runtime).acquireCamera({
-  				owner: "turbowarp-multiview-pose-calibration",
+  				owner: "turbowarp-realtime-motion-capture-calibration",
   				cameraId: normalized.cameraId
   			});
   		} catch (error) {
@@ -70326,7 +70326,7 @@
   			this.reject("reprojection-too-high", `Reprojection RMS ${this.reprojectionError} px exceeds ${session.maximumReprojectionErrorPx} px.`);
   		}
   		const profile = {
-  			schema: "twmp/camera-calibration",
+  			schema: "twrmc/camera-calibration",
   			version: 1,
   			calibrationId: session.calibrationId,
   			cameraId: session.cameraId,
@@ -81784,8 +81784,8 @@
   	*/
   	loadPerformanceDsl(json) {
   		const decoded = decodeProtocolJson(json, Date.now());
-  		if (!decoded.ok || decoded.schema !== "twmp/performance-dsl") {
-  			const message = decoded.ok ? `Expected twmp/performance-dsl, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  		if (!decoded.ok || decoded.schema !== "twrmc/performance-dsl") {
+  			const message = decoded.ok ? `Expected twrmc/performance-dsl, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
   			this.fail("performance-dsl-invalid", message);
   		}
   		const performers = decoded.value.performers;
@@ -81819,8 +81819,8 @@
   	}
   	loadCalibration(json) {
   		const decoded = decodeProtocolJson(json, Date.now());
-  		if (!decoded.ok || decoded.schema !== "twmp/camera-calibration") {
-  			const message = decoded.ok ? `Expected twmp/camera-calibration, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  		if (!decoded.ok || decoded.schema !== "twrmc/camera-calibration") {
+  			const message = decoded.ok ? `Expected twrmc/camera-calibration, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
   			this.fail("calibration-invalid", message);
   		}
   		const calibration = decoded.value;
@@ -81842,8 +81842,8 @@
   	ingestFrame(json) {
   		this.requireStarted();
   		const decoded = decodeProtocolJson(json, Date.now());
-  		if (!decoded.ok || decoded.schema !== "twmp/pose-frame-2d") {
-  			const message = decoded.ok ? `Expected twmp/pose-frame-2d, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
+  		if (!decoded.ok || decoded.schema !== "twrmc/pose-frame-2d") {
+  			const message = decoded.ok ? `Expected twrmc/pose-frame-2d, received ${decoded.schema}.` : formatProtocolDiagnostic(decoded.diagnostic);
   			this.fail("frame-invalid", message);
   		}
   		const frame = decoded.value;
@@ -81906,7 +81906,7 @@
   			return false;
   		}
   		const frame = {
-  			schema: "twmp/pose-frame-3d",
+  			schema: "twrmc/pose-frame-3d",
   			version: 1,
   			sequence: this.sequence,
   			timestampUs,

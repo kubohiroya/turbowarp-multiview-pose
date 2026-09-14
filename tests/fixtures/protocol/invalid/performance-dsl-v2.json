@@ -1,5 +1,5 @@
 {
-  "schema": "twmp/performance-dsl",
+  "schema": "twrmc/performance-dsl",
   "version": 2,
   "performers": [
     {

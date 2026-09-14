@@ -27,7 +27,7 @@ export function createPoseFrame2D(
   markersByPose?: ReadonlyMap<number, PoseMarkerV2[]>,
 ): PoseFrame2DV1 | PoseFrame2DV2 {
   const header = {
-    schema: "twmp/pose-frame-2d",
+    schema: "twrmc/pose-frame-2d",
     cameraId: identifier(context.cameraId, "camera ID"),
     peerId: identifier(context.peerId, "peer ID"),
     sequence: safeInteger(context.sequence, "sequence"),

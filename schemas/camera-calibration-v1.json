@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "twmp/camera-calibration",
+      "const": "twrmc/camera-calibration",
       "type": "string"
     },
     "version": {

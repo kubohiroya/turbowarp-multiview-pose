@@ -69,7 +69,7 @@ applicationは本packageと配布された`schemas/`を通して契約を利用�
 repositoryから契約定義を読むことはなく、依存方向はapplication → extensionの一方向に保たれます。
 
 契約はversionを切って追加し、公開済みversionを書き換えません。`protocolSchemas`はschema識別子と
-versionの2段でdispatchするため、`twmp/pose-frame-2d`はv1とv2を受理し、v1利用者はv2 payloadを
+versionの2段でdispatchするため、`twrmc/pose-frame-2d`はv1とv2を受理し、v1利用者はv2 payloadを
 拒否し続けます。PoseFrame2D v2は人物ごとに最大4件のサイリウムmarkerを追加します。各markerは、
 一意な色の発光体を観測したCOCO-17 keypoint、`#RRGGBB`の色、patch内で色が占めた割合を持ちます。
 色はkeypointと同一の映像frame・同一のcapture timestampの観測なので、別messageではなくpose frame
@@ -118,7 +118,7 @@ CPU／WASM／WebGL推論fallbackは行いません。
 controllerはCamera Sourceから`{cameraId: "pose"}`のleaseを取得し、media captureを所有しません。
 同時に呼ばれた推論blockは1つのPromiseを共有するため、detector実行は重ならず、古いframe要求を
 蓄積しません。成功時は最新video frameから最大6人を推定し、model tracking IDと17個すべての
-名前付きCOCO keypointを必須として、`twmp/pose-frame-2d` version 1へserializeします。
+名前付きCOCO keypointを必須として、`twrmc/pose-frame-2d` version 1へserializeします。
 
 停止時は実行中の初期化／推論を待ち、detectorをdisposeし、camera leaseと最新frameを解放します。
 TensorFlow.js backendはprocess全体で共有されるためresetせず、本機能が所有するmodel resourceは

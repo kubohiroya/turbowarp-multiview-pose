@@ -4,14 +4,20 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
-const { stdout } = await execFileAsync(
-  "git",
-  ["status", "--short", "--untracked-files=all", "--", "schemas"],
-  { cwd: repositoryRoot },
-);
+const [{ stdout: modified }, { stdout: untracked }] = await Promise.all([
+  execFileAsync("git", ["diff", "--name-only", "--", "schemas"], {
+    cwd: repositoryRoot,
+  }),
+  execFileAsync(
+    "git",
+    ["ls-files", "--others", "--exclude-standard", "--", "schemas"],
+    { cwd: repositoryRoot },
+  ),
+]);
 
-if (stdout.length > 0) {
+const staleFiles = `${modified}${untracked}`;
+if (staleFiles.length > 0) {
   process.stderr.write("Generated protocol JSON Schemas are not up to date:\n");
-  process.stderr.write(stdout);
+  process.stderr.write(staleFiles);
   process.exitCode = 1;
 }

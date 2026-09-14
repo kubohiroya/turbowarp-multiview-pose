@@ -2,7 +2,7 @@
 
 [利用ガイド](../README.ja.md) | [English](turbowarp-extension-api.md) | [アーキテクチャ](architecture.ja.md)
 
-これは`@kubohiroya/turbowarp-multiview-pose` 0.2.0の公開APIリファレンスです。正式な公開面は、
+これは`@kubohiroya/turbowarp-realtime-motion-capture` 0.2.0の公開APIリファレンスです。正式な公開面は、
 サンドボックスなしで動作するTurboWarp機能拡張のID、opcode、引数、reporter、JSON契約、runtime
 capabilityです。`src/`以下のTypeScript classは実装詳細であり、npm packageのexportではありません。
 
@@ -10,8 +10,8 @@ capabilityです。`src/`以下のTypeScript classは実装詳細であり、npm
 
 | 項目         | 契約                                                 |
 | ------------ | ---------------------------------------------------- |
-| Extension ID | `kubohiroyamultiviewpose`                            |
-| Bundle       | `dist/turbowarp-multiview-pose.js`                   |
+| Extension ID | `kubohiroyarealtimemotioncapture`                            |
+| Bundle       | `dist/turbowarp-realtime-motion-capture.js`          |
 | 機械可読API  | `dist/extension-manifest.json`（`formatVersion: 1`） |
 | 実行mode     | サンドボックスなしのみ                               |
 | 機能選択     | 起動時固定、すべて既定OFF                            |
@@ -86,12 +86,12 @@ protocol codecが受け付ける組み合わせは次の5つだけです。
 
 | `schema`                  | `version` | 主な制約                                                         |
 | ------------------------- | --------: | ---------------------------------------------------------------- |
-| `twmp/session-policy`     |         1 | camera 1〜16台、performer最大6人                                 |
-| `twmp/camera-calibration` |         1 | 3x3 intrinsic、distortion最大14係数、4x4 world変換               |
-| `twmp/pose-frame-2d`      |         1 | person最大6人、順序固定COCO-17、pixel座標                        |
-| `twmp/pose-frame-2d`      |         2 | version 1のfieldとsample済みcolor marker                          |
-| `twmp/pose-frame-3d`      |         1 | person最大6人、重複なしcamera ID 2〜16個、順序固定COCO-17、meter |
-| `twmp/performance-dsl`    |         1 | performer 1〜6人とサイリウム色                                   |
+| `twrmc/session-policy`     |         1 | camera 1〜16台、performer最大6人                                 |
+| `twrmc/camera-calibration` |         1 | 3x3 intrinsic、distortion最大14係数、4x4 world変換               |
+| `twrmc/pose-frame-2d`      |         1 | person最大6人、順序固定COCO-17、pixel座標                        |
+| `twrmc/pose-frame-2d`      |         2 | version 1のfieldとsample済みcolor marker                          |
+| `twrmc/pose-frame-3d`      |         1 | person最大6人、重複なしcamera ID 2〜16個、順序固定COCO-17、meter |
+| `twrmc/performance-dsl`    |         1 | performer 1〜6人とサイリウム色                                   |
 
 unknown field／schema／versionは拒否します。WebRTC pairing secretに関係するkey（offer、answer、
 SDP、ICE、DTLS、credentialの各形式）も入れ子の深さに関係なく拒否します。timestampは非負の

@@ -1,4 +1,4 @@
-# TurboWarp-Multiview-Pose
+# TurboWarp Realtime Motion Capture
 
 [English](README.md)
 
@@ -30,14 +30,14 @@ network接続を必要とする場合があります。QRにはICE credentialや
 
 ## 使い方
 
-provider拡張を先に読み込み、その後に`dist/turbowarp-multiview-pose.js`をサンドボックスなしの
-custom extensionとして読み込みます。通常の順序はCamera Source、WebRTC、A-Frame、Multiview Pose
+provider拡張を先に読み込み、その後に`dist/turbowarp-realtime-motion-capture.js`をサンドボックスなしの
+custom extensionとして読み込みます。通常の順序はCamera Source、WebRTC、A-Frame、Realtime Motion Capture
 です。使わないproviderは省略できます。
 
 version固定CDN URL:
 
 ```text
-https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.2.0/dist/turbowarp-multiview-pose.js
+https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-realtime-motion-capture@0.2.0/dist/turbowarp-realtime-motion-capture.js
 ```
 
 npm packageが公開するのはbrowser向けstandalone bundle、schema、文書です。Composition APIは

@@ -84,7 +84,7 @@ describe("PosePipelineController", () => {
     expect(model.initializeWebGpu).toHaveBeenCalledOnce();
     expect(model.createMultiPoseDetector).toHaveBeenCalledOnce();
     expect(acquireCamera).toHaveBeenCalledWith({
-      owner: "turbowarp-multiview-pose",
+      owner: "turbowarp-realtime-motion-capture",
       cameraId: "pose",
     });
     await controller.inferLatestFrame(1_234_500);
@@ -97,7 +97,7 @@ describe("PosePipelineController", () => {
       unknown
     >;
     expect(frame).toMatchObject({
-      schema: "twmp/pose-frame-2d",
+      schema: "twrmc/pose-frame-2d",
       version: 1,
       cameraId: "pose",
       peerId: "source-1",

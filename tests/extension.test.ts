@@ -289,7 +289,7 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     expect(extension.poseFusionErrorCode()).toBe("");
     expect(extension.poseFusionError()).toBe("");
     expect(JSON.parse(extension.latestPoseFrame3D())).toMatchObject({
-      schema: "twmp/pose-frame-3d",
+      schema: "twrmc/pose-frame-3d",
       version: 1,
     });
     expect(JSON.parse(extension.synchronizedPoseSet2D())).toMatchObject({
@@ -415,7 +415,7 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     setup();
     const extension = new MultiviewPoseExtension({ protocolEnabled: true });
     const dsl = JSON.stringify({
-      schema: "twmp/performance-dsl",
+      schema: "twrmc/performance-dsl",
       version: 1,
       performers: [
         {
@@ -432,7 +432,7 @@ describe("MultiviewPoseExtension offer QR blocks", () => {
     extension.decodeProtocolJson({ JSON: dsl });
     expect(extension.encodeProtocolJson({ JSON: dsl })).toBe(dsl);
     expect(extension.decodedProtocolJson()).toBe(dsl);
-    expect(extension.protocolSchema()).toBe("twmp/performance-dsl");
+    expect(extension.protocolSchema()).toBe("twrmc/performance-dsl");
     expect(extension.protocolVersion()).toBe(1);
     expect(extension.protocolJsonValid({ JSON: "{" })).toBe(false);
     expect(extension.protocolErrorPath()).toBe("/");

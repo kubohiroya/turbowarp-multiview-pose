@@ -196,7 +196,7 @@ describe("AvatarRetargetController", () => {
 
 function frame(persons: ReturnType<typeof person>[]): string {
   return JSON.stringify({
-    schema: "twmp/pose-frame-3d",
+    schema: "twrmc/pose-frame-3d",
     version: 1,
     sequence: 7,
     timestampUs: 9_007_199_254_740_000,
@@ -237,7 +237,7 @@ function person(personId: string) {
 
 function frame2d(persons: ReturnType<typeof person2d>[]): string {
   return JSON.stringify({
-    schema: "twmp/pose-frame-2d",
+    schema: "twrmc/pose-frame-2d",
     version: 1,
     cameraId: "camera-1",
     peerId: "source-1",

@@ -221,7 +221,7 @@ export class PosePipelineController {
     let lease: CameraLeasePort;
     try {
       lease = await requireCameraSource(this.runtime).acquireCamera({
-        owner: "turbowarp-multiview-pose",
+        owner: "turbowarp-realtime-motion-capture",
         cameraId: options.cameraId,
       });
     } catch (error) {

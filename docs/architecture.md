@@ -77,7 +77,7 @@ The controller acquires `{cameraId: "pose"}` through Camera Source and never own
 Concurrent inference block calls share one promise, so detector invocations do not overlap and old
 frame requests do not accumulate. Each successful call reads the latest video frame, requests no
 more than six poses, requires model tracking IDs and all 17 named COCO keypoints, and serializes the
-result to the `twmp/pose-frame-2d` version 1 contract.
+result to the `twrmc/pose-frame-2d` version 1 contract.
 
 Stopping waits for in-flight initialization/inference, disposes the detector, releases the camera
 lease, and clears the last frame. The TensorFlow.js backend is process-global and is not reset,
@@ -101,7 +101,7 @@ contract definitions from an application repository, which keeps the dependency 
 application to the extension.
 
 Contracts are versioned, never edited in place. `protocolSchemas` dispatches by schema identifier and
-then by version, so `twmp/pose-frame-2d` accepts v1 and v2 while a v1 consumer still rejects a v2
+then by version, so `twrmc/pose-frame-2d` accepts v1 and v2 while a v1 consumer still rejects a v2
 payload. PoseFrame2D v2 adds up to four glow stick markers per person, each naming the COCO-17
 keypoint where a uniquely colored light was observed, its `#RRGGBB` color, and the patch coverage
 that produced it. The color is observed on the same video frame and at the same capture timestamp as

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "productName": "TurboWarp-Multiview-Pose",
+  "productName": "TurboWarp Realtime Motion Capture",
   "packageType": "turbowarp-extension",
   "licensePolicy": "mpl-2.0",
   "readmeLanguages": ["en", "ja"],

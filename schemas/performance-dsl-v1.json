@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "twmp/performance-dsl",
+      "const": "twrmc/performance-dsl",
       "type": "string"
     },
     "version": {
