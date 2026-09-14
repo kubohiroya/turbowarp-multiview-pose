@@ -95,7 +95,7 @@ export const SessionPolicySchema = object(
     }),
   },
   {
-    $id: "https://kubohiroya.github.io/multiview-pose/schema/session-policy-v1.json",
+    $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/session-policy-v1.json",
   },
 );
 
@@ -119,7 +119,7 @@ export const CameraCalibrationSchema = object(
     calibratedAt: utcDateTime,
   },
   {
-    $id: "https://kubohiroya.github.io/multiview-pose/schema/camera-calibration-v1.json",
+    $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/camera-calibration-v1.json",
   },
 );
 
@@ -140,7 +140,7 @@ export const PoseFrame2DSchema = object(
     ),
   },
   {
-    $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v1.json",
+    $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/pose-frame-2d-v1.json",
   },
 );
 
@@ -184,7 +184,7 @@ export const PoseFrame2DV2Schema = object(
     ),
   },
   {
-    $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v2.json",
+    $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/pose-frame-2d-v2.json",
   },
 );
 
@@ -213,7 +213,7 @@ export const PoseFrame3DSchema = object(
     ),
   },
   {
-    $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-3d-v1.json",
+    $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/pose-frame-3d-v1.json",
   },
 );
 
@@ -234,7 +234,7 @@ export const PerformanceDslSchema = object(
     ),
   },
   {
-    $id: "https://kubohiroya.github.io/multiview-pose/schema/performance-dsl-v1.json",
+    $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/performance-dsl-v1.json",
   },
 );
 
