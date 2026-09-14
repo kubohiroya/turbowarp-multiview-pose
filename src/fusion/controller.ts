@@ -154,9 +154,9 @@ export class PoseFusionController {
    */
   public loadPerformanceDsl(json: string): void {
     const decoded = decodeProtocolJson(json, Date.now());
-    if (!decoded.ok || decoded.schema !== "twmp/performance-dsl") {
+    if (!decoded.ok || decoded.schema !== "twrmc/performance-dsl") {
       const message = decoded.ok
-        ? `Expected twmp/performance-dsl, received ${decoded.schema}.`
+        ? `Expected twrmc/performance-dsl, received ${decoded.schema}.`
         : formatProtocolDiagnostic(decoded.diagnostic);
       this.fail("performance-dsl-invalid", message);
     }
@@ -205,9 +205,9 @@ export class PoseFusionController {
 
   public loadCalibration(json: string): void {
     const decoded = decodeProtocolJson(json, Date.now());
-    if (!decoded.ok || decoded.schema !== "twmp/camera-calibration") {
+    if (!decoded.ok || decoded.schema !== "twrmc/camera-calibration") {
       const message = decoded.ok
-        ? `Expected twmp/camera-calibration, received ${decoded.schema}.`
+        ? `Expected twrmc/camera-calibration, received ${decoded.schema}.`
         : formatProtocolDiagnostic(decoded.diagnostic);
       this.fail("calibration-invalid", message);
     }
@@ -239,9 +239,9 @@ export class PoseFusionController {
   public ingestFrame(json: string): void {
     this.requireStarted();
     const decoded = decodeProtocolJson(json, Date.now());
-    if (!decoded.ok || decoded.schema !== "twmp/pose-frame-2d") {
+    if (!decoded.ok || decoded.schema !== "twrmc/pose-frame-2d") {
       const message = decoded.ok
-        ? `Expected twmp/pose-frame-2d, received ${decoded.schema}.`
+        ? `Expected twrmc/pose-frame-2d, received ${decoded.schema}.`
         : formatProtocolDiagnostic(decoded.diagnostic);
       this.fail("frame-invalid", message);
     }
@@ -341,7 +341,7 @@ export class PoseFusionController {
     }
 
     const frame = {
-      schema: "twmp/pose-frame-3d",
+      schema: "twrmc/pose-frame-3d",
       version: 1,
       sequence: this.sequence,
       timestampUs,

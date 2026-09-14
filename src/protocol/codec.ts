@@ -104,7 +104,7 @@ export function decodeProtocolJson(
       first?.message ?? "Protocol value does not match its v1 schema.",
     );
   }
-  if (value.schema === "twmp/session-policy") {
+  if (value.schema === "twrmc/session-policy") {
     const timeError = validateSessionPolicyWindow(value, nowMilliseconds);
     if (timeError) return failure(timeError.path, timeError.message);
   }

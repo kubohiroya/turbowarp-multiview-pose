@@ -110,7 +110,7 @@ process.stdout.write("Repository policy is aligned.\n");
 function checkPolicy() {
   if (policy.schemaVersion !== 1)
     errors.push("repo-policy.json schemaVersion must be 1");
-  if (policy.productName !== "TurboWarp-Multiview-Pose") {
+  if (policy.productName !== "TurboWarp Realtime Motion Capture") {
     errors.push("repo-policy.json productName must match README.md H1");
   }
   if (policy.licensePolicy !== "mpl-2.0") {
@@ -151,7 +151,7 @@ function checkPackageMetadata() {
   }
   if (
     packageMetadata.repository?.url !==
-    "git+https://github.com/kubohiroya/turbowarp-multiview-pose.git"
+    "git+https://github.com/kubohiroya/turbowarp-realtime-motion-capture.git"
   ) {
     errors.push(
       "package.json repository.url must point to the current repository",
@@ -159,7 +159,7 @@ function checkPackageMetadata() {
   }
   if (
     packageMetadata.bugs?.url !==
-    "https://github.com/kubohiroya/turbowarp-multiview-pose/issues"
+    "https://github.com/kubohiroya/turbowarp-realtime-motion-capture/issues"
   ) {
     errors.push(
       "package.json bugs.url must point to the current issue tracker",
@@ -397,7 +397,7 @@ function checkGlowStickPolicy() {
     errors.push("Glow stick sampling must read the leased camera frame only");
   }
   if (
-    !JSON.stringify(protocolSchemas["twmp/pose-frame-2d"][2]).includes(
+    !JSON.stringify(protocolSchemas["twrmc/pose-frame-2d"][2]).includes(
       "markers",
     )
   ) {
@@ -413,7 +413,7 @@ async function checkProtocolOwnership() {
     errors.push("ClockProbe belongs to the external synchronized time service");
   }
   if (
-    JSON.stringify(protocolSchemas["twmp/pose-frame-2d"]).includes("clockId")
+    JSON.stringify(protocolSchemas["twrmc/pose-frame-2d"]).includes("clockId")
   ) {
     errors.push("PoseFrame2D must not contain clockId");
   }

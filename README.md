@@ -1,4 +1,4 @@
-# TurboWarp-Multiview-Pose
+# TurboWarp Realtime Motion Capture
 
 [日本語](README.ja.md)
 
@@ -30,12 +30,12 @@ local addresses; display and retain them only in a trusted environment. See the
 
 ## Installation
 
-Load provider extensions first, then load `dist/turbowarp-multiview-pose.js` as an unsandboxed custom
-extension. The usual order is Camera Source, WebRTC, A-Frame, then Multiview Pose; providers that are
+Load provider extensions first, then load `dist/turbowarp-realtime-motion-capture.js` as an unsandboxed custom
+extension. The usual order is Camera Source, WebRTC, A-Frame, then Realtime Motion Capture; providers that are
 not used may be omitted. A version-pinned package URL is:
 
 ```text
-https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-multiview-pose@0.2.0/dist/turbowarp-multiview-pose.js
+https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-realtime-motion-capture@0.2.0/dist/turbowarp-realtime-motion-capture.js
 ```
 
 The npm package distributes a standalone browser bundle, schemas, and documentation. It does not
@@ -84,8 +84,8 @@ See the [TurboWarp extension API](docs/turbowarp-extension-api.md) for every blo
 
 | Identifier         | Value                                            |
 | ------------------ | ------------------------------------------------ |
-| npm package        | `@kubohiroya/turbowarp-multiview-pose`           |
-| Extension ID       | `kubohiroyamultiviewpose`                        |
+| npm package        | `@kubohiroya/turbowarp-realtime-motion-capture`           |
+| Extension ID       | `kubohiroyarealtimemotioncapture`                        |
 | WebRTC capability  | `kubohiroyaWebRtcCapability`, version 2          |
 | Extension manifest | `dist/extension-manifest.json`, format version 1 |
 

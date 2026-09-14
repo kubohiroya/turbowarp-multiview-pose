@@ -73,7 +73,7 @@ describe("CameraCalibrationController", () => {
     const { controller, acquireCamera, solve, release } = setup();
     await controller.start(startOptions);
     expect(acquireCamera).toHaveBeenCalledWith({
-      owner: "turbowarp-multiview-pose-calibration",
+      owner: "turbowarp-realtime-motion-capture-calibration",
       cameraId: "camera-1",
     });
     for (let index = 0; index < 8; index += 1) {
@@ -92,7 +92,7 @@ describe("CameraCalibrationController", () => {
     expect(controller.latestReprojectionError()).toBe(0.75);
     expect(release).toHaveBeenCalledOnce();
     expect(JSON.parse(controller.profileJson())).toEqual({
-      schema: "twmp/camera-calibration",
+      schema: "twrmc/camera-calibration",
       version: 1,
       calibrationId: "calibration-1",
       cameraId: "camera-1",

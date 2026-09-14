@@ -93,7 +93,7 @@ export class CameraCalibrationController {
     let lease: CameraLeasePort;
     try {
       lease = await requireCameraSource(this.runtime).acquireCamera({
-        owner: "turbowarp-multiview-pose-calibration",
+        owner: "turbowarp-realtime-motion-capture-calibration",
         cameraId: normalized.cameraId,
       });
     } catch (error) {
@@ -362,7 +362,7 @@ export class CameraCalibrationController {
       );
     }
     const profile: CameraCalibrationV1 = {
-      schema: "twmp/camera-calibration",
+      schema: "twrmc/camera-calibration",
       version: 1,
       calibrationId: session.calibrationId,
       cameraId: session.cameraId,

@@ -45,7 +45,7 @@ export interface PoseFrame2DPersonV2 extends PoseFrame2DPersonV1 {
 }
 
 export interface PoseFrame2DV1 {
-  schema: "twmp/pose-frame-2d";
+  schema: "twrmc/pose-frame-2d";
   version: 1;
   cameraId: string;
   peerId: string;

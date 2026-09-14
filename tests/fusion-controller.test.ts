@@ -112,7 +112,7 @@ describe("PoseFusionController", () => {
       unknown
     >;
     expect(Value.Check(PoseFrame3DSchema, frame)).toBe(true);
-    expect(frame.schema).toBe("twmp/pose-frame-3d");
+    expect(frame.schema).toBe("twrmc/pose-frame-3d");
     expect(frame.timestampUs).toBe(controller.fusedTimestampUs());
     expect(controller.personCount()).toBe(2);
     expect(controller.meanReprojectionErrorPx()).toBeLessThan(1);
@@ -306,7 +306,7 @@ describe("PoseFusionController", () => {
     expect(() => controller.ingestFrame("{")).toThrow(/frame-invalid/u);
     expect(() =>
       controller.ingestFrame(JSON.stringify(calibrations[0])),
-    ).toThrow(/twmp\/camera-calibration/u);
+    ).toThrow(/twrmc\/camera-calibration/u);
     expect(() => controller.loadCalibration(frame)).toThrow(
       /calibration-invalid/u,
     );

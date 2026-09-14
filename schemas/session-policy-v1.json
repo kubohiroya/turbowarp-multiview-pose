@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "twmp/session-policy",
+      "const": "twrmc/session-policy",
       "type": "string"
     },
     "version": {

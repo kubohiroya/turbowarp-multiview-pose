@@ -62,7 +62,7 @@ const keypoints3d = Type.Tuple(
 
 export const SessionPolicySchema = object(
   {
-    schema: Type.Literal("twmp/session-policy"),
+    schema: Type.Literal("twrmc/session-policy"),
     version: Type.Literal(1),
     sessionId: identifier,
     revision: Type.Integer({
@@ -101,7 +101,7 @@ export const SessionPolicySchema = object(
 
 export const CameraCalibrationSchema = object(
   {
-    schema: Type.Literal("twmp/camera-calibration"),
+    schema: Type.Literal("twrmc/camera-calibration"),
     version: Type.Literal(1),
     calibrationId: identifier,
     cameraId: identifier,
@@ -125,7 +125,7 @@ export const CameraCalibrationSchema = object(
 
 export const PoseFrame2DSchema = object(
   {
-    schema: Type.Literal("twmp/pose-frame-2d"),
+    schema: Type.Literal("twrmc/pose-frame-2d"),
     version: Type.Literal(1),
     cameraId: identifier,
     peerId: identifier,
@@ -164,7 +164,7 @@ const glowStickMarkers = Type.Array(
 
 export const PoseFrame2DV2Schema = object(
   {
-    schema: Type.Literal("twmp/pose-frame-2d"),
+    schema: Type.Literal("twrmc/pose-frame-2d"),
     version: Type.Literal(2),
     cameraId: identifier,
     peerId: identifier,
@@ -190,7 +190,7 @@ export const PoseFrame2DV2Schema = object(
 
 export const PoseFrame3DSchema = object(
   {
-    schema: Type.Literal("twmp/pose-frame-3d"),
+    schema: Type.Literal("twrmc/pose-frame-3d"),
     version: Type.Literal(1),
     sequence: timestampUs,
     timestampUs,
@@ -219,7 +219,7 @@ export const PoseFrame3DSchema = object(
 
 export const PerformanceDslSchema = object(
   {
-    schema: Type.Literal("twmp/performance-dsl"),
+    schema: Type.Literal("twrmc/performance-dsl"),
     version: Type.Literal(1),
     performers: Type.Array(
       object({
@@ -244,11 +244,11 @@ export const PerformanceDslSchema = object(
  * not mirrored from another repository.
  */
 export const protocolSchemas = {
-  "twmp/camera-calibration": { 1: CameraCalibrationSchema },
-  "twmp/performance-dsl": { 1: PerformanceDslSchema },
-  "twmp/pose-frame-2d": { 1: PoseFrame2DSchema, 2: PoseFrame2DV2Schema },
-  "twmp/pose-frame-3d": { 1: PoseFrame3DSchema },
-  "twmp/session-policy": { 1: SessionPolicySchema },
+  "twrmc/camera-calibration": { 1: CameraCalibrationSchema },
+  "twrmc/performance-dsl": { 1: PerformanceDslSchema },
+  "twrmc/pose-frame-2d": { 1: PoseFrame2DSchema, 2: PoseFrame2DV2Schema },
+  "twrmc/pose-frame-3d": { 1: PoseFrame3DSchema },
+  "twrmc/session-policy": { 1: SessionPolicySchema },
 } as const;
 
 export type ProtocolSchemaId = keyof typeof protocolSchemas;

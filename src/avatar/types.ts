@@ -94,7 +94,7 @@ export interface PoseFrame2DPerson {
 }
 
 export interface PoseFrame2D {
-  schema: "twmp/pose-frame-2d";
+  schema: "twrmc/pose-frame-2d";
   version: 1;
   captureTimestampUs: number;
   frameWidth: number;
@@ -111,7 +111,7 @@ export interface AvatarPoseSolverPort {
 }
 
 export interface PoseFrame3D {
-  schema: "twmp/pose-frame-3d";
+  schema: "twrmc/pose-frame-3d";
   version: 1;
   sequence: number;
   timestampUs: number;

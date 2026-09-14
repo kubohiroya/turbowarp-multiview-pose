@@ -11,7 +11,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "twmp/pose-frame-3d",
+      "const": "twrmc/pose-frame-3d",
       "type": "string"
     },
     "version": {

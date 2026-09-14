@@ -39,7 +39,7 @@ export interface CalibrationBackendPort {
 }
 
 export interface CameraCalibrationV1 {
-  schema: "twmp/camera-calibration";
+  schema: "twrmc/camera-calibration";
   version: 1;
   calibrationId: string;
   cameraId: string;
