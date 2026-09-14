@@ -69801,7 +69801,7 @@
   		minimum: 1024,
   		maximum: 16777216
   	})
-  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/session-policy-v1.json" });
+  }, { $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/session-policy-v1.json" });
   var CameraCalibrationSchema = object({
   	schema: Type.Literal("twrmc/camera-calibration"),
   	version: Type.Literal(1),
@@ -69823,7 +69823,7 @@
   	worldFromCameraMatrix: Type.Tuple(Array.from({ length: 16 }, () => boundedNumber)),
   	worldUnit: Type.Literal("meter"),
   	calibratedAt: utcDateTime
-  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/camera-calibration-v1.json" });
+  }, { $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/camera-calibration-v1.json" });
   var PoseFrame2DSchema = object({
   	schema: Type.Literal("twrmc/pose-frame-2d"),
   	version: Type.Literal(1),
@@ -69845,7 +69845,7 @@
   		score,
   		keypoints: keypoints2d
   	}), { maxItems: 6 })
-  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v1.json" });
+  }, { $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/pose-frame-2d-v1.json" });
   var coco17KeypointId = Type.Union(coco17KeypointIds.map((id) => Type.Literal(id)));
   /**
   * Glow stick observed on the same video frame as the keypoints: a performer
@@ -69879,7 +69879,7 @@
   		keypoints: keypoints2d,
   		markers: glowStickMarkers
   	}), { maxItems: 6 })
-  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-2d-v2.json" });
+  }, { $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/pose-frame-2d-v2.json" });
   var PoseFrame3DSchema = object({
   	schema: Type.Literal("twrmc/pose-frame-3d"),
   	version: Type.Literal(1),
@@ -69899,7 +69899,7 @@
   		}),
   		keypoints: keypoints3d
   	}), { maxItems: 6 })
-  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/pose-frame-3d-v1.json" });
+  }, { $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/pose-frame-3d-v1.json" });
   var PerformanceDslSchema = object({
   	schema: Type.Literal("twrmc/performance-dsl"),
   	version: Type.Literal(1),
@@ -69917,7 +69917,7 @@
   		minItems: 1,
   		maxItems: 6
   	})
-  }, { $id: "https://kubohiroya.github.io/multiview-pose/schema/performance-dsl-v1.json" });
+  }, { $id: "https://kubohiroya.github.io/turbowarp-realtime-motion-capture/schema/performance-dsl-v1.json" });
   /**
   * Every application contract this package owns, dispatched by schema identifier
   * and then by explicit version. Applications consume these definitions; they are

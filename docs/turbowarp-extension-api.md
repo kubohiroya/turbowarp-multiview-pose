@@ -2,7 +2,7 @@
 
 [User guide](../README.md) | [日本語](turbowarp-extension-api.ja.md) | [Architecture](architecture.md)
 
-This is the public API reference for `@kubohiroya/turbowarp-realtime-motion-capture` 0.2.0.
+This is the public API reference for `@kubohiroya/turbowarp-realtime-motion-capture` 0.2.1.
 The supported integration surface is the unsandboxed TurboWarp extension: its extension ID,
 opcodes, arguments, reporters, JSON contracts, and runtime capabilities. The TypeScript classes
 under `src/` are implementation details and are not package exports.

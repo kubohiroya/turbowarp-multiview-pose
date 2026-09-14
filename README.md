@@ -35,7 +35,7 @@ extension. The usual order is Camera Source, WebRTC, A-Frame, then Realtime Moti
 not used may be omitted. A version-pinned package URL is:
 
 ```text
-https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-realtime-motion-capture@0.2.0/dist/turbowarp-realtime-motion-capture.js
+https://cdn.jsdelivr.net/npm/@kubohiroya/turbowarp-realtime-motion-capture@0.2.1/dist/turbowarp-realtime-motion-capture.js
 ```
 
 The npm package distributes a standalone browser bundle, schemas, and documentation. It does not

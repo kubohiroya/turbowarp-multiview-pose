@@ -2,7 +2,7 @@
 
 [利用ガイド](../README.ja.md) | [English](turbowarp-extension-api.md) | [アーキテクチャ](architecture.ja.md)
 
-これは`@kubohiroya/turbowarp-realtime-motion-capture` 0.2.0の公開APIリファレンスです。正式な公開面は、
+これは`@kubohiroya/turbowarp-realtime-motion-capture` 0.2.1の公開APIリファレンスです。正式な公開面は、
 サンドボックスなしで動作するTurboWarp機能拡張のID、opcode、引数、reporter、JSON契約、runtime
 capabilityです。`src/`以下のTypeScript classは実装詳細であり、npm packageのexportではありません。
 
